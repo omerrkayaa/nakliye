@@ -1,15 +1,14 @@
 import { Module } from "@nestjs/common";
 import { LoadsModule } from "../loads/loads.module.js";
-import { MatchingModule } from "../matching/matching.module.js";
-import { VehiclesModule } from "../vehicles/vehicles.module.js";
-import { AdminJobsController } from "./jobs.controller.js";
-import { JobsScheduler } from "./jobs.scheduler.js";
+import { JobsController, OffersController } from "./jobs.controller.js";
 import { JobsService } from "./jobs.service.js";
+import { OffersService } from "./offers.service.js";
 
-/** Periyodik işler (pg-boss). Yeni periyodik iş eklenince JobsService.tick'e bir adım eklenir. */
+/** Teklif → iş → teslim (FR-30…34). */
 @Module({
-  imports: [LoadsModule, VehiclesModule, MatchingModule],
-  controllers: [AdminJobsController],
-  providers: [JobsService, JobsScheduler],
+  imports: [LoadsModule],
+  controllers: [OffersController, JobsController],
+  providers: [OffersService, JobsService],
+  exports: [OffersService, JobsService],
 })
 export class JobsModule {}

@@ -1,8 +1,8 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import type { CreateVehicleInput, UpdateVehicleInput } from "@nakliye/shared";
-import { and, asc, eq, ne } from "drizzle-orm";
+import { ACTIVE_JOB_STATUSES, type CreateVehicleInput, type UpdateVehicleInput } from "@nakliye/shared";
+import { and, asc, eq, inArray, ne } from "drizzle-orm";
 import { DB, type Db } from "../db/db.module.js";
-import { capacityPosts, vehicles } from "../db/schema.js";
+import { capacityPosts, jobs, offers, vehicles } from "../db/schema.js";
 
 const PG_UNIQUE_VIOLATION = "23505";
 
@@ -48,7 +48,7 @@ export class VehiclesService {
 
   /**
    * Aracı siler: kayıt saklanır (ilan ve iş geçmişi ona bağlı), durum "silindi" olur, plaka serbest kalır.
-   * Aktif boş araç ilanları iptal edilir. (İleride: aktif işi olan araç silinemeyecek.)
+   * Aktif boş araç ilanları iptal, bekleyen teklifleri geri çekilir. Aktif işteki araç silinemez.
    */
   async remove(userId: string, id: string) {
     await this.db.transaction(async (tx) => {
@@ -58,7 +58,17 @@ export class VehiclesService {
         .where(and(eq(vehicles.id, id), eq(vehicles.ownerUserId, userId), eq(vehicles.status, "aktif")))
         .for("update");
       if (!v) throw new NotFoundException("Araç bulunamadı");
+      const [busy] = await tx
+        .select({ id: jobs.id })
+        .from(jobs)
+        .where(and(eq(jobs.vehicleId, id), inArray(jobs.status, [...ACTIVE_JOB_STATUSES])))
+        .limit(1);
+      if (busy) throw new ConflictException("Araç devam eden bir işte; iş bitmeden silinemez");
       await tx.update(vehicles).set({ status: "silindi" }).where(eq(vehicles.id, id));
+      await tx
+        .update(offers)
+        .set({ status: "geri_cekildi" })
+        .where(and(eq(offers.vehicleId, id), eq(offers.status, "beklemede")));
       await tx
         .update(capacityPosts)
         .set({ status: "iptal" })

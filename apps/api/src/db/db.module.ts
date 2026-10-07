@@ -5,6 +5,8 @@ import * as schema from "./schema.js";
 
 export const DB = Symbol("DB");
 export type Db = NodePgDatabase<typeof schema>;
+/** Db.transaction içindeki işlem nesnesi */
+export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
 @Global()
 @Module({

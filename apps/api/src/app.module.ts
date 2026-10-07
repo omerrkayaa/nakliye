@@ -8,6 +8,7 @@ import { LocationsController } from "./locations.controller.js";
 import { MatchingModule } from "./matching/matching.module.js";
 import { NotificationsModule } from "./notifications/notifications.module.js";
 import { ReportsModule } from "./reports/reports.module.js";
+import { SchedulerModule } from "./scheduler/scheduler.module.js";
 import { UsersModule } from "./users/users.module.js";
 import { VehiclesModule } from "./vehicles/vehicles.module.js";
 
@@ -22,6 +23,7 @@ import { VehiclesModule } from "./vehicles/vehicles.module.js";
     ReportsModule,
     VehiclesModule,
     JobsModule,
+    SchedulerModule,
   ],
   controllers: [HealthController, LocationsController],
 })

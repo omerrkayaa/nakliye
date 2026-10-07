@@ -327,34 +327,55 @@ export const offers = pgTable(
     status: offerStatusEnum("status").notNull().default("beklemede"),
     createdAt: createdAt(),
   },
-  (t) => [index("offers_load_idx").on(t.loadPostId)],
+  (t) => [
+    index("offers_load_idx").on(t.loadPostId),
+    index("offers_carrier_idx").on(t.carrierId),
+    // Bir nakliyecinin aynı ilana tek bekleyen teklifi olur (değiştirmek için geri çekip yenisini verir)
+    uniqueIndex("offers_one_pending_uq").on(t.loadPostId, t.carrierId).where(sql`status = 'beklemede'`),
+  ],
 );
 
-export const jobs = pgTable("jobs", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  loadPostId: uuid("load_post_id").notNull().unique().references(() => loadPosts.id),
-  offerId: uuid("offer_id").references(() => offers.id),
-  shipperId: uuid("shipper_id").notNull().references(() => users.id),
-  carrierId: uuid("carrier_id").notNull().references(() => users.id),
-  vehicleId: uuid("vehicle_id").notNull().references(() => vehicles.id),
-  agreedPrice: numeric("agreed_price", { precision: 10, scale: 2, mode: "number" }),
-  status: jobStatusEnum("status").notNull().default("anlasildi"),
-  deliveryCodeHash: varchar("delivery_code_hash", { length: 64 }).notNull(),
-  deliveredAt: timestamp("delivered_at", { withTimezone: true }),
-  completedAt: timestamp("completed_at", { withTimezone: true }),
-  cancelReason: text("cancel_reason"),
-  cancelledBy: uuid("cancelled_by").references(() => users.id),
-  createdAt: createdAt(),
-});
+export const jobs = pgTable(
+  "jobs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    loadPostId: uuid("load_post_id").notNull().unique().references(() => loadPosts.id),
+    offerId: uuid("offer_id").references(() => offers.id),
+    shipperId: uuid("shipper_id").notNull().references(() => users.id),
+    carrierId: uuid("carrier_id").notNull().references(() => users.id),
+    vehicleId: uuid("vehicle_id").notNull().references(() => vehicles.id),
+    agreedPrice: numeric("agreed_price", { precision: 10, scale: 2, mode: "number" }),
+    status: jobStatusEnum("status").notNull().default("anlasildi"),
+    deliveryCodeHash: varchar("delivery_code_hash", { length: 64 }).notNull(),
+    // Yanlış teslim kodu denemeleri (6 hane kaba kuvvete açık); sınır dolunca yük sahibi yeni kod üretir
+    deliveryCodeAttempts: smallint("delivery_code_attempts").notNull().default(0),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    cancelReason: text("cancel_reason"),
+    cancelledBy: uuid("cancelled_by").references(() => users.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("jobs_shipper_idx").on(t.shipperId),
+    index("jobs_carrier_idx").on(t.carrierId),
+    index("jobs_vehicle_idx").on(t.vehicleId),
+    index("jobs_delivered_idx").on(t.deliveredAt).where(sql`status = 'teslim_edildi'`),
+  ],
+);
 
-export const jobEvents = pgTable("job_events", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  jobId: uuid("job_id").notNull().references(() => jobs.id, { onDelete: "cascade" }),
-  type: varchar("type", { length: 32 }).notNull(),
-  actorId: uuid("actor_id").references(() => users.id),
-  meta: jsonb("meta"),
-  createdAt: createdAt(),
-});
+// İşin zaman çizelgesi (durum değişiklikleri, kod denemeleri…); null actor = sistem
+export const jobEvents = pgTable(
+  "job_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    jobId: uuid("job_id").notNull().references(() => jobs.id, { onDelete: "cascade" }),
+    type: varchar("type", { length: 32 }).notNull(),
+    actorId: uuid("actor_id").references(() => users.id),
+    meta: jsonb("meta"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("job_events_job_idx").on(t.jobId)],
+);
 
 export const ratings = pgTable(
   "ratings",

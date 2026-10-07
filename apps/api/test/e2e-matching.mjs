@@ -151,7 +151,7 @@ check("yük sahibi de 5'te kaldı", (await matchNotes(S)).length === 5, String((
 console.log("\n7. Zamanlayıcı süpürmesi");
 psql(`delete from matches where load_post_id='${L2}'`);
 psql(`update load_posts set matched_at = null where id='${L2}'`);
-r = await api("POST", "/admin/jobs/tick", A);
+r = await api("POST", "/admin/tick", A);
 check("tur gözden kaçan ilanı eşleştirdi", r.body.matchSwept >= 1 && pairs(L2) === "1", JSON.stringify(r.body));
 check("süpürmede aynı bildirim tekrar gitmedi (tekil anahtar)", (await matchNotes(S, (n) => n.data.loadId === L2)).length === 1);
 

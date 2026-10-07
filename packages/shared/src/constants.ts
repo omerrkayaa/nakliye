@@ -119,6 +119,9 @@ export const NOTIFICATION_TYPES = {
   load_confirm: "İlan teyidi",
   match_for_carrier: "Uygun yük",
   match_for_shipper: "Uygun araç",
+  offer_new: "Yeni teklif",
+  offer_result: "Teklif sonucu",
+  job_update: "İş durumu",
 } as const;
 export type NotificationType = keyof typeof NOTIFICATION_TYPES;
 

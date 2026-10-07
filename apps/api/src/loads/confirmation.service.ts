@@ -37,7 +37,7 @@ export interface ConfirmationTickStats {
 
 /**
  * Canlı ilan teyidi (F1) zamanlayıcı işleri + SMS linkiyle teyit.
- * Tur her 5 dakikada bir çalışır (JobsScheduler); her adım tekrar çalıştırılabilir (idempotent).
+ * Tur her 5 dakikada bir çalışır (PeriodicScheduler); her adım tekrar çalıştırılabilir (idempotent).
  */
 @Injectable()
 export class ConfirmationService {

@@ -31,15 +31,14 @@ import {
 import { and, asc, count, countDistinct, desc, eq, gte, inArray, isNull, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { randomBytes } from "node:crypto";
-import { DB, type Db } from "../db/db.module.js";
+import { DB, type Db, type Tx } from "../db/db.module.js";
 import { callLogs, capacityPosts, companies, districts, loadConfirmations, loadPosts, matches, provinces, users } from "../db/schema.js";
 import { MatchingService } from "../matching/matching.service.js";
 
 const PAGE_SIZE = 20;
 const PG_UNIQUE_VIOLATION = "23505";
 
-type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
-type LoadRow = typeof loadPosts.$inferSelect;
+export type LoadRow = typeof loadPosts.$inferSelect;
 
 const od = alias(districts, "od");
 const op = alias(provinces, "op");
@@ -284,6 +283,15 @@ export class LoadsService {
         ),
       );
     return { phone: row.shipperPhone, displayName: row.companyTitle ?? row.shipperName };
+  }
+
+  /**
+   * Teklif kabulünde ilanı kapatır (FR-31): durum makinesine uyar, açık teyit sorusunu "araç bulundu" diye kapatır.
+   * Çağıranın transaction'ında çalışır (iş kaydıyla birlikte ya hep ya hiç).
+   */
+  async closeForJob(tx: Tx, load: LoadRow, now: Date) {
+    await this.transition(tx, load, "kapandi", { reminderSentAt: null });
+    await this.answerOpenQuestion(tx, load.id, "arac_bulundu", now);
   }
 
   // ── Moderasyon (BR-11) ─────────────────────────────────────────────

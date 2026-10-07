@@ -207,8 +207,22 @@ export const confirmLoadSchema = z.object({ answer: z.enum(CONFIRMATION_ANSWERS)
 
 export const createOfferSchema = z.object({
   vehicleId: z.string().uuid(),
-  price: z.number().positive(),
-  note: z.string().max(280).optional(),
+  price: z.number().positive().max(1_000_000),
+  note: z.string().trim().max(280).optional(),
+});
+
+/** Nakliyecinin ara durum güncellemesi; teslim yalnız kodla (deliverJobSchema). */
+export const jobStatusSchema = z.object({ status: z.enum(["yuklendi", "yolda"]) });
+
+/** İptal ve itirazda sebep zorunlu (iptal oranı ve yönetici incelemesi için). */
+const reasonSchema = z.object({ reason: z.string().trim().min(5, "Sebebi en az 5 karakterle yazın").max(500) });
+export const cancelJobSchema = reasonSchema;
+export const disputeJobSchema = reasonSchema;
+
+export const jobListSchema = z.object({
+  /** active: sürenler (teslim edildi dahil), past: tamamlanan/iptal/itirazlı */
+  scope: z.enum(["active", "past"]).default("active"),
+  page: z.coerce.number().int().min(1).default(1),
 });
 
 export const deliverJobSchema = z.object({ code: z.string().regex(/^\d{6}$/) });
@@ -236,6 +250,10 @@ export type CloseLoadInput = z.infer<typeof closeLoadSchema>;
 export type ReviewLoadInput = z.infer<typeof reviewLoadSchema>;
 export type ConfirmLoadInput = z.infer<typeof confirmLoadSchema>;
 export type CreateReportInput = z.infer<typeof createReportSchema>;
+export type JobStatusInput = z.infer<typeof jobStatusSchema>;
+export type ReasonInput = z.infer<typeof reasonSchema>;
+export type JobListInput = z.infer<typeof jobListSchema>;
+export type DeliverJobInput = z.infer<typeof deliverJobSchema>;
 export type CreateCapacityInput = z.infer<typeof createCapacitySchema>;
 export type CreateVehicleInput = z.infer<typeof createVehicleSchema>;
 export type UpdateVehicleInput = z.infer<typeof updateVehicleSchema>;

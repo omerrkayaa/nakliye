@@ -103,7 +103,7 @@ check("kapanan ilanın tarihleri yeniden kullanılabilir", (await post(C, { avai
 
 console.log("\nSüresi dolma (zamanlayıcı)");
 psql(`update capacity_posts set available_from = current_date - 3, available_to = current_date - 1 where id='${P2}'`);
-r = await api("POST", "/admin/jobs/tick", A);
+r = await api("POST", "/admin/tick", A);
 check("tur: süresi geçen ilan düştü", r.body.capacityExpired >= 1 && psql(`select status from capacity_posts where id='${P2}'`) === "suresi_doldu", JSON.stringify(r.body));
 
 console.log("\nAraç silme");
