@@ -9,7 +9,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "node scripts/seed-locations.mts",
+    "data:locations": "node scripts/fetch-locations.mts"
   },
   "dependencies": {
     "@nakliye/shared": "*",

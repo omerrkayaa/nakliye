@@ -11,3 +11,4 @@ coverage/
 .DS_Store
 Thumbs.db
 infra/data/
+apps/api/scripts/.cache/

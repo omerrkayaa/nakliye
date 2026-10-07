@@ -12,8 +12,8 @@ import {
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  customType,
   date,
-  geometry,
   index,
   integer,
   jsonb,
@@ -45,7 +45,24 @@ export const priceTypeEnum = pgEnum("price_type", ["sabit", "teklif"]);
 export const offerStatusEnum = pgEnum("offer_status", ["beklemede", "kabul", "ret", "geri_cekildi"]);
 export const confirmAnswerEnum = pgEnum("confirm_answer", ["gecerli", "arac_bulundu", "iptal", "cevapsiz"]);
 
-const point = (name: string) => geometry(name, { type: "point", mode: "xy", srid: 4326 });
+/**
+ * WGS84 (SRID 4326) nokta. drizzle'ın kendi `geometry()` tipi `srid` ayarını yok sayıyor: sütunu
+ * `geometry(point)` (SRID 0) oluşturuyor ve değeri SRID'siz yazıyor. SRID'ler karışırsa PostGIS
+ * "mixed SRID" hatası verir; bu tip hem sütunu hem değeri 4326 ile tanımlar. x = boylam, y = enlem.
+ */
+const point = customType<{ data: { x: number; y: number }; driverData: string }>({
+  dataType: () => "geometry(Point,4326)",
+  toDriver: ({ x, y }) => `SRID=4326;POINT(${x} ${y})`,
+  // PostGIS hex EWKB döndürür: bayt sırası(1) + tip(4) [+ SRID(4)] + x(8) + y(8)
+  fromDriver: (hex) => {
+    const buf = Buffer.from(hex, "hex");
+    const le = buf[0] === 1;
+    const type = le ? buf.readUInt32LE(1) : buf.readUInt32BE(1);
+    const offset = type & 0x20000000 ? 9 : 5;
+    const read = (o: number) => (le ? buf.readDoubleLE(o) : buf.readDoubleBE(o));
+    return { x: read(offset), y: read(offset + 8) };
+  },
+});
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 
 // ── Konum (statik veri) ─────────────────────────────────────────────
