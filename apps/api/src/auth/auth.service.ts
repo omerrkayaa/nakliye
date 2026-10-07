@@ -84,10 +84,18 @@ export class AuthService {
       .where(eq(refreshTokens.tokenHash, sha256(refreshToken)));
   }
 
-  private async issueTokens(userId: string) {
+  /**
+   * Güncel rollerle erişim belirteci üretir. Roller belirtecin içinde taşındığı için rol değişince
+   * (POST /me/roles) yeni belirteç verilir; yoksa kullanıcı belirteç süresi dolana kadar eski rollerle kalır.
+   */
+  async accessTokenFor(userId: string): Promise<string> {
     const roles = await this.db.select({ role: userRoles.role }).from(userRoles).where(eq(userRoles.userId, userId));
     const payload: AccessPayload = { sub: userId, roles: roles.map((r) => r.role) };
-    const accessToken = await this.jwt.signAsync(payload);
+    return this.jwt.signAsync(payload);
+  }
+
+  private async issueTokens(userId: string) {
+    const accessToken = await this.accessTokenFor(userId);
     const refreshToken = randomToken();
     await this.db.insert(refreshTokens).values({
       userId,

@@ -106,7 +106,8 @@ export const userRoles = pgTable(
 
 export const companies = pgTable("companies", {
   id: uuid("id").primaryKey().defaultRandom(),
-  ownerUserId: uuid("owner_user_id").notNull().references(() => users.id),
+  // Bir kullanıcının tek firması olur (FR-03; API'de POST/PATCH /companies tekil)
+  ownerUserId: uuid("owner_user_id").notNull().unique().references(() => users.id),
   title: varchar("title", { length: 160 }).notNull(),
   taxNo: varchar("tax_no", { length: 11 }),
   taxOffice: varchar("tax_office", { length: 80 }),

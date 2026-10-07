@@ -32,6 +32,60 @@ export const isoDaySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tarih YYYY-
 export const otpRequestSchema = z.object({ phone: phoneSchema });
 export const otpVerifySchema = z.object({ phone: phoneSchema, code: z.string().regex(/^\d{6}$/) });
 
+// ── Kullanıcı ve firma (FR-02, FR-03) ────────────────────────────────
+
+/** T.C. kimlik no kontrol haneleri: 10. hane = (tekler×7 − çiftler) mod 10, 11. hane = ilk 10 hanenin toplamı mod 10. */
+export function isValidTckn(s: string): boolean {
+  if (!/^[1-9]\d{10}$/.test(s)) return false;
+  const d = [...s].map(Number);
+  const odd = d[0]! + d[2]! + d[4]! + d[6]! + d[8]!;
+  const even = d[1]! + d[3]! + d[5]! + d[7]!;
+  const d10 = (((odd * 7 - even) % 10) + 10) % 10;
+  const d11 = d.slice(0, 10).reduce((a, b) => a + b, 0) % 10;
+  return d[9] === d10 && d[10] === d11;
+}
+
+/**
+ * Vergi numarası: tüzel kişide 10 haneli VKN, şahıs firmasında 11 haneli TCKN.
+ * VKN için yalnız biçim kontrolü yapılır (kontrol algoritması doğrulanana kadar gerçek numarayı reddetmemek için);
+ * asıl doğrulama yöneticinin firma onayıdır.
+ */
+export const taxNoSchema = z
+  .string()
+  .transform((s) => s.replace(/\s+/g, ""))
+  .refine((s) => /^\d{10}$/.test(s) || isValidTckn(s), "Vergi no 10 haneli VKN ya da geçerli 11 haneli T.C. kimlik no olmalı");
+
+const trimmed = (min: number, max: number, label: string) =>
+  z
+    .string()
+    .trim()
+    .min(min, `${label} en az ${min} karakter olmalı`)
+    .max(max, `${label} en fazla ${max} karakter olabilir`)
+    // U+FFFD: istemci metni UTF-8 dışı kodlamayla gönderdi (ör. Windows curl'de "Ö" → "�"); sessizce bozuk kaydetme
+    .refine((s) => !s.includes("�"), `${label} geçersiz karakter içeriyor (UTF-8 gönderin)`);
+
+export const updateMeSchema = z.object({ name: trimmed(2, 80, "Ad soyad") });
+
+/** Kullanıcı kendine yalnız nakliyeci / yük sahibi rolü ekleyebilir; yönetici rolü elle verilir. */
+export const SELF_ROLES = ["carrier", "shipper"] as const;
+export const addRolesSchema = z.object({ roles: z.array(z.enum(SELF_ROLES)).min(1, "En az bir rol seçin").max(2) });
+
+export const createCompanySchema = z.object({
+  title: trimmed(2, 160, "Unvan"),
+  taxNo: taxNoSchema.optional(),
+  taxOffice: trimmed(2, 80, "Vergi dairesi").optional(),
+  address: trimmed(5, 500, "Adres").optional(),
+});
+/** Güncellemede isteğe bağlı alanlar null ile silinebilir (ör. yanlış girilmiş vergi no). */
+export const updateCompanySchema = z
+  .object({
+    title: createCompanySchema.shape.title.optional(),
+    taxNo: taxNoSchema.nullable().optional(),
+    taxOffice: createCompanySchema.shape.taxOffice.nullable(),
+    address: createCompanySchema.shape.address.nullable(),
+  })
+  .refine((v) => Object.values(v).some((x) => x !== undefined), "Değiştirilecek en az bir alan gönderin");
+
 export const plateSchema = z
   .string()
   .transform((s) => s.toUpperCase().replace(/\s+/g, ""))
@@ -108,6 +162,10 @@ export const createReportSchema = z.object({
   note: z.string().max(500).optional(),
 });
 
+export type UpdateMeInput = z.infer<typeof updateMeSchema>;
+export type AddRolesInput = z.infer<typeof addRolesSchema>;
+export type CreateCompanyInput = z.infer<typeof createCompanySchema>;
+export type UpdateCompanyInput = z.infer<typeof updateCompanySchema>;
 export type CreateLoadInput = z.infer<typeof createLoadSchema>;
 export type CreateCapacityInput = z.infer<typeof createCapacitySchema>;
 export type CreateVehicleInput = z.infer<typeof createVehicleSchema>;
