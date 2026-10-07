@@ -29,9 +29,9 @@ export class JobsScheduler implements OnApplicationBootstrap, OnApplicationShutd
     await boss.schedule(QUEUE, "*/5 * * * *", null, { tz: "Europe/Istanbul" });
     await boss.work(QUEUE, async () => {
       const s = await this.jobs.tick();
-      if (s.statusChanged || s.reminded || s.smsSent || s.capacityExpired) {
+      if (s.statusChanged || s.reminded || s.smsSent || s.capacityExpired || s.matchSwept) {
         this.logger.log(
-          `Tur: ${s.statusChanged} ilan durumu değişti, ${s.reminded} teyit sorusu, ${s.smsSent} SMS, ${s.capacityExpired} boş araç ilanı süresi doldu`,
+          `Tur: ${s.statusChanged} ilan durumu değişti, ${s.reminded} teyit sorusu, ${s.smsSent} SMS, ${s.capacityExpired} boş araç ilanı süresi doldu, ${s.matchSwept} ilan eşleştirildi`,
         );
       }
     });

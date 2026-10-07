@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { ConfirmationService } from "../loads/confirmation.service.js";
+import { MatchingService } from "../matching/matching.service.js";
 import { CapacityService } from "../vehicles/capacity.service.js";
 
 export interface TickStats {
@@ -11,6 +12,8 @@ export interface TickStats {
   smsSent: number;
   /** Müsaitlik tarihi geçen boş araç ilanları */
   capacityExpired: number;
+  /** Süpürmede eşleştirilen (gözden kaçmış) ilanlar */
+  matchSwept: number;
 }
 
 /** Periyodik işlerin tek turu. Her adım tekrar çalıştırılabilir (idempotent). */
@@ -19,11 +22,14 @@ export class JobsService {
   constructor(
     private readonly confirmation: ConfirmationService,
     private readonly capacity: CapacityService,
+    private readonly matching: MatchingService,
   ) {}
 
   async tick(now = new Date()): Promise<TickStats> {
     const confirmation = await this.confirmation.tick(now);
     const capacityExpired = await this.capacity.expire(now);
-    return { ...confirmation, capacityExpired };
+    // Süpürme en sonda: düşen/süresi dolan ilanlar artık eşleştirilmez
+    const matchSwept = await this.matching.sweep(now);
+    return { ...confirmation, capacityExpired, matchSwept };
   }
 }

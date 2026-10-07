@@ -113,3 +113,14 @@ export const RATING_TAGS = {
   fiyat_degisti: "Fiyat değişti",
 } as const;
 export type RatingTag = keyof typeof RATING_TAGS;
+
+/** Uygulama içi bildirim tipleri (A14 Bildirimler ekranı; push ile birlikte kayda geçer). */
+export const NOTIFICATION_TYPES = {
+  load_confirm: "İlan teyidi",
+  match_for_carrier: "Uygun yük",
+  match_for_shipper: "Uygun araç",
+} as const;
+export type NotificationType = keyof typeof NOTIFICATION_TYPES;
+
+/** BR-22 saatlik sınırına giren tipler */
+export const MATCH_NOTIFICATION_TYPES: readonly NotificationType[] = ["match_for_carrier", "match_for_shipper"];

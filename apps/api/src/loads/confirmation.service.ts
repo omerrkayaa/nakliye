@@ -11,7 +11,7 @@ import {
 import { and, eq, inArray, isNull, lt, lte, or, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { randomToken, sha256 } from "../common/hash.js";
-import { PushService } from "../common/push.service.js";
+import { NotificationsService } from "../notifications/notifications.service.js";
 import { SmsService } from "../common/sms.service.js";
 import { DB, type Db } from "../db/db.module.js";
 import { districts, loadConfirmations, loadPosts, provinces, users } from "../db/schema.js";
@@ -46,7 +46,7 @@ export class ConfirmationService {
 
   constructor(
     @Inject(DB) private readonly db: Db,
-    private readonly push: PushService,
+    private readonly notifications: NotificationsService,
     private readonly sms: SmsService,
   ) {}
 
@@ -147,8 +147,11 @@ export class ConfirmationService {
     const routes = await this.routes(asked.map((a) => a.loadPostId));
     for (const a of asked) {
       const r = routes.get(a.loadPostId);
-      await this.push
-        .sendToUser(a.shipperId, {
+      // Bildirim hatası turu durdurmasın: soru açık kalır, SMS yedeği devreye girer
+      await this.notifications
+        .notify(a.shipperId, {
+          type: "load_confirm",
+          refKey: `confirm:${a.id}`,
           title: "İlanınız hâlâ geçerli mi?",
           body: r ? `${r.origin.province}/${r.origin.district} → ${r.dest.province}/${r.dest.district}` : "Yük ilanınız",
           data: { type: "load_confirm", loadId: a.loadPostId, confirmationId: a.id },
@@ -158,7 +161,7 @@ export class ConfirmationService {
             { id: "iptal", title: "İptal" },
           ],
         })
-        .catch((e: Error) => this.logger.warn(`Push gönderilemedi (${a.loadPostId}): ${e.message}`));
+        .catch((e: Error) => this.logger.warn(`Bildirim gönderilemedi (${a.loadPostId}): ${e.message}`));
     }
     return asked.length;
   }
@@ -242,8 +245,10 @@ export class ConfirmationService {
     if (!asked) return false;
 
     this.logger.log(`BR-05: ilan ${loadId} şikayetler üzerine teyide düştü`);
-    await this.push
-      .sendToUser(asked.shipperId, {
+    await this.notifications
+      .notify(asked.shipperId, {
+        type: "load_confirm",
+        refKey: `confirm:${asked.confirmationId}:reports`,
         title: "Yükünüzün gittiği bildirildi",
         body: "Yük hâlâ duruyorsa tek dokunuşla teyit edin; cevap gelmezse ilan 12 saat içinde yayından kalkar.",
         data: { type: "load_confirm", loadId, confirmationId: asked.confirmationId, reason: "reports" },
@@ -253,7 +258,7 @@ export class ConfirmationService {
           { id: "iptal", title: "İptal" },
         ],
       })
-      .catch((e: Error) => this.logger.warn(`Push gönderilemedi (${loadId}): ${e.message}`));
+      .catch((e: Error) => this.logger.warn(`Bildirim gönderilemedi (${loadId}): ${e.message}`));
     return true;
   }
 

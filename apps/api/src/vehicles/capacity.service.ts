@@ -12,6 +12,7 @@ import { and, desc, eq, gte, inArray, lt, lte, ne, type SQL } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core";
 import { DB, type Db } from "../db/db.module.js";
 import { capacityPosts, districts, provinces, vehicles } from "../db/schema.js";
+import { MatchingService } from "../matching/matching.service.js";
 
 const PAGE_SIZE = 20;
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
@@ -27,7 +28,10 @@ const dp = alias(provinces, "dp");
  */
 @Injectable()
 export class CapacityService {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly matching: MatchingService,
+  ) {}
 
   async create(userId: string, input: CreateCapacityInput, now = new Date()) {
     this.checkDates(input.availableFrom, input.availableTo, now);
@@ -48,6 +52,7 @@ export class CapacityService {
         .returning({ id: capacityPosts.id });
       return row!.id;
     });
+    this.matching.schedule("capacity", id); // UC-07: yayınla → eşleşen yükler
     return this.get(userId, id);
   }
 
@@ -81,9 +86,10 @@ export class CapacityService {
       await this.assertNoOverlap(tx, current.vehicleId, merged.availableFrom, merged.availableTo, now, id);
       await tx
         .update(capacityPosts)
-        .set({ ...merged, originGeom: geoms.origin, destGeom: geoms.dest })
+        .set({ ...merged, originGeom: geoms.origin, destGeom: geoms.dest, matchedAt: null })
         .where(eq(capacityPosts.id, id));
     });
+    this.matching.schedule("capacity", id);
     return this.get(userId, id);
   }
 

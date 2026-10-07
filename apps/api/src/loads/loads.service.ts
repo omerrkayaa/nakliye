@@ -32,7 +32,8 @@ import { and, asc, count, countDistinct, desc, eq, gte, inArray, isNull, lte, ne
 import { alias } from "drizzle-orm/pg-core";
 import { randomBytes } from "node:crypto";
 import { DB, type Db } from "../db/db.module.js";
-import { callLogs, companies, districts, loadConfirmations, loadPosts, provinces, users } from "../db/schema.js";
+import { callLogs, capacityPosts, companies, districts, loadConfirmations, loadPosts, matches, provinces, users } from "../db/schema.js";
+import { MatchingService } from "../matching/matching.service.js";
 
 const PAGE_SIZE = 20;
 const PG_UNIQUE_VIOLATION = "23505";
@@ -50,7 +51,10 @@ const newShareId = () => randomBytes(8).toString("base64url").slice(0, 10);
 
 @Injectable()
 export class LoadsService {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly matching: MatchingService,
+  ) {}
 
   // ── Okuma ──────────────────────────────────────────────────────────
 
@@ -146,6 +150,7 @@ export class LoadsService {
           .insert(loadPosts)
           .values({ ...values, shareId: newShareId() })
           .returning({ id: loadPosts.id });
+        if (values.status === "teyitli") this.matching.schedule("load", row!.id);
         return this.get(userId, row!.id);
       } catch (e) {
         const err = e as { code?: string; cause?: { code?: string } };
@@ -191,10 +196,12 @@ export class LoadsService {
       await this.transition(tx, load, reconfirm ? "teyitli" : load.status, {
         ...fields,
         note: fields.note ?? null,
-        ...(reconfirm ? this.confirmedFields(merged.loadFrom, now) : {}),
+        // Yayındaki ilan düzenlenince eşleşmeler yeni bilgilerle yeniden aranır (moderasyondaki onayda aranacak)
+        ...(reconfirm ? { ...this.confirmedFields(merged.loadFrom, now), matchedAt: null } : {}),
       });
       if (reconfirm) await this.answerOpenQuestion(tx, load.id, "gecerli", now);
     });
+    if (reconfirm) this.matching.schedule("load", id);
     return this.get(userId, id);
   }
 
@@ -216,13 +223,17 @@ export class LoadsService {
     }
 
     const to = applyConfirmationAnswer(answer);
+    // "Teyit bekliyor"dan geri dönen ilan yeniden eşleştirilir: beklerken açılan boş araç ilanları onu görmemişti
+    const rematch = load.status === "teyit_bekliyor" && to === "teyitli";
     await this.db.transaction(async (tx) => {
       await this.transition(tx, load, to, {
         reminderSentAt: null,
         ...(to === "teyitli" ? this.confirmedFields(load.loadFrom, now) : {}),
+        ...(rematch ? { matchedAt: null } : {}),
       });
       await this.answerOpenQuestion(tx, load.id, answer, now, channel);
     });
+    if (rematch) this.matching.schedule("load", load.id);
     return to;
   }
 
@@ -261,6 +272,17 @@ export class LoadsService {
       );
     }
     await this.db.insert(callLogs).values({ callerId: userId, loadPostId: id, createdAt: now });
+    // Tez metriği "eşleşme isabeti": arayanın boş araç ilanıyla bu yük arasında eşleşme varsa aramaya dönüştü say
+    await this.db
+      .update(matches)
+      .set({ outcome: "arandi" })
+      .where(
+        and(
+          eq(matches.loadPostId, id),
+          inArray(matches.capacityPostId, this.db.select({ id: capacityPosts.id }).from(capacityPosts).where(eq(capacityPosts.carrierId, userId))),
+          or(isNull(matches.outcome), eq(matches.outcome, "goruldu")),
+        ),
+      );
     return { phone: row.shipperPhone, displayName: row.companyTitle ?? row.shipperName };
   }
 
@@ -289,6 +311,7 @@ export class LoadsService {
         // Onay gecikip yükleme tarihi geçtiyse: onaylı sayılır (BR-11 muafiyetine yazılır) ama yayında kalmaz
         if (load.loadTo < trDay(now)) await this.transition(tx, { ...load, status: "teyitli" }, "suresi_doldu", {});
       });
+      this.matching.schedule("load", id);
     }
     const [row] = await this.selectLoads().where(eq(loadPosts.id, id));
     return this.view(row!, true);

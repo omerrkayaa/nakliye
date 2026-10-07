@@ -5,12 +5,24 @@ import { HealthController } from "./health.controller.js";
 import { JobsModule } from "./jobs/jobs.module.js";
 import { LoadsModule } from "./loads/loads.module.js";
 import { LocationsController } from "./locations.controller.js";
+import { MatchingModule } from "./matching/matching.module.js";
+import { NotificationsModule } from "./notifications/notifications.module.js";
 import { ReportsModule } from "./reports/reports.module.js";
 import { UsersModule } from "./users/users.module.js";
 import { VehiclesModule } from "./vehicles/vehicles.module.js";
 
 @Module({
-  imports: [DbModule, AuthModule, UsersModule, LoadsModule, ReportsModule, VehiclesModule, JobsModule],
+  imports: [
+    DbModule,
+    AuthModule,
+    NotificationsModule,
+    UsersModule,
+    MatchingModule,
+    LoadsModule,
+    ReportsModule,
+    VehiclesModule,
+    JobsModule,
+  ],
   controllers: [HealthController, LocationsController],
 })
 export class AppModule {}

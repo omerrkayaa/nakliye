@@ -2,6 +2,7 @@
 import {
   BODY_TYPES,
   type CapacityStatus,
+  type NotificationType,
   type VehicleStatus,
   CARGO_TYPES,
   DOCUMENT_TYPES,
@@ -206,6 +207,8 @@ export const loadPosts = pgTable(
     reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true }),
     // BR-11: null = moderasyon gerekmedi; bekliyor/onay/ret = moderasyon kararı. Onaylı ilan sayısı muafiyeti belirler.
     moderation: reviewStatusEnum("moderation"),
+    // Eşleştirme (BR-20) bu ilan için en son ne zaman çalıştı; null = bekliyor (zamanlayıcı süpürür)
+    matchedAt: timestamp("matched_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [
@@ -251,6 +254,7 @@ export const capacityPosts = pgTable(
     availableFrom: date("available_from").notNull(),
     availableTo: date("available_to").notNull(),
     status: varchar("status", { length: 16 }).$type<CapacityStatus>().notNull().default("aktif"),
+    matchedAt: timestamp("matched_at", { withTimezone: true }), // bkz. load_posts.matched_at
     createdAt: createdAt(),
   },
   (t) => [
@@ -281,7 +285,33 @@ export const matches = pgTable(
     outcome: varchar("outcome", { length: 16 }),
     createdAt: createdAt(),
   },
-  (t) => [uniqueIndex("matches_pair_uq").on(t.loadPostId, t.capacityPostId)],
+  (t) => [
+    uniqueIndex("matches_pair_uq").on(t.loadPostId, t.capacityPostId),
+    index("matches_capacity_idx").on(t.capacityPostId),
+  ],
+);
+
+/**
+ * Uygulama içi bildirimler (A14) — push'un kaydı. ref_key tekilleştirir: BR-22 "aynı ilan için en fazla 1 bildirim"
+ * (ör. "match:load:<id>"); (user_id, ref_key) tekil olduğu için eşzamanlı eşleştirmeler de çift bildirim üretemez.
+ */
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    type: varchar("type", { length: 24 }).$type<NotificationType>().notNull(),
+    title: varchar("title", { length: 120 }).notNull(),
+    body: varchar("body", { length: 500 }).notNull(),
+    data: jsonb("data").$type<Record<string, string>>().notNull().default({}),
+    refKey: varchar("ref_key", { length: 80 }),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("notifications_ref_uq").on(t.userId, t.refKey),
+    index("notifications_user_time_idx").on(t.userId, t.createdAt),
+  ],
 );
 
 // ── Teklif ve iş ───────────────────────────────────────────────────
