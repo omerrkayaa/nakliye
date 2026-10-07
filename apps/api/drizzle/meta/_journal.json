@@ -29,6 +29,13 @@
       "when": 1791398447921,
       "tag": "0003_load_moderation",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791402147441,
+      "tag": "0004_confirmation_sms_token",
+      "breakpoints": true
     }
   ]
 }

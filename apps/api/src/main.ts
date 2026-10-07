@@ -10,6 +10,8 @@ async function bootstrap() {
   }
   const app = await NestFactory.create(AppModule);
   app.setGlobalPrefix("api/v1");
+  // Kapanışta zamanlayıcı (pg-boss) düzgün dursun
+  app.enableShutdownHooks();
   app.enableCors({ origin: process.env.WEB_ORIGIN?.split(",") ?? true });
   await app.listen(Number(process.env.PORT ?? 3000));
 }

@@ -21,6 +21,7 @@
     "@nestjs/platform-express": "^11.1.0",
     "drizzle-orm": "^0.45.0",
     "pg": "^8.13.0",
+    "pg-boss": "^12.37.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "zod": "^3.25.0"

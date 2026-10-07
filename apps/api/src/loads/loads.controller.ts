@@ -17,6 +17,7 @@ import {
 import { AuthGuard, CurrentUser, Roles } from "../auth/auth.guard.js";
 import type { AccessPayload } from "../auth/auth.service.js";
 import { ZodPipe } from "../common/zod.pipe.js";
+import { ConfirmationService } from "./confirmation.service.js";
 import { LoadsService } from "./loads.service.js";
 
 const uuid = new ParseUUIDPipe({ version: "4" });
@@ -98,5 +99,19 @@ export class AdminLoadsController {
   @HttpCode(200)
   review(@Param("id", uuid) id: string, @Body(new ZodPipe(reviewLoadSchema)) body: ReviewLoadInput) {
     return this.loads.review(id, body.decision);
+  }
+}
+
+/** Teyit turunu elle çalıştırır (test ve demo; normalde zamanlayıcı her 5 dk çalıştırır). */
+@Controller("admin/jobs")
+@UseGuards(AuthGuard)
+@Roles("admin")
+export class AdminJobsController {
+  constructor(private readonly confirmation: ConfirmationService) {}
+
+  @Post("confirmation-tick")
+  @HttpCode(200)
+  tick() {
+    return this.confirmation.tick();
   }
 }

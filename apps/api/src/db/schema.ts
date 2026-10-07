@@ -207,16 +207,26 @@ export const loadPosts = pgTable(
   ],
 );
 
-export const loadConfirmations = pgTable("load_confirmations", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  loadPostId: uuid("load_post_id").notNull().references(() => loadPosts.id, { onDelete: "cascade" }),
-  askedAt: timestamp("asked_at", { withTimezone: true }).notNull().defaultNow(),
-  pushOpenedAt: timestamp("push_opened_at", { withTimezone: true }),
-  smsSentAt: timestamp("sms_sent_at", { withTimezone: true }),
-  answeredAt: timestamp("answered_at", { withTimezone: true }),
-  answer: confirmAnswerEnum("answer"),
-  channel: varchar("channel", { length: 8 }),
-});
+/**
+ * Her "hâlâ geçerli mi?" sorusu bir satır (tez metriği: cevap süresi, kanal, cevapsız oranı).
+ * Açık soru: answer IS NULL. Cevapsız düşen ilanda answer = 'cevapsiz', answered_at boş kalır.
+ */
+export const loadConfirmations = pgTable(
+  "load_confirmations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    loadPostId: uuid("load_post_id").notNull().references(() => loadPosts.id, { onDelete: "cascade" }),
+    askedAt: timestamp("asked_at", { withTimezone: true }).notNull().defaultNow(),
+    pushOpenedAt: timestamp("push_opened_at", { withTimezone: true }),
+    smsSentAt: timestamp("sms_sent_at", { withTimezone: true }),
+    // SMS'teki tek kullanımlık teyit linkinin token'ı (sha256); token'ın kendisi saklanmaz
+    smsTokenHash: varchar("sms_token_hash", { length: 64 }).unique(),
+    answeredAt: timestamp("answered_at", { withTimezone: true }),
+    answer: confirmAnswerEnum("answer"),
+    channel: varchar("channel", { length: 8 }), // app | sms | push
+  },
+  (t) => [index("load_confirmations_load_idx").on(t.loadPostId)],
+);
 
 export const capacityPosts = pgTable(
   "capacity_posts",

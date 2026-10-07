@@ -188,9 +188,18 @@ export class LoadsService {
     return this.get(userId, id);
   }
 
-  /** "Hâlâ geçerli mi?" cevabı (UC-04, BR-02…04). Uygulamadan; SMS linki ayrı uç noktada olacak. */
+  /** "Hâlâ geçerli mi?" cevabı, uygulamadan (UC-04, BR-02…04). */
   async confirm(userId: string, id: string, answer: ConfirmationAnswer, now = new Date()) {
     const load = await this.ownLoad(userId, id);
+    await this.applyAnswer(load, answer, "app", now);
+    return this.get(userId, id);
+  }
+
+  /**
+   * Teyit cevabını uygular; uygulama ve SMS linki (public/confirm) aynı yolu kullanır.
+   * Yalnız görünür ilan cevaplanabilir; yükleme tarihi geçmişse "geçerli" denemez.
+   */
+  async applyAnswer(load: LoadRow, answer: ConfirmationAnswer, channel: "app" | "sms", now = new Date()): Promise<LoadStatus> {
     if (!VISIBLE_LOAD_STATUSES.includes(load.status)) throw this.statusConflict(load.status, "teyit edilemez");
     if (answer === "gecerli" && load.loadTo < trDay(now)) {
       throw new ConflictException("Yükleme tarihi geçmiş; tarihi güncelleyin ya da ilanı kapatın");
@@ -202,9 +211,9 @@ export class LoadsService {
         reminderSentAt: null,
         ...(to === "teyitli" ? this.confirmedFields(load.loadFrom, now) : {}),
       });
-      await this.answerOpenQuestion(tx, load.id, answer, now);
+      await this.answerOpenQuestion(tx, load.id, answer, now, channel);
     });
-    return this.get(userId, id);
+    return to;
   }
 
   /** İlanı kapat (FR-15): araç bulundu → kapandı, vazgeçildi → iptal. Moderasyondaki ilan yalnız iptal edilebilir. */
@@ -328,11 +337,11 @@ export class LoadsService {
   }
 
   /** Açık bir "hâlâ geçerli mi?" sorusu varsa cevabı işler (tez metriği: cevap süresi). Kendiliğinden teyit kaydedilmez. */
-  private async answerOpenQuestion(tx: Tx, loadId: string, answer: ConfirmationAnswer, now: Date) {
+  private async answerOpenQuestion(tx: Tx, loadId: string, answer: ConfirmationAnswer, now: Date, channel: "app" | "sms" = "app") {
     await tx
       .update(loadConfirmations)
-      .set({ answeredAt: now, answer, channel: "app" })
-      .where(and(eq(loadConfirmations.loadPostId, loadId), isNull(loadConfirmations.answeredAt)));
+      .set({ answeredAt: now, answer, channel })
+      .where(and(eq(loadConfirmations.loadPostId, loadId), isNull(loadConfirmations.answer)));
   }
 
   private statusConflict(status: LoadStatus, what: string) {
