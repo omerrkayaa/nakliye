@@ -1,9 +1,10 @@
 import { BadRequestException, type PipeTransform } from "@nestjs/common";
-import type { ZodType } from "zod";
+import type { ZodType, ZodTypeDef } from "zod";
 
 /** Gövdeyi @nakliye/shared içindeki zod şemasıyla doğrular; Android ve Web aynı kuralları kullanır. */
 export class ZodPipe<T> implements PipeTransform<unknown, T> {
-  constructor(private readonly schema: ZodType<T>) {}
+  // Giriş tipi serbest: şema dönüştürebilir (ör. "37.8,27.8" → {lat, lng})
+  constructor(private readonly schema: ZodType<T, ZodTypeDef, unknown>) {}
 
   transform(value: unknown): T {
     const result = this.schema.safeParse(value);

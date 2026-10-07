@@ -116,6 +116,34 @@ export const createLoadSchema = z
   .refine((v) => v.loadFrom <= v.loadTo, { message: "Bitiş tarihi başlangıçtan önce olamaz", path: ["loadTo"] })
   .refine((v) => v.priceType === "teklif" || v.price !== null, { message: "Sabit fiyatta tutar zorunlu", path: ["price"] });
 
+/**
+ * İlan düzenleme: kalkış/varış değiştirilemez (başka bir ilan olur, eşleşmeler bozulur).
+ * Tarih/fiyat tutarlılığı API'de mevcut ilanla birleştirilip createLoadSchema ile yeniden denetlenir.
+ */
+export const updateLoadSchema = z
+  .object({
+    loadFrom: isoDaySchema,
+    loadTo: isoDaySchema,
+    cargoType: cargoTypeSchema,
+    weightTon: z.number().positive().max(60),
+    vehicleType: vehicleTypeSchema,
+    bodyType: bodyTypeSchema.nullable(),
+    priceType: z.enum(["sabit", "teklif"]),
+    price: z.number().positive().nullable(),
+    note: z.string().max(280).nullable(),
+  })
+  .strict("Bu alan düzenlenemez (kalkış/varış değişecekse ilanı kapatıp yenisini verin)")
+  .partial()
+  .refine((v) => Object.values(v).some((x) => x !== undefined), "Değiştirilecek en az bir alan gönderin");
+
+/** FR-15: ilanı kapat — araç bulundu ya da vazgeçildi. */
+export const closeLoadSchema = z.object({ reason: z.enum(["arac_bulundu", "iptal"]) });
+
+/** BR-11: yönetici moderasyon kararı. */
+export const reviewLoadSchema = z.object({ decision: z.enum(["onay", "ret"]) });
+
+export const pageSchema = z.object({ page: z.coerce.number().int().min(1).default(1) });
+
 export const createCapacitySchema = z
   .object({
     vehicleId: z.string().uuid(),
@@ -131,9 +159,18 @@ export const loadSearchSchema = z.object({
   toProvinceId: z.coerce.number().int().optional(),
   date: isoDaySchema.optional(),
   vehicleType: vehicleTypeSchema.optional(),
+  bodyType: bodyTypeSchema.optional(),
+  /** Aracın taşıyabileceği en fazla tonaj: bundan ağır yükler gelmez (FR-20) */
+  maxWeightTon: z.coerce.number().positive().max(60).optional(),
+  /** "enlem,boylam" — yakınımdakiler (FR-21) */
   near: z
     .string()
-    .regex(/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/)
+    .regex(/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/, "Konum 'enlem,boylam' biçiminde olmalı")
+    .transform((s) => {
+      const [lat, lng] = s.split(",").map(Number) as [number, number];
+      return { lat, lng };
+    })
+    .refine((p) => Math.abs(p.lat) <= 90 && Math.abs(p.lng) <= 180, "Geçersiz konum")
     .optional(),
   radiusKm: z.coerce.number().min(5).max(200).default(50),
   page: z.coerce.number().int().min(1).default(1),
@@ -167,6 +204,10 @@ export type AddRolesInput = z.infer<typeof addRolesSchema>;
 export type CreateCompanyInput = z.infer<typeof createCompanySchema>;
 export type UpdateCompanyInput = z.infer<typeof updateCompanySchema>;
 export type CreateLoadInput = z.infer<typeof createLoadSchema>;
+export type UpdateLoadInput = z.infer<typeof updateLoadSchema>;
+export type CloseLoadInput = z.infer<typeof closeLoadSchema>;
+export type ReviewLoadInput = z.infer<typeof reviewLoadSchema>;
+export type ConfirmLoadInput = z.infer<typeof confirmLoadSchema>;
 export type CreateCapacityInput = z.infer<typeof createCapacitySchema>;
 export type CreateVehicleInput = z.infer<typeof createVehicleSchema>;
 export type LoadSearchInput = z.infer<typeof loadSearchSchema>;

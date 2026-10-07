@@ -194,6 +194,8 @@ export const loadPosts = pgTable(
     lastConfirmedAt: timestamp("last_confirmed_at", { withTimezone: true }).notNull().defaultNow(),
     nextReminderAt: timestamp("next_reminder_at", { withTimezone: true }).notNull(),
     reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true }),
+    // BR-11: null = moderasyon gerekmedi; bekliyor/onay/ret = moderasyon kararı. Onaylı ilan sayısı muafiyeti belirler.
+    moderation: reviewStatusEnum("moderation"),
     createdAt: createdAt(),
   },
   (t) => [

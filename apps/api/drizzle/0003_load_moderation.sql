@@ -1,0 +1,1 @@
+ALTER TABLE "load_posts" ADD COLUMN "moderation" "review_status";

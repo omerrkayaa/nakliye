@@ -47,6 +47,15 @@ export const LOAD_STATUSES = [
   "iptal",
 ] as const;
 export type LoadStatus = (typeof LOAD_STATUSES)[number];
+export const LOAD_STATUS_LABELS: Record<LoadStatus, string> = {
+  taslak: "Taslak",
+  moderasyonda: "Onay bekliyor",
+  teyitli: "Teyitli",
+  teyit_bekliyor: "Teyit bekliyor",
+  suresi_doldu: "Süresi doldu",
+  kapandi: "Kapandı",
+  iptal: "İptal",
+};
 
 // docs/03 §6 — iş (taşıma) durum diyagramı
 export const JOB_STATUSES = [

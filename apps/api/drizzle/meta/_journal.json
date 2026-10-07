@@ -22,6 +22,13 @@
       "when": 1791395963485,
       "tag": "0002_company_owner_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791398447921,
+      "tag": "0003_load_moderation",
+      "breakpoints": true
     }
   ]
 }
