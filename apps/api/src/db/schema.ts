@@ -347,15 +347,24 @@ export const reports = pgTable(
   (t) => [
     uniqueIndex("reports_once_uq").on(t.reporterId, t.targetType, t.targetId, t.reason),
     index("reports_target_idx").on(t.targetType, t.targetId),
+    index("reports_reporter_time_idx").on(t.reporterId, t.createdAt),
   ],
 );
 
-export const callLogs = pgTable("call_logs", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  callerId: uuid("caller_id").notNull().references(() => users.id),
-  loadPostId: uuid("load_post_id").notNull().references(() => loadPosts.id, { onDelete: "cascade" }),
-  createdAt: createdAt(),
-});
+// BR-40: "Ara" ile numara açıldığında bir satır (kötüye kullanım ölçümü, BR-05 tanıklığı, eşleşme isabeti metriği)
+export const callLogs = pgTable(
+  "call_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    callerId: uuid("caller_id").notNull().references(() => users.id),
+    loadPostId: uuid("load_post_id").notNull().references(() => loadPosts.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("call_logs_caller_time_idx").on(t.callerId, t.createdAt),
+    index("call_logs_load_idx").on(t.loadPostId),
+  ],
+);
 
 export const appParams = pgTable("app_params", {
   key: varchar("key", { length: 64 }).primaryKey(),

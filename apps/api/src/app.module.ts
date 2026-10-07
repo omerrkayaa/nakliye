@@ -4,10 +4,11 @@ import { DbModule } from "./db/db.module.js";
 import { HealthController } from "./health.controller.js";
 import { LoadsModule } from "./loads/loads.module.js";
 import { LocationsController } from "./locations.controller.js";
+import { ReportsModule } from "./reports/reports.module.js";
 import { UsersModule } from "./users/users.module.js";
 
 @Module({
-  imports: [DbModule, AuthModule, UsersModule, LoadsModule],
+  imports: [DbModule, AuthModule, UsersModule, LoadsModule, ReportsModule],
   controllers: [HealthController, LocationsController],
 })
 export class AppModule {}

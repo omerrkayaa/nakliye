@@ -1,11 +1,21 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import {
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import {
+  ABUSE_LIMITS,
   applyConfirmationAnswer,
   canTransition,
   createLoadSchema,
   isVerifiedBadge,
   loadDateError,
   LOAD_STATUS_LABELS,
+  maskPhone,
   needsModeration,
   nextReminderAt,
   trDay,
@@ -18,11 +28,11 @@ import {
   type LoadStatus,
   type UpdateLoadInput,
 } from "@nakliye/shared";
-import { and, asc, count, desc, eq, gte, inArray, isNull, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, countDistinct, desc, eq, gte, inArray, isNull, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { randomBytes } from "node:crypto";
 import { DB, type Db } from "../db/db.module.js";
-import { companies, districts, loadConfirmations, loadPosts, provinces, users } from "../db/schema.js";
+import { callLogs, companies, districts, loadConfirmations, loadPosts, provinces, users } from "../db/schema.js";
 
 const PAGE_SIZE = 20;
 const PG_UNIQUE_VIOLATION = "23505";
@@ -227,10 +237,37 @@ export class LoadsService {
     return this.get(userId, id);
   }
 
+  /**
+   * "Ara" (FR-30, BR-40): ilan sahibinin numarasını açar ve aramayı loglar. BR-12: dönen numara ilanı veren
+   * hesabın kendi (OTP ile doğrulanmış) numarasıdır; ilana ayrı numara yazılamaz. Numara toplamaya karşı
+   * 24 saatte farklı ilan sayısı sınırlıdır; aynı ilanı tekrar aramak sınırı tüketmez.
+   */
+  async call(userId: string, id: string, now = new Date()) {
+    const [row] = await this.selectLoads().where(eq(loadPosts.id, id));
+    if (!row || !VISIBLE_LOAD_STATUSES.includes(row.load.status)) throw new NotFoundException("İlan bulunamadı");
+    if (row.load.shipperId === userId) throw new BadRequestException("Kendi ilanınızı arayamazsınız");
+
+    const since = new Date(now.getTime() - 24 * 3_600_000);
+    const [{ loads }] = (await this.db
+      .select({ loads: countDistinct(callLogs.loadPostId) })
+      .from(callLogs)
+      .where(and(eq(callLogs.callerId, userId), gte(callLogs.createdAt, since), ne(callLogs.loadPostId, id)))) as [
+      { loads: number },
+    ];
+    if (loads >= ABUSE_LIMITS.callsPerDay) {
+      throw new HttpException(
+        `Günlük arama sınırına ulaştınız (${ABUSE_LIMITS.callsPerDay} farklı ilan). Yarın tekrar deneyin.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    await this.db.insert(callLogs).values({ callerId: userId, loadPostId: id, createdAt: now });
+    return { phone: row.shipperPhone, displayName: row.companyTitle ?? row.shipperName };
+  }
+
   // ── Moderasyon (BR-11) ─────────────────────────────────────────────
 
   async moderationQueue(page: number) {
-    const rows = await this.selectLoads(undefined, true)
+    const rows = await this.selectLoads()
       .where(eq(loadPosts.status, "moderasyonda"))
       .orderBy(asc(loadPosts.createdAt))
       .limit(PAGE_SIZE + 1)
@@ -259,7 +296,7 @@ export class LoadsService {
 
   // ── Yardımcılar ────────────────────────────────────────────────────
 
-  private selectLoads(distance?: SQL<number>, withPhone = false) {
+  private selectLoads(distance?: SQL<number>) {
     return this.db
       .select({
         load: loadPosts,
@@ -267,7 +304,7 @@ export class LoadsService {
         dest: { districtId: dd.id, district: dd.name, provinceId: dp.id, province: dp.name },
         shipperName: users.name,
         shipperLevel: users.verificationLevel,
-        shipperPhone: withPhone ? users.phone : sql<null>`null`,
+        shipperPhone: users.phone, // yanıta yalnız maskeli çıkar (view); tam numara sadece call() ve yöneticide
         companyTitle: companies.title,
         distanceKm: distance ?? sql<null>`null`,
       })
@@ -301,8 +338,12 @@ export class LoadsService {
       lastConfirmedAt: l.lastConfirmedAt,
       createdAt: l.createdAt,
       ...(r.distanceKm !== null ? { distanceKm: Math.round(Number(r.distanceKm) * 10) / 10 } : {}),
-      // Telefon burada yok: arama POST /loads/:id/call ile loglanarak verilecek (docs/04 §6)
-      shipper: { displayName: r.companyTitle ?? r.shipperName, verified: isVerifiedBadge(r.shipperLevel) },
+      // BR-40: numara maskeli; tam numara POST /loads/:id/call ile loglanarak açılır
+      shipper: {
+        displayName: r.companyTitle ?? r.shipperName,
+        verified: isVerifiedBadge(r.shipperLevel),
+        phoneMasked: maskPhone(r.shipperPhone),
+      },
       ...(owner ? { nextReminderAt: l.nextReminderAt, reminderSentAt: l.reminderSentAt, moderation: l.moderation } : {}),
     };
   }

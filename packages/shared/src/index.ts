@@ -3,6 +3,7 @@ export * from "./geo.js";
 export * from "./schemas.js";
 export * from "./sms.js";
 export * from "./rules/confirmation.js";
+export * from "./rules/contact.js";
 export * from "./rules/load.js";
 export * from "./rules/matching.js";
 export * from "./rules/trust.js";

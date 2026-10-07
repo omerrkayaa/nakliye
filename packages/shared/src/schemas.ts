@@ -196,7 +196,7 @@ export const createReportSchema = z.object({
   targetType: z.enum(["load_post", "user"]),
   targetId: z.string().uuid(),
   reason: reportReasonSchema,
-  note: z.string().max(500).optional(),
+  note: z.string().trim().max(500).optional(),
 });
 
 export type UpdateMeInput = z.infer<typeof updateMeSchema>;
@@ -208,6 +208,7 @@ export type UpdateLoadInput = z.infer<typeof updateLoadSchema>;
 export type CloseLoadInput = z.infer<typeof closeLoadSchema>;
 export type ReviewLoadInput = z.infer<typeof reviewLoadSchema>;
 export type ConfirmLoadInput = z.infer<typeof confirmLoadSchema>;
+export type CreateReportInput = z.infer<typeof createReportSchema>;
 export type CreateCapacityInput = z.infer<typeof createCapacitySchema>;
 export type CreateVehicleInput = z.infer<typeof createVehicleSchema>;
 export type LoadSearchInput = z.infer<typeof loadSearchSchema>;

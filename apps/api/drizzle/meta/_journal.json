@@ -36,6 +36,13 @@
       "when": 1791402147441,
       "tag": "0004_confirmation_sms_token",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791402674002,
+      "tag": "0005_call_report_indexes",
+      "breakpoints": true
     }
   ]
 }

@@ -71,6 +71,14 @@ export class LoadsController {
     return this.loads.confirm(user.sub, id, body.answer);
   }
 
+  /** "Ara": numarayı açar ve loglar (BR-40). Nakliyeci içindir; yük sahibinin yük sahibini araması gerekmez. */
+  @Post(":id/call")
+  @HttpCode(200)
+  @Roles("carrier")
+  call(@CurrentUser() user: AccessPayload, @Param("id", uuid) id: string) {
+    return this.loads.call(user.sub, id);
+  }
+
   @Post(":id/close")
   @HttpCode(200)
   @Roles("shipper")

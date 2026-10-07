@@ -213,6 +213,50 @@ export class ConfirmationService {
     return sent;
   }
 
+  // ── BR-05: şikayetle anında teyit ─────────────────────────────────
+
+  /**
+   * İlanı hemen "teyit bekliyor"a çeker ve sahibine anında soru gönderir. Yalnız "teyitli" ilanda çalışır;
+   * zaten bekliyorsa ya da yayında değilse bir şey yapmaz (aynı anda iki çağrı gelse de tek soru açılır).
+   * reminder_sent_at cevap penceresi kadar geriye yazılır: böylece evaluateLoadStatus'a göre BR-04'ün 12 saati
+   * "teyit bekliyor"a girildiği an başlar (normal akışta da 4 saat cevapsızlıktan sonra başlıyor).
+   */
+  async forceReconfirm(loadId: string, now = new Date()): Promise<boolean> {
+    const asked = await this.db.transaction(async (tx) => {
+      const [l] = await tx.select().from(loadPosts).where(eq(loadPosts.id, loadId)).for("update");
+      if (!l || l.status !== "teyitli") return null;
+      await tx
+        .update(loadPosts)
+        .set({ status: "teyit_bekliyor", reminderSentAt: new Date(now.getTime() - this.p.answerWindowH * HOUR) })
+        .where(eq(loadPosts.id, loadId));
+      // Açık soru varsa (ör. 1 saat önce sorulmuş) o kullanılır; yoksa yeni soru açılır (30 dk sonra SMS yedeği)
+      const [open] = await tx
+        .select({ id: loadConfirmations.id })
+        .from(loadConfirmations)
+        .where(and(eq(loadConfirmations.loadPostId, loadId), isNull(loadConfirmations.answer)));
+      const question =
+        open ??
+        (await tx.insert(loadConfirmations).values({ loadPostId: loadId, askedAt: now }).returning({ id: loadConfirmations.id }))[0]!;
+      return { shipperId: l.shipperId, confirmationId: question.id };
+    });
+    if (!asked) return false;
+
+    this.logger.log(`BR-05: ilan ${loadId} şikayetler üzerine teyide düştü`);
+    await this.push
+      .sendToUser(asked.shipperId, {
+        title: "Yükünüzün gittiği bildirildi",
+        body: "Yük hâlâ duruyorsa tek dokunuşla teyit edin; cevap gelmezse ilan 12 saat içinde yayından kalkar.",
+        data: { type: "load_confirm", loadId, confirmationId: asked.confirmationId, reason: "reports" },
+        actions: [
+          { id: "gecerli", title: "Hâlâ geçerli" },
+          { id: "arac_bulundu", title: "Araç bulundu" },
+          { id: "iptal", title: "İptal" },
+        ],
+      })
+      .catch((e: Error) => this.logger.warn(`Push gönderilemedi (${loadId}): ${e.message}`));
+    return true;
+  }
+
   // ── SMS linkiyle teyit (giriş gerektirmez) ─────────────────────────
 
   /**

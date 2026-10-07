@@ -9,5 +9,6 @@ import { PublicConfirmController } from "./public-confirm.controller.js";
 @Module({
   controllers: [LoadsController, AdminLoadsController, AdminJobsController, PublicConfirmController],
   providers: [LoadsService, ConfirmationService, ConfirmationScheduler, PushService],
+  exports: [ConfirmationService],
 })
 export class LoadsModule {}

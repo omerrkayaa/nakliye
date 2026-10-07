@@ -95,10 +95,13 @@ export function shouldSendSmsFallback(
   return !pushOpened && now.getTime() - reminderSentAt.getTime() >= p.smsFallbackMin * 60_000;
 }
 
-/** BR-05: farklı doğrulanmış kullanıcılardan gelen "yük yok" şikayeti eşiği aştı mı? */
+/**
+ * BR-05: son teyitten sonra "yük yok" diyen farklı *sayılan* şikayetçi sayısı eşiğe ulaştı mı?
+ * Sayılan şikayetçi: bkz. `isQualifiedReporter` (doğrulanmış ya da ilanı aramış).
+ */
 export function shouldForceReconfirm(
-  distinctVerifiedReporters: number,
+  distinctQualifiedReporters: number,
   p: ConfirmationParams = DEFAULT_CONFIRMATION_PARAMS,
 ): boolean {
-  return distinctVerifiedReporters >= p.reportThreshold;
+  return distinctQualifiedReporters >= p.reportThreshold;
 }

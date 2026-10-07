@@ -81,7 +81,7 @@ check("il/ilçe adları ve paylaşım kimliği var", r.body.origin?.district ===
 check("telefon yanıtta yok", !JSON.stringify(r.body).includes("+90"));
 
 console.log("\nModerasyondaki ilan");
-check("nakliyeci aramada görmez", !(await api("GET", "/loads", C)).body.items.some((l) => l.id === L1));
+check("nakliyeci aramada görmez (tüm sayfalar)", !(await findAll("")));
 check("nakliyeci detayda 404", (await api("GET", `/loads/${L1}`, C)).status === 404);
 check("sahibi İlanlarım'da görür", (await api("GET", "/loads/mine", S)).body.items.some((l) => l.id === L1));
 check("moderasyonda teyit 409", (await api("POST", `/loads/${L1}/confirm`, S, { answer: "gecerli" })).status === 409);
@@ -92,7 +92,15 @@ r = await api("POST", `/admin/loads/${L1}/review`, A, { decision: "onay" });
 check("onay → teyitli", r.body.status === "teyitli" && r.body.moderation === "onay");
 
 console.log("\nArama filtreleri");
-const has = async (qs) => (await api("GET", `/loads?${qs}`, C)).body.items?.some((l) => l.id === L1);
+/** Tüm sayfaları tarar: önceki test çalıştırmalarının ilanları L1'i ilk sayfadan itebilir. */
+async function findAll(qs) {
+  for (let page = 1; page <= 100; page++) {
+    const body = (await api("GET", `/loads?${qs}${qs ? "&" : ""}page=${page}`, C)).body;
+    const hit = body.items?.find((l) => l.id === L1);
+    if (hit || !body.hasMore) return hit;
+  }
+}
+const has = async (qs) => Boolean(await findAll(qs));
 check("filtresiz bulunur", await has(""));
 check("fromProvinceId=35 bulunur, =9 bulunmaz", (await has("fromProvinceId=35")) && !(await has("fromProvinceId=9")));
 check("toProvinceId=9 bulunur", await has("toProvinceId=9"));
@@ -100,8 +108,7 @@ check("tarih aralık içinde bulunur, dışında bulunmaz", (await has(`date=${t
 check("araç tipi uyuşmazsa bulunmaz", !(await has("vehicleType=kamyonet")));
 check("kasa tipi belirtilmemiş yük her kasaya uyar", await has("bodyType=frigo"));
 check("tonaj sınırı", (await has("maxWeightTon=20")) && !(await has("maxWeightTon=10")));
-r = await api("GET", `/loads?near=38.42,27.13&radiusKm=20`, C);
-const nearItem = r.body.items?.find((l) => l.id === L1);
+const nearItem = await findAll("near=38.42,27.13&radiusKm=20");
 check("Konak yakınında bulunur + mesafe", nearItem && nearItem.distanceKm < 5, JSON.stringify(nearItem?.distanceKm));
 check("Aydın yakınında (20 km) bulunmaz", !(await has("near=37.85,27.84&radiusKm=20")));
 check("bozuk konum 400", (await api("GET", "/loads?near=99,27", C)).status === 400);
