@@ -74,3 +74,12 @@ describe("needsModeration (BR-11)", () => {
     expect(needsModeration(1, 0)).toBe(false);
   });
 });
+
+describe("dateRangeError (boş araç müsaitliği)", () => {
+  it("mesajda verilen adı kullanır", async () => {
+    const { dateRangeError } = await import("../src/rules/load.js");
+    expect(dateRangeError("2026-10-01", "2026-10-02", new Date("2026-10-07T10:00:00Z"), undefined, "Müsaitlik")).toBe(
+      "Müsaitlik tarihi geçmişte olamaz",
+    );
+  });
+});

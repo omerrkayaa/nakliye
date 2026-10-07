@@ -119,7 +119,7 @@ check("BR-04'ün 12 saati şimdi başlar (hatırlatma 4 saat geriye yazıldı)",
 await call(C3, L);
 await report(C3, L);
 check("3. şikayet yeni soru açmaz", questions(L) === "1");
-await api("POST", "/admin/jobs/confirmation-tick", A);
+await api("POST", "/admin/jobs/tick", A);
 check("tur hemen düşürmez", status(L) === "teyit_bekliyor");
 
 console.log("\nTeyitten sonra eski şikayetler sayılmaz");
@@ -130,7 +130,7 @@ check("teyitten sonra tek yeni şikayet: teyitli kalır", status(L) === "teyitli
 await report(C2, L);
 check("ikinci yeni şikayet: tekrar teyit bekliyor", status(L) === "teyit_bekliyor");
 psql(`update load_posts set reminder_sent_at = now() - interval '16 hours 5 minutes' where id='${L}'`);
-await api("POST", "/admin/jobs/confirmation-tick", A);
+await api("POST", "/admin/jobs/tick", A);
 check("12 saat cevapsız → süresi doldu", status(L) === "suresi_doldu");
 check("süresi dolan ilan şikayet edilemez 404", (await report(C3, L)).status === 404);
 

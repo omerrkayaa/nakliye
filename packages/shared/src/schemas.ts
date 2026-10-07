@@ -99,6 +99,18 @@ export const createVehicleSchema = z.object({
   volumeM3: z.number().positive().max(150).optional(),
 });
 
+/** Araç düzenleme: plaka değiştirilemez (başka araç demektir; silip yenisini ekleyin). */
+export const updateVehicleSchema = z
+  .object({
+    vehicleType: vehicleTypeSchema,
+    bodyType: bodyTypeSchema,
+    capacityTon: z.number().positive().max(60),
+    volumeM3: z.number().positive().max(150).nullable(),
+  })
+  .strict("Bu alan düzenlenemez (plaka değişecekse aracı silip yenisini ekleyin)")
+  .partial()
+  .refine((v) => Object.values(v).some((x) => x !== undefined), "Değiştirilecek en az bir alan gönderin");
+
 export const createLoadSchema = z
   .object({
     originDistrictId: z.number().int().positive(),
@@ -153,6 +165,21 @@ export const createCapacitySchema = z
     availableTo: isoDaySchema,
   })
   .refine((v) => v.availableFrom <= v.availableTo, { message: "Bitiş tarihi başlangıçtan önce olamaz", path: ["availableTo"] });
+
+/** Boş araç ilanı düzenleme: yükün aksine kalkış değişebilir (araç başka yerde boşalacaksa). Araç değiştirilemez. */
+export const updateCapacitySchema = z
+  .object({
+    originDistrictId: z.number().int().positive(),
+    destDistrictId: z.number().int().positive().nullable(),
+    availableFrom: isoDaySchema,
+    availableTo: isoDaySchema,
+  })
+  .strict("Bu alan düzenlenemez (araç değişecekse ilanı kapatıp yenisini verin)")
+  .partial()
+  .refine((v) => Object.values(v).some((x) => x !== undefined), "Değiştirilecek en az bir alan gönderin");
+
+/** Boş araç ilanını kapat: araç doldu ya da vazgeçildi. */
+export const closeCapacitySchema = z.object({ reason: z.enum(["doldu", "iptal"]) });
 
 export const loadSearchSchema = z.object({
   fromProvinceId: z.coerce.number().int().optional(),
@@ -211,5 +238,8 @@ export type ConfirmLoadInput = z.infer<typeof confirmLoadSchema>;
 export type CreateReportInput = z.infer<typeof createReportSchema>;
 export type CreateCapacityInput = z.infer<typeof createCapacitySchema>;
 export type CreateVehicleInput = z.infer<typeof createVehicleSchema>;
+export type UpdateVehicleInput = z.infer<typeof updateVehicleSchema>;
+export type UpdateCapacityInput = z.infer<typeof updateCapacitySchema>;
+export type CloseCapacityInput = z.infer<typeof closeCapacitySchema>;
 export type LoadSearchInput = z.infer<typeof loadSearchSchema>;
 export type CreateOfferInput = z.infer<typeof createOfferSchema>;

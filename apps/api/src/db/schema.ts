@@ -1,6 +1,8 @@
 // Veri modeli — docs/04 §3
 import {
   BODY_TYPES,
+  type CapacityStatus,
+  type VehicleStatus,
   CARGO_TYPES,
   DOCUMENT_TYPES,
   JOB_STATUSES,
@@ -141,17 +143,25 @@ export const devices = pgTable("devices", {
 });
 
 // ── Araç ve belge ──────────────────────────────────────────────────
-export const vehicles = pgTable("vehicles", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  ownerUserId: uuid("owner_user_id").notNull().references(() => users.id),
-  plate: varchar("plate", { length: 12 }).notNull().unique(),
-  vehicleType: vehicleTypeEnum("vehicle_type").notNull(),
-  bodyType: bodyTypeEnum("body_type").notNull(),
-  capacityTon: numeric("capacity_ton", { precision: 5, scale: 2, mode: "number" }).notNull(),
-  volumeM3: numeric("volume_m3", { precision: 6, scale: 2, mode: "number" }),
-  status: varchar("status", { length: 16 }).notNull().default("aktif"),
-  createdAt: createdAt(),
-});
+export const vehicles = pgTable(
+  "vehicles",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerUserId: uuid("owner_user_id").notNull().references(() => users.id),
+    plate: varchar("plate", { length: 12 }).notNull(),
+    vehicleType: vehicleTypeEnum("vehicle_type").notNull(),
+    bodyType: bodyTypeEnum("body_type").notNull(),
+    capacityTon: numeric("capacity_ton", { precision: 5, scale: 2, mode: "number" }).notNull(),
+    volumeM3: numeric("volume_m3", { precision: 6, scale: 2, mode: "number" }),
+    status: varchar("status", { length: 16 }).$type<VehicleStatus>().notNull().default("aktif"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    // Plaka yalnız silinmemiş araçlar arasında tekil: silinen araç (geçmiş için saklanır) plakayı kilitlemesin
+    uniqueIndex("vehicles_plate_active_uq").on(t.plate).where(sql`status <> 'silindi'`),
+    index("vehicles_owner_idx").on(t.ownerUserId),
+  ],
+);
 
 export const documents = pgTable(
   "documents",
@@ -240,12 +250,13 @@ export const capacityPosts = pgTable(
     destGeom: point("dest_geom"),
     availableFrom: date("available_from").notNull(),
     availableTo: date("available_to").notNull(),
-    status: varchar("status", { length: 16 }).notNull().default("aktif"),
+    status: varchar("status", { length: 16 }).$type<CapacityStatus>().notNull().default("aktif"),
     createdAt: createdAt(),
   },
   (t) => [
     index("capacity_origin_geom_idx").using("gist", t.originGeom),
     index("capacity_status_date_idx").on(t.status, t.availableFrom),
+    index("capacity_vehicle_idx").on(t.vehicleId),
   ],
 );
 

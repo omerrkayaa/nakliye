@@ -1,5 +1,5 @@
 // Canlı ilan teyidi (F1) uçtan uca test: zamanlayıcı turu, BR-02…04, SMS yedeği ve tek kullanımlık link.
-// Zamanın geçişi veritabanındaki zaman damgaları geri çekilerek taklit edilir; tur POST /admin/jobs/confirmation-tick ile tetiklenir.
+// Zamanın geçişi veritabanındaki zaman damgaları geri çekilerek taklit edilir; tur POST /admin/jobs/tick ile tetiklenir.
 // Ön koşul: API JOBS_ENABLED=false ve SMS_PROVIDER=console ile çalışıyor, çıktısı dosyaya yazılıyor.
 // Kullanım (apps/api içinden): JOBS_ENABLED=false node dist/main.js > api.log 2>&1 &   sonra   node test/e2e-confirmation.mjs api.log
 import { readFileSync } from "node:fs";
@@ -59,14 +59,14 @@ async function liveLoad() {
   if (r.body.status === "moderasyonda") await api("POST", `/admin/loads/${r.body.id}/review`, A, { decision: "onay" });
   return r.body.id;
 }
-const tick = async () => (await api("POST", "/admin/jobs/confirmation-tick", A)).body;
+const tick = async () => (await api("POST", "/admin/jobs/tick", A)).body;
 const load = (id) => psql(`select status||'|'||coalesce(reminder_sent_at::text,'-') from load_posts where id='${id}'`).split("|");
 const questions = (id) => psql(`select count(*) from load_confirmations where load_post_id='${id}'`);
 /** Son SMS'teki token (bu ilanın sahibine giden) */
 const lastSms = () => [...log().matchAll(new RegExp(`\\[SMS → \\${phone(1)}\\] (Nakliye: .*?/t/([A-Za-z0-9_-]+))`, "g"))].at(-1);
 
 console.log("\nYetki");
-check("yönetici olmayan turu tetikleyemez 403", (await api("POST", "/admin/jobs/confirmation-tick", S)).status === 403);
+check("yönetici olmayan turu tetikleyemez 403", (await api("POST", "/admin/jobs/tick", S)).status === 403);
 
 console.log("\n1. Hatırlatma (BR-02)");
 const L1 = await liveLoad();

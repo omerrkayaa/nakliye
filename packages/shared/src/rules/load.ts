@@ -32,15 +32,22 @@ export const LOAD_DATE_LIMITS = {
   maxRangeDays: 30,
 };
 
-/** Yükleme tarihlerini denetler; sorun yoksa null, varsa kullanıcıya gösterilecek mesaj döner. */
-export function loadDateError(loadFrom: string, loadTo: string, now: Date, limits = LOAD_DATE_LIMITS): string | null {
+/**
+ * İlan tarih aralığını denetler; sorun yoksa null, varsa kullanıcıya gösterilecek mesaj döner.
+ * @param label mesajlarda geçen ad ("Yükleme", "Müsaitlik")
+ */
+export function dateRangeError(from: string, to: string, now: Date, limits = LOAD_DATE_LIMITS, label = "Yükleme"): string | null {
   const today = trDay(now);
-  if (loadFrom > loadTo) return "Bitiş tarihi başlangıçtan önce olamaz";
-  if (loadTo < today) return "Yükleme tarihi geçmişte olamaz";
-  if (daysBetween(today, loadFrom) > limits.maxDaysAhead) return `Yükleme en fazla ${limits.maxDaysAhead} gün sonrası için verilebilir`;
-  if (daysBetween(loadFrom, loadTo) > limits.maxRangeDays) return `Yükleme aralığı en fazla ${limits.maxRangeDays} gün olabilir`;
+  if (from > to) return "Bitiş tarihi başlangıçtan önce olamaz";
+  if (to < today) return `${label} tarihi geçmişte olamaz`;
+  if (daysBetween(today, from) > limits.maxDaysAhead) return `${label} en fazla ${limits.maxDaysAhead} gün sonrası için verilebilir`;
+  if (daysBetween(from, to) > limits.maxRangeDays) return `${label} aralığı en fazla ${limits.maxRangeDays} gün olabilir`;
   return null;
 }
+
+/** Yük ilanı yükleme tarihleri (bkz. dateRangeError). */
+export const loadDateError = (loadFrom: string, loadTo: string, now: Date, limits = LOAD_DATE_LIMITS) =>
+  dateRangeError(loadFrom, loadTo, now, limits, "Yükleme");
 
 // ── Durum makinesi ───────────────────────────────────────────────────
 /** İzin verilen geçişler. teyitli → teyitli: sahibinin "hâlâ geçerli" teyidi (son teyit zamanı yenilenir). */

@@ -26,7 +26,7 @@ const op = alias(provinces, "op");
 const dd = alias(districts, "dd");
 const dp = alias(provinces, "dp");
 
-export interface TickStats {
+export interface ConfirmationTickStats {
   /** teyitli → teyit bekliyor / süresi doldu geçişleri (BR-03, BR-04) */
   statusChanged: number;
   /** gönderilen "hâlâ geçerli mi?" soruları (BR-02) */
@@ -37,7 +37,7 @@ export interface TickStats {
 
 /**
  * Canlı ilan teyidi (F1) zamanlayıcı işleri + SMS linkiyle teyit.
- * Tur her 5 dakikada bir çalışır (ConfirmationScheduler); her adım tekrar çalıştırılabilir (idempotent).
+ * Tur her 5 dakikada bir çalışır (JobsScheduler); her adım tekrar çalıştırılabilir (idempotent).
  */
 @Injectable()
 export class ConfirmationService {
@@ -50,7 +50,7 @@ export class ConfirmationService {
     private readonly sms: SmsService,
   ) {}
 
-  async tick(now = new Date()): Promise<TickStats> {
+  async tick(now = new Date()): Promise<ConfirmationTickStats> {
     // Sıra önemli: önce düşür (cevapsızlar), sonra yeni soruları sor, en son SMS yedeği
     const statusChanged = await this.updateStatuses(now);
     const reminded = await this.sendReminders(now);

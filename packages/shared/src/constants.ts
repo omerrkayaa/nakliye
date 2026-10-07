@@ -47,6 +47,20 @@ export const LOAD_STATUSES = [
   "iptal",
 ] as const;
 export type LoadStatus = (typeof LOAD_STATUSES)[number];
+/** Araç: silinen araç kaydı silinmez (ilan/iş geçmişi), "silindi" olur. */
+export const VEHICLE_STATUSES = ["aktif", "silindi"] as const;
+export type VehicleStatus = (typeof VEHICLE_STATUSES)[number];
+
+/** Boş araç ilanı (FR-12) */
+export const CAPACITY_STATUSES = ["aktif", "kapandi", "iptal", "suresi_doldu"] as const;
+export type CapacityStatus = (typeof CAPACITY_STATUSES)[number];
+export const CAPACITY_STATUS_LABELS: Record<CapacityStatus, string> = {
+  aktif: "Aktif",
+  kapandi: "Doldu",
+  iptal: "İptal",
+  suresi_doldu: "Süresi doldu",
+};
+
 export const LOAD_STATUS_LABELS: Record<LoadStatus, string> = {
   taslak: "Taslak",
   moderasyonda: "Onay bekliyor",
