@@ -1,0 +1,13 @@
+node_modules/
+dist/
+build/
+.next/
+.expo/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+infra/data/

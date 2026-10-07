@@ -1,0 +1,19 @@
+{
+  "name": "nakliye",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Nakliyeci – yük sahibi eşleştirme platformu (Android + Web)",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:up": "docker compose -f infra/docker-compose.yml up -d",
+    "db:down": "docker compose -f infra/docker-compose.yml down"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
