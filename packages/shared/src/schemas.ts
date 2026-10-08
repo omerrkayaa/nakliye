@@ -4,10 +4,12 @@ import {
   BODY_TYPES,
   CARGO_TYPES,
   CONFIRMATION_ANSWERS,
+  RATING_TAGS,
   REPORT_REASONS,
   VEHICLE_TYPES,
   type BodyType,
   type CargoType,
+  type RatingTag,
   type ReportReason,
   type VehicleType,
 } from "./constants.js";
@@ -227,10 +229,15 @@ export const jobListSchema = z.object({
 
 export const deliverJobSchema = z.object({ code: z.string().regex(/^\d{6}$/) });
 
+/** FR-40. Etiketin puanlanan tarafa uygunluğu serviste (RATING_TAGS_FOR); tekrar eden etiket teke indirilir. */
 export const createRatingSchema = z.object({
   stars: z.number().int().min(1).max(5),
-  tags: z.array(z.string()).max(6).default([]),
-  comment: z.string().max(500).optional(),
+  tags: z
+    .array(z.enum(keysOf(RATING_TAGS)) as z.ZodType<RatingTag>)
+    .max(Object.keys(RATING_TAGS).length)
+    .default([])
+    .transform((t) => [...new Set(t)]),
+  comment: z.string().trim().max(500).optional(),
 });
 
 export const createReportSchema = z.object({
@@ -250,6 +257,7 @@ export type CloseLoadInput = z.infer<typeof closeLoadSchema>;
 export type ReviewLoadInput = z.infer<typeof reviewLoadSchema>;
 export type ConfirmLoadInput = z.infer<typeof confirmLoadSchema>;
 export type CreateReportInput = z.infer<typeof createReportSchema>;
+export type CreateRatingInput = z.infer<typeof createRatingSchema>;
 export type JobStatusInput = z.infer<typeof jobStatusSchema>;
 export type ReasonInput = z.infer<typeof reasonSchema>;
 export type JobListInput = z.infer<typeof jobListSchema>;

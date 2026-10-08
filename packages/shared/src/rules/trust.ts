@@ -17,9 +17,19 @@ export interface TrustInput {
 const COMPLETED_SATURATION = 50;
 const POSITIVE_WEIGHT_SUM = 0.4 + 0.25 + 0.15;
 
+/**
+ * Bayes ortalaması: puanlar, PRIOR_COUNT adet nötr (PRIOR_STARS) sanal puanla başlar.
+ * Az puanlı kullanıcıda tek puan skoru sert oynatmasın (düz ortalamada tek 1 yıldız yeni üyeyi 0,25'ten 0,06'ya düşürüyordu).
+ */
+const PRIOR_STARS = 3;
+const PRIOR_COUNT = 3;
+
+export const smoothedStars = (avgStars: number | null, ratingCount: number) =>
+  ratingCount > 0 && avgStars !== null ? (avgStars * ratingCount + PRIOR_STARS * PRIOR_COUNT) / (ratingCount + PRIOR_COUNT) : PRIOR_STARS;
+
 export function trustScore(i: TrustInput): number {
-  // Hiç puanı olmayan yeni üyeye nötr başlangıç (BR-30).
-  const ratingNorm = i.ratingCount > 0 && i.avgStars !== null ? (i.avgStars - 1) / 4 : 0.5;
+  // Hiç puanı olmayan yeni üyede ortalama nötr 3 yıldız → puan bileşeni 0,5 (BR-30).
+  const ratingNorm = (smoothedStars(i.avgStars, i.ratingCount) - 1) / 4;
   const experienceNorm = Math.min(1, Math.log(i.completedJobs + 1) / Math.log(COMPLETED_SATURATION + 1));
   const verificationNorm = i.verificationLevel / 2;
 

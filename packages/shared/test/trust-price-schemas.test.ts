@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { trustScore, isVerifiedBadge } from "../src/rules/trust.js";
+import { trustScore, isVerifiedBadge, smoothedStars } from "../src/rules/trust.js";
 import { estimatePrice } from "../src/rules/price.js";
 import { createLoadSchema, phoneSchema, plateSchema } from "../src/schemas.js";
 
@@ -18,6 +18,20 @@ describe("trustScore (BR-30)", () => {
   it("iptal oranı skoru düşürür ve sonuç 0–1 aralığında kalır", () => {
     const bad = { ...fresh, avgStars: 1, ratingCount: 3, cancelRate: 1, reportRate: 1 };
     expect(trustScore(bad)).toBe(0);
+  });
+
+  it("tek puan az puanlı kullanıcıyı sert oynatmaz (Bayes ortalaması)", () => {
+    const one = (stars: number) => trustScore({ ...fresh, avgStars: stars, ratingCount: 1, completedJobs: 1 });
+    // Düz ortalamada tek 1 yıldız 0,055'e, tek 5 yıldız 0,555'e götürüyordu
+    expect(one(1)).toBeGreaterThan(0.15);
+    expect(one(5)).toBeLessThan(0.45);
+    expect(one(5)).toBeGreaterThan(one(1));
+  });
+
+  it("puan sayısı arttıkça gerçek ortalamaya yaklaşır", () => {
+    expect(smoothedStars(null, 0)).toBe(3);
+    expect(smoothedStars(5, 1)).toBe(3.5);
+    expect(smoothedStars(5, 97)).toBeCloseTo(4.94, 2);
   });
 
   it("rozet seviye 1'den itibaren verilir", () => {

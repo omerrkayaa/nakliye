@@ -121,7 +121,11 @@ Bir kullanıcı hem nakliyeci hem yük sahibi rolüne sahip olabilir (ör. komis
 
 ### Güven skoru
 - **BR-30:** `güven = 0,4·puan_norm + 0,25·log(tamamlanan_iş+1)_norm + 0,15·doğrulama_seviyesi_norm − 0,15·iptal_oranı − 0,05·şikayet_oranı` Sonuç pozitif ağırlık toplamına (0,8) bölünür, böylece kusursuz kullanıcı 1 alır. Ardından 0–1 aralığına kırpılır. Yeni üye 0,25 ile başlar (hiç puanı yoksa puan bileşeni nötr 0,5 sayılır).
+  - *(2026-10-08)* `puan_norm` Bayes ortalamasıyla yumuşatılır: puanlara 3 adet nötr (3 yıldız) sanal puan eklenir, `ort = (toplam + 9) / (adet + 3)`. Düz ortalamada tek puan az puanlı kullanıcıyı sert oynatıyordu (yeni üye tek 1 yıldızla 0,25 → 0,06). Profilde gösterilen ortalama düz ortalamadır.
+  - *(2026-10-08)* `iptal_oranı` = kullanıcının **kendi** iptal ettiği iş / taraf olduğu tüm işler (karşı tarafın iptali mağdura yazılmaz). `şikayet_oranı` = haklı bulunan şikayet (kullanıcıya ya da ilanına) / (ilan + iş); şikayeti yönetici sonuçlandırana kadar (FR-51) bu bileşen 0'dır.
+  - *(2026-10-08)* BR-06'nın formülde terimi yok; uygulanmadı, karar bekliyor.
 - **BR-31:** Puan verilebilmesi için iş "Tamamlandı" olmalıdır, yani teslim kodu girilmiş olmalı ya da yük sahibi elle onaylamış olmalı.
+  - *(2026-10-08)* Puan, tamamlanmadan sonraki **14 gün** içinde ve bir kez verilir (düzenlenemez). **Kör puanlama:** puan, iki taraf da puanlayınca ya da 14 gün dolunca görünür ve güven skoruna girer; o zamana kadar karşı taraf yalnız puanlandığını bilir (misillemeye karşı). Etiketler yöne göre: "ödeme sorunsuz" yalnız yük sahibine, "yüke özenli" yalnız nakliyeciye.
 - **BR-32:** İş, teslimden sonra 48 saat içinde itiraz yoksa otomatik "Tamamlandı" olur.
 
 ### Gizlilik

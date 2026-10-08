@@ -3,6 +3,7 @@ import { JobsService } from "../jobs/jobs.service.js";
 import { OffersService } from "../jobs/offers.service.js";
 import { ConfirmationService } from "../loads/confirmation.service.js";
 import { MatchingService } from "../matching/matching.service.js";
+import { RatingsService } from "../ratings/ratings.service.js";
 import { CapacityService } from "../vehicles/capacity.service.js";
 
 export interface TickStats {
@@ -20,6 +21,8 @@ export interface TickStats {
   offersClosed: number;
   /** Teslimden 48 saat sonra otomatik tamamlanan işler (BR-32) */
   jobsCompleted: number;
+  /** Puanlama süresi bittiği için görünür olan (kör) puanlar */
+  ratingsRevealed: number;
 }
 
 /** Periyodik görevlerin tek turu. Her adım tekrar çalıştırılabilir (idempotent). */
@@ -31,6 +34,7 @@ export class SchedulerService {
     private readonly matching: MatchingService,
     private readonly offers: OffersService,
     private readonly jobs: JobsService,
+    private readonly ratings: RatingsService,
   ) {}
 
   async tick(now = new Date()): Promise<TickStats> {
@@ -40,6 +44,7 @@ export class SchedulerService {
     const matchSwept = await this.matching.sweep(now);
     const offersClosed = await this.offers.rejectStale();
     const jobsCompleted = await this.jobs.autoComplete(now);
-    return { ...confirmation, capacityExpired, matchSwept, offersClosed, jobsCompleted };
+    const ratingsRevealed = await this.ratings.revealExpired(now);
+    return { ...confirmation, capacityExpired, matchSwept, offersClosed, jobsCompleted, ratingsRevealed };
   }
 }

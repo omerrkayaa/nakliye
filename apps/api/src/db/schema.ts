@@ -387,9 +387,15 @@ export const ratings = pgTable(
     stars: smallint("stars").notNull(),
     tags: text("tags").array().notNull().default(sql`'{}'`),
     comment: varchar("comment", { length: 500 }),
+    // Kör puanlama: iki taraf da puanlayınca ya da puanlama süresi bitince dolar; dolmadan puan görünmez ve skora girmez
+    revealedAt: timestamp("revealed_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
-  (t) => [uniqueIndex("ratings_job_rater_uq").on(t.jobId, t.raterId), index("ratings_ratee_idx").on(t.rateeId)],
+  (t) => [
+    uniqueIndex("ratings_job_rater_uq").on(t.jobId, t.raterId),
+    index("ratings_ratee_idx").on(t.rateeId),
+    index("ratings_unrevealed_idx").on(t.jobId).where(sql`revealed_at is null`),
+  ],
 );
 
 // ── Güven ve moderasyon ────────────────────────────────────────────

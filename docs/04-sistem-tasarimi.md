@@ -110,7 +110,7 @@ price_params                 -- F7 formül katsayıları
 | **offers** | id, load_post_id, carrier_id, vehicle_id, price, note, status (`beklemede`/`kabul`/`ret`/`geri_cekildi`) |
 | **jobs** | id, load_post_id (unique), offer_id, shipper_id, carrier_id, vehicle_id, agreed_price, **status**, delivery_code_hash, delivered_at, completed_at, cancel_reason, cancelled_by |
 | **job_events** | id, job_id, type, actor_id, created_at, meta (json) |
-| **ratings** | id, job_id, rater_id, ratee_id, stars, tags[], comment, created_at — unique(job_id, rater_id) |
+| **ratings** | id, job_id, rater_id, ratee_id, stars, tags[], comment, revealed_at (kör puanlama: dolana kadar gizli), created_at — unique(job_id, rater_id) |
 | **reports** | id, reporter_id, target_type (`load_post`/`user`), target_id, reason, status, resolution |
 | **call_logs** | id, caller_id, load_post_id, created_at — BR-40 için |
 | **devices** | id, user_id, fcm_token, platform, last_seen |

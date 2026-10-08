@@ -29,6 +29,8 @@ import { DB, type Db, type Tx } from "../db/db.module.js";
 import { capacityPosts, companies, districts, jobEvents, jobs, loadPosts, offers, provinces, users, vehicles } from "../db/schema.js";
 import { LoadsService } from "../loads/loads.service.js";
 import { NotificationsService } from "../notifications/notifications.service.js";
+import { RatingsService } from "../ratings/ratings.service.js";
+import { TrustService } from "../ratings/trust.service.js";
 import { OffersService } from "./offers.service.js";
 
 const PAGE_SIZE = 20;
@@ -59,6 +61,8 @@ export class JobsService {
     private readonly offersService: OffersService,
     private readonly notifications: NotificationsService,
     private readonly sms: SmsService,
+    private readonly trust: TrustService,
+    private readonly ratings: RatingsService,
   ) {}
 
   /**
@@ -123,7 +127,8 @@ export class JobsService {
       return { carrierId: offer.carrierId, loadId: load.id, rejected };
     });
 
-    // Yan etkiler commit'ten sonra
+    // Yan etkiler commit'ten sonra (toplam iş sayısı iptal oranının paydası)
+    await this.trust.refresh(userId, result.carrierId);
     const route = await this.offersService.route(result.loadId);
     const [shipper] = await this.db.select({ phone: users.phone }).from(users).where(eq(users.id, userId));
     await this.sms.send(shipper!.phone, deliveryCodeSmsText(code)).catch((e: Error) => this.logger.warn(`Teslim kodu SMS'i gitmedi (${jobId}): ${e.message}`));
@@ -165,6 +170,7 @@ export class JobsService {
       .orderBy(asc(jobEvents.createdAt));
     return {
       ...this.view(row, userId),
+      rating: await this.ratings.forJob(userId, row.job),
       events: events.map((e) => ({
         type: e.type,
         at: e.at,
@@ -229,6 +235,7 @@ export class JobsService {
   async complete(userId: string, jobId: string, now = new Date()) {
     const job = await this.party(userId, jobId, "shipper");
     await this.db.transaction((tx) => this.transition(tx, job, "tamamlandi", userId, "shipper", { completedAt: now }));
+    await this.trust.refresh(job.shipperId, job.carrierId);
     await this.tell(job, "carrier", "İş tamamlandı. Yük sahibini puanlayabilirsiniz.");
     return this.get(userId, jobId);
   }
@@ -249,6 +256,7 @@ export class JobsService {
     const job = await this.party(userId, jobId);
     const actor: Actor = job.shipperId === userId ? "shipper" : "carrier";
     await this.db.transaction((tx) => this.transition(tx, job, "iptal", userId, actor, { cancelReason: reason, cancelledBy: userId }, { reason }));
+    await this.trust.refresh(job.shipperId, job.carrierId);
     await this.tell(job, actor === "shipper" ? "carrier" : "shipper", `İş iptal edildi: ${reason}`);
     return this.get(userId, jobId);
   }
@@ -269,6 +277,7 @@ export class JobsService {
         throw e;
       }
       done++;
+      await this.trust.refresh(job.shipperId, job.carrierId);
       await this.tell(job, "shipper", "İş otomatik tamamlandı. Nakliyeciyi puanlayabilirsiniz.");
       await this.tell(job, "carrier", "İş tamamlandı. Yük sahibini puanlayabilirsiniz.");
     }

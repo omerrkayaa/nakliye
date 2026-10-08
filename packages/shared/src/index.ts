@@ -7,5 +7,6 @@ export * from "./rules/contact.js";
 export * from "./rules/job.js";
 export * from "./rules/load.js";
 export * from "./rules/matching.js";
+export * from "./rules/rating.js";
 export * from "./rules/trust.js";
 export * from "./rules/price.js";
