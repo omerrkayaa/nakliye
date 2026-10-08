@@ -1,8 +1,8 @@
 "use client";
 
-import { startTransition, useActionState, useState } from "react";
+import { useActionState, useState } from "react";
 import { BODY_TYPES, CARGO_TYPES, VEHICLE_TYPES } from "@nakliye/shared";
-import { Field, invalid, selectClass } from "@/components/field";
+import { Field, invalid, selectClass, submitWithoutReset } from "@/components/field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Province } from "@/lib/types";
@@ -55,11 +55,7 @@ function PlacePicker({ id, label, provinces, error }: { id: string; label: strin
   );
 }
 
-/**
- * P3 ilan oluştur. Alanlar kontrollü: hata dönünce girilenler kaybolmaz.
- * <form action> işlem bitince formu sıfırlıyor; kontrollü <select> DOM'da sıfırlanıp state'le uyumsuz kalıyordu
- * (ilçe boş görünüyor, tekrar gönderimde boş gidiyordu — testte yakalandı). Bu yüzden gönderim onSubmit'te elle.
- */
+/** P3 ilan oluştur. Alanlar kontrollü ve form sıfırlanmadan gönderilir: hata dönünce girilenler kaybolmaz. */
 export function NewLoadForm({ provinces, today, maxDay }: { provinces: Province[]; today: string; maxDay: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(createLoadAction, {});
   const [v, setV] = useState({ loadFrom: today, loadTo: today, cargoType: "", weightTon: "", vehicleType: "", bodyType: "", priceType: "teklif", price: "", note: "" });
@@ -67,15 +63,7 @@ export function NewLoadForm({ provinces, today, maxDay }: { provinces: Province[
   const f = state.fields ?? {};
 
   return (
-    <form
-      className="space-y-8"
-      noValidate
-      onSubmit={(e) => {
-        e.preventDefault();
-        const data = new FormData(e.currentTarget);
-        startTransition(() => action(data));
-      }}
-    >
+    <form className="space-y-8" noValidate onSubmit={submitWithoutReset(action)}>
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">Güzergâh</h2>
         <PlacePicker id="originDistrictId" label="Kalkış" provinces={provinces} error={f.originDistrictId} />

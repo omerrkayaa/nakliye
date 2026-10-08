@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { startTransition, type FormEvent, type ReactNode } from "react";
 import { Label } from "@/components/ui/label";
 
 /** Doğal <select> (klavye, ekran okuyucu ve mobilde yerel seçici hazır gelir); Input ile aynı görünüm. */
@@ -20,6 +20,16 @@ export function Field({ label, htmlFor, error, children, hint }: { label: string
     </div>
   );
 }
+
+/**
+ * Formu sıfırlamadan gönder. <form action> işlem bitince formu sıfırlıyor: hata dönünce yazılan metin siliniyor,
+ * kontrollü <select>/radyo DOM'da boşalıp state'le uyumsuz kalıyor (ilan formunda testte yakalandı).
+ */
+export const submitWithoutReset = (dispatch: (data: FormData) => void) => (e: FormEvent<HTMLFormElement>) => {
+  e.preventDefault();
+  const data = new FormData(e.currentTarget);
+  startTransition(() => dispatch(data));
+};
 
 /** Alanın erişilebilirlik öznitelikleri (hata varsa) */
 export const invalid = (id: string, error?: string) =>

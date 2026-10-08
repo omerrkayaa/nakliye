@@ -89,3 +89,23 @@ export async function closeLoadAction(_prev: FormState, form: FormData): Promise
   refresh();
   return {};
 }
+
+export interface AcceptState extends FormState {
+  /** Teslim kodu yalnız kabul yanıtında döner (DB'de hash): bir kez gösterilir, ayrıca SMS'le gider */
+  deliveryCode?: string;
+  jobId?: string;
+}
+
+/** Teklif kabul (FR-31, UC-09): iş oluşur, diğer teklifler reddedilir, ilan kapanır. */
+export async function acceptOfferAction(_prev: AcceptState, form: FormData): Promise<AcceptState> {
+  const offerId = String(form.get("offerId") ?? "");
+  let r: { job: { id: string }; deliveryCode: string };
+  try {
+    r = await api(`/offers/${encodeURIComponent(offerId)}/accept`, { method: "POST" });
+  } catch (e) {
+    if (e instanceof ApiError) return { error: e.message };
+    throw e;
+  }
+  refresh();
+  return { deliveryCode: r.deliveryCode, jobId: r.job.id };
+}

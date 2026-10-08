@@ -18,15 +18,18 @@ export const phone = (n: number) => `+90559${run}${String(n).padStart(3, "0")}`;
 /** Formda yazılan biçim: 0559 … */
 export const localPhone = (p: string) => `0${p.slice(3)}`;
 
-/** API geliştirme modunda SMS'i loga yazar; o numaraya giden son giriş kodu. */
-export async function otpFor(p: string): Promise<string> {
+/** API geliştirme modunda SMS'i loga yazar; o numaraya giden son SMS'te kalıba uyan 6 haneli kod. */
+export async function smsCode(p: string, text: string): Promise<string> {
+  const re = new RegExp(String.raw`\[SMS → (\+\d+)\] ${text}: (\d{6})`, "g");
   for (let i = 0; i < 40; i++) {
-    const m = [...readFileSync(API_LOG, "utf8").matchAll(/\[SMS → (\+\d+)\] Nakliye giriş kodunuz: (\d{6})/g)].filter((x) => x[1] === p).at(-1);
+    const m = [...readFileSync(API_LOG, "utf8").matchAll(re)].filter((x) => x[1] === p).at(-1);
     if (m) return m[2]!;
     await sleep(150);
   }
-  throw new Error(`OTP bulunamadı: ${p}`);
+  throw new Error(`SMS bulunamadı: ${p} ${text}`);
 }
+
+export const otpFor = (p: string) => smsCode(p, "Nakliye giriş kodunuz");
 
 export async function api<T = Record<string, string>>(method: string, path: string, token?: string, body?: unknown) {
   const res = await fetch(API + path, {
@@ -49,9 +52,10 @@ export async function apiLogin(p: string) {
   return (await api<{ accessToken: string; refreshToken: string }>("POST", "/auth/otp/verify", undefined, { phone: p, code })).body;
 }
 
-/** Yönetici belirteci: rol DB'den verilir, refresh ile rolü taşıyan belirteç alınır. */
-export async function adminToken() {
-  const p = phone(900);
+/** Yönetici belirteci: rol DB'den verilir, refresh ile rolü taşıyan belirteç alınır. Her test dosyası ayrı numara
+ * kullanır (aynı numaraya art arda OTP istemek bekleme süresine takılır). */
+export async function adminToken(n = 900) {
+  const p = phone(n);
   const t = await apiLogin(p);
   psql(`insert into user_roles(user_id, role) select id, 'admin' from users where phone='${p}' on conflict do nothing`);
   return (await api("POST", "/auth/refresh", undefined, { refreshToken: t.refreshToken })).body.accessToken!;
@@ -77,4 +81,12 @@ export async function createLoad(token: string, admin: string) {
   });
   if (r.body.status === "moderasyonda") await api("POST", `/admin/loads/${r.body.id}/review`, admin, { decision: "onay" });
   return r.body.id!;
+}
+
+/** API ile kullanıcı: giriş + rol (+ ad); rolü taşıyan erişim belirteci döner. */
+export async function apiUser(p: string, role: "shipper" | "carrier", name?: string) {
+  const t = await apiLogin(p);
+  const access = (await api("POST", "/me/roles", t.accessToken, { roles: [role] })).body.accessToken!;
+  if (name) await api("PATCH", "/me", access, { name });
+  return { ...t, accessToken: access, id: (await api("GET", "/me", access)).body.id! };
 }

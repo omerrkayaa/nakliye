@@ -10,7 +10,7 @@ export default function PanelLayout({ children }: LayoutProps<"/panel">) {
   return (
     <div className="flex flex-1 flex-col">
       <header className="border-b bg-primary text-primary-foreground">
-        <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-6 px-4">
+        <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-4 px-4 sm:gap-6">
           <Link href="/panel" className="flex items-center gap-2 font-bold">
             <Truck className="size-5 text-brand-accent" aria-hidden />
             Nakliye
@@ -18,6 +18,9 @@ export default function PanelLayout({ children }: LayoutProps<"/panel">) {
           <nav className="flex gap-4 text-sm">
             <Link href="/panel/ilanlar" className="underline-offset-4 hover:underline">
               İlanlarım
+            </Link>
+            <Link href="/panel/tasimalar" className="underline-offset-4 hover:underline">
+              Taşımalar
             </Link>
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm">
@@ -39,5 +42,6 @@ export default function PanelLayout({ children }: LayoutProps<"/panel">) {
 
 async function UserName() {
   const me = await api<Me>("/me");
-  return <span className="opacity-90">{me.company?.title ?? me.name ?? `0${me.phone.slice(3)}`}</span>;
+  // Telefon genişliğinde menü sığsın diye ad gizlenir
+  return <span className="hidden opacity-90 sm:inline">{me.company?.title ?? me.name ?? `0${me.phone.slice(3)}`}</span>;
 }

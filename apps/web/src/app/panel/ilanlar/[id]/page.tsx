@@ -7,13 +7,14 @@ import { LoadStatusBadge } from "@/components/load-status-badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api";
 import { ago, dayRange, place, tl } from "@/lib/format";
-import type { LoadDetail } from "@/lib/types";
+import type { LoadDetail, Offer } from "@/lib/types";
 import { ConfirmButton } from "../confirm-button";
 import { CloseButtons } from "./close-buttons";
+import { OffersList } from "./offers-list";
 
 export const metadata: Metadata = { title: "İlan" };
 
-/** İlan detayı (sahibi): özet, teyit ve kapatma. */
+/** İlan detayı (sahibi): özet, teyit, kapatma ve gelen teklifler (P5). */
 export default function LoadPage({ params, searchParams }: PageProps<"/panel/ilanlar/[id]">) {
   return (
     <div className="max-w-4xl space-y-6">
@@ -38,6 +39,7 @@ async function Load({ params, searchParams }: Pick<PageProps<"/panel/ilanlar/[id
     throw e;
   }
   const visible = VISIBLE_LOAD_STATUSES.includes(l.status);
+  const offers = l.status === "moderasyonda" ? [] : (await api<{ items: Offer[] }>(`/loads/${l.id}/offers`)).items;
 
   return (
     <>
@@ -79,6 +81,12 @@ async function Load({ params, searchParams }: Pick<PageProps<"/panel/ilanlar/[id
           )}
         </CardContent>
       </Card>
+      {l.status !== "moderasyonda" && (
+        <section id="teklifler" className="space-y-3">
+          <h2 className="text-lg font-semibold">Teklifler</h2>
+          <OffersList offers={offers} canAccept={visible} />
+        </section>
+      )}
     </>
   );
 }
