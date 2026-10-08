@@ -122,8 +122,9 @@ export const NOTIFICATION_TYPES = {
   offer_new: "Yeni teklif",
   offer_result: "Teklif sonucu",
   job_update: "İş durumu",
+  route_alert: "Rota alarmı",
 } as const;
 export type NotificationType = keyof typeof NOTIFICATION_TYPES;
 
 /** BR-22 saatlik sınırına giren tipler */
-export const MATCH_NOTIFICATION_TYPES: readonly NotificationType[] = ["match_for_carrier", "match_for_shipper"];
+export const MATCH_NOTIFICATION_TYPES: readonly NotificationType[] = ["match_for_carrier", "match_for_shipper", "route_alert"];

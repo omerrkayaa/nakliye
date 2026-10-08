@@ -17,6 +17,7 @@ import {
 } from "@nakliye/shared";
 import { and, eq, gte, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { AlertsService } from "../alerts/alerts.service.js";
 import { DB, type Db } from "../db/db.module.js";
 import { capacityPosts, companies, districts, loadPosts, matches, provinces, users, vehicles } from "../db/schema.js";
 import { NotificationsService, type NotifyLimit } from "../notifications/notifications.service.js";
@@ -67,6 +68,7 @@ export class MatchingService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly notifications: NotificationsService,
+    private readonly alerts: AlertsService,
   ) {}
 
   /** İsteği bekletmeden eşleştirmeyi başlatır; hata olursa zamanlayıcı süpürmesi yakalar (matched_at boş kalır). */
@@ -123,6 +125,22 @@ export class MatchingService {
         if (sent) await this.db.update(matches).set({ notifiedAt: now }).where(and(eq(matches.loadPostId, load.id), eq(matches.capacityPostId, c.cap.id)));
       }
       if (fresh > 0) await this.notifyShipper(load, route, fresh, now);
+      // Rota alarmı (FR-22). ref_key eşleşmeyle ortak: boş araç ilanından zaten haber alan nakliyeciye ikinci bildirim
+      // gitmez; ilan düzenlenip yeniden eşleştirilse de tekrar gitmez. Saatlik sınır (BR-22) eşleşmelerle ortak.
+      for (const a of await this.alerts.ownersForLoad(load.id)) {
+        await this.notifications.notify(
+          a.userId,
+          {
+            type: "route_alert",
+            refKey: `match:load:${load.id}`,
+            title: "Alarmınıza uygun yeni yük",
+            body: `${route}, ${dayText(load.loadFrom)} yükleme, ${load.weightTon} ton`,
+            data: { type: "alert", loadId: load.id, alertId: a.alertId },
+          },
+          LIMIT,
+          now,
+        );
+      }
     }
     await this.db.update(loadPosts).set({ matchedAt: now }).where(eq(loadPosts.id, load.id));
     return fresh;

@@ -1,5 +1,6 @@
 // API sözleşmesi: Android, Web ve API aynı şemaları kullanır (docs/04 §6).
 import { z } from "zod";
+import { ROUTE_ALERT_PARAMS as RA } from "./rules/matching.js";
 import {
   BODY_TYPES,
   CARGO_TYPES,
@@ -240,6 +241,29 @@ export const createRatingSchema = z.object({
   comment: z.string().trim().max(500).optional(),
 });
 
+const radiusSchema = z.number().int().min(RA.minRadiusKm).max(RA.maxRadiusKm);
+
+/** Rota alarmı (FR-22): nereden (ilçe ± km) → nereye (ilçe ± km ya da null = her yer) + isteğe bağlı araç tipi. */
+export const createRouteAlertSchema = z.object({
+  originDistrictId: z.number().int().positive(),
+  originRadiusKm: radiusSchema.default(RA.defaultOriginRadiusKm),
+  destDistrictId: z.number().int().positive().nullable().default(null),
+  destRadiusKm: radiusSchema.default(RA.defaultDestRadiusKm),
+  vehicleType: vehicleTypeSchema.nullable().default(null),
+});
+
+export const updateRouteAlertSchema = z
+  .object({
+    originDistrictId: z.number().int().positive(),
+    originRadiusKm: radiusSchema,
+    destDistrictId: z.number().int().positive().nullable(),
+    destRadiusKm: radiusSchema,
+    vehicleType: vehicleTypeSchema.nullable(),
+    active: z.boolean(),
+  })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, "Değiştirilecek alan yok");
+
 export const createReportSchema = z.object({
   targetType: z.enum(["load_post", "user"]),
   targetId: z.string().uuid(),
@@ -258,6 +282,8 @@ export type ReviewLoadInput = z.infer<typeof reviewLoadSchema>;
 export type ConfirmLoadInput = z.infer<typeof confirmLoadSchema>;
 export type CreateReportInput = z.infer<typeof createReportSchema>;
 export type CreateRatingInput = z.infer<typeof createRatingSchema>;
+export type CreateRouteAlertInput = z.infer<typeof createRouteAlertSchema>;
+export type UpdateRouteAlertInput = z.infer<typeof updateRouteAlertSchema>;
 export type JobStatusInput = z.infer<typeof jobStatusSchema>;
 export type ReasonInput = z.infer<typeof reasonSchema>;
 export type JobListInput = z.infer<typeof jobListSchema>;

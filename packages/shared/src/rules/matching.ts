@@ -103,8 +103,18 @@ export function matchLoadWithCapacity(
   return { candidate: true, score: round3(score), originKm: round1(originKm), destKm: destKm === null ? null : round1(destKm) };
 }
 
-/** BR-22: kullanıcı başına saatlik bildirim sınırı */
+/** BR-22: kullanıcı başına saatlik bildirim sınırı (rota alarmı bildirimleri de bu sınıra girer) */
 export const MAX_MATCH_NOTIFICATIONS_PER_HOUR = 5;
+
+/** Rota alarmı (FR-22, UC-06): ilçe + yarıçap. Varsayılan yarıçaplar eşleştirmeninkiyle aynı (BR-20). */
+export const ROUTE_ALERT_PARAMS = {
+  /** Kullanıcı başına aktif alarm sınırı (bildirim yorgunluğu, BR-22) */
+  maxActive: 10,
+  minRadiusKm: 10,
+  maxRadiusKm: 200,
+  defaultOriginRadiusKm: DEFAULT_MATCH_PARAMS.originRadiusKm,
+  defaultDestRadiusKm: DEFAULT_MATCH_PARAMS.destRadiusKm,
+};
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const round3 = (n: number) => Math.round(n * 1000) / 1000;

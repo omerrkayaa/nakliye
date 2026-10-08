@@ -264,15 +264,23 @@ export const capacityPosts = pgTable(
   ],
 );
 
-export const routeAlerts = pgTable("route_alerts", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  originProvinceId: smallint("origin_province_id").references(() => provinces.id),
-  destProvinceId: smallint("dest_province_id").references(() => provinces.id),
-  vehicleType: vehicleTypeEnum("vehicle_type"),
-  active: boolean("active").notNull().default(true),
-  createdAt: createdAt(),
-});
+// Rota alarmı (FR-22): ilçe merkezi ± yarıçap; varış null = her yer, araç tipi null = hepsi
+export const routeAlerts = pgTable(
+  "route_alerts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    originDistrictId: integer("origin_district_id").notNull().references(() => districts.id),
+    originRadiusKm: smallint("origin_radius_km").notNull(),
+    destDistrictId: integer("dest_district_id").references(() => districts.id),
+    destRadiusKm: smallint("dest_radius_km").notNull(),
+    vehicleType: vehicleTypeEnum("vehicle_type"),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+  },
+  // Alarm araması yarıçapla yapılır (ilçe merkezine mesafe); aktif alarmlar az olduğu için taranır, ilçe kimliği indeksi işe yaramaz
+  (t) => [index("route_alerts_user_idx").on(t.userId)],
+);
 
 export const matches = pgTable(
   "matches",

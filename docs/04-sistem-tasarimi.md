@@ -105,7 +105,7 @@ price_params                 -- F7 formül katsayıları
 | **load_posts** | id, shipper_id, origin_loc_id, origin_geom (Point), dest_loc_id, dest_geom, load_from, load_to (tarih aralığı), cargo_type, weight_ton, req_vehicle_type, req_body_type, price_type (`sabit`/`teklif`), price, currency, note, **status** (`taslak`/`moderasyonda`/`teyitli`/`teyit_bekliyor`/`suresi_doldu`/`kapandi`/`iptal`), **last_confirmed_at**, next_reminder_at, created_at |
 | **load_confirmations** | id, load_post_id, asked_at, answered_at, answer (`gecerli`/`arac_bulundu`/`iptal`/`cevapsiz`), channel (`push`/`sms`) |
 | **capacity_posts** | id, carrier_id, vehicle_id, origin_geom, available_from, available_to, dest_geom? (null = her yer), route_polyline?, status |
-| **route_alerts** | id, user_id, origin_loc_id, dest_loc_id, radius_km, vehicle_type?, active |
+| **route_alerts** | id, user_id, origin_district_id, origin_radius_km, dest_district_id? (null = her yer), dest_radius_km, vehicle_type?, active |
 | **matches** | id, load_post_id, capacity_post_id, score, notified_at, outcome (`goruldu`/`arandi`/`teklif`/`yok`) |
 | **offers** | id, load_post_id, carrier_id, vehicle_id, price, note, status (`beklemede`/`kabul`/`ret`/`geri_cekildi`) |
 | **jobs** | id, load_post_id (unique), offer_id, shipper_id, carrier_id, vehicle_id, agreed_price, **status**, delivery_code_hash, delivered_at, completed_at, cancel_reason, cancelled_by |
@@ -119,7 +119,7 @@ price_params                 -- F7 formül katsayıları
 ### Önemli indeksler
 - `load_posts`: GIST(origin_geom), GIST(dest_geom), (status, load_from), (shipper_id)
 - `capacity_posts`: GIST(origin_geom), (status, available_from)
-- `route_alerts`: (origin_loc_id, dest_loc_id) WHERE active
+- `route_alerts`: (user_id). Alarm araması yarıçapla (ilçe merkezine `ST_DWithin` mesafe) yapıldığı için ilçe kimliği indeksi işe yaramaz; aktif alarmlar taranır (MVP ölçeğinde yeterli).
 
 ---
 

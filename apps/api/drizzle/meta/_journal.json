@@ -71,6 +71,20 @@
       "when": 1791458116411,
       "tag": "0009_ratings_reveal",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791461309232,
+      "tag": "0010_route_alerts_drop_province",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791461310999,
+      "tag": "0011_route_alerts_district_radius",
+      "breakpoints": true
     }
   ]
 }

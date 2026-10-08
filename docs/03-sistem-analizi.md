@@ -55,7 +55,7 @@ Bir kullanıcı hem nakliyeci hem yük sahibi rolüne sahip olabilir (ör. komis
 |---|---|---|
 | FR-20 | Nakliyeci yükleri nereden → nereye, tarih, araç ve kasa tipi, tonaj ile filtreler. | MVP |
 | FR-21 | "Yakınımdakiler": kullanıcının izniyle bir kerelik konuma göre yarıçap araması. | MVP |
-| FR-22 | **Rota alarmı:** nakliyeci güzergâh kaydeder, uyan yeni ilan çıkınca push bildirim alır. | MVP |
+| FR-22 | **Rota alarmı:** nakliyeci güzergâh kaydeder, uyan yeni ilan çıkınca push bildirim alır. *(2026-10-08: güzergâh = kalkış ilçesi ± km → varış ilçesi ± km ya da her yer, isteğe bağlı araç tipi; varsayılan 50 / 80 km, 10–200 km; kullanıcı başına 10 aktif alarm. Yalnız teyitli ilan bildirilir; aynı yük için eşleşmeyle ortak tek bildirim ve BR-22 saatlik sınırı.)* | MVP |
 | FR-23 | **Otomatik eşleştirme:** yeni yük ilanı uygun boş araç ilanlarıyla, yeni boş araç ilanı da uygun yüklerle eşleştirilir; iki taraf da bildirim alır (BR-20…23). | MVP |
 | FR-24 | **Dönüş planı (F4):** nakliyecinin aktif işinin varış yeri ve tarihine göre dönüş ve rota üstü yük önerileri. | MVP+ (2. iterasyon) |
 | FR-25 | **Koridor fiyat aralığı (F7):** mesafe, tonaj, araç tipi, yakıt ve otoyol parametreleriyle formüle dayalı tahmini aralık. | MVP+ |
