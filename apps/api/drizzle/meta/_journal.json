@@ -85,6 +85,13 @@
       "when": 1791461310999,
       "tag": "0011_route_alerts_district_radius",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791488495797,
+      "tag": "0012_admin_reports_suspend",
+      "breakpoints": true
     }
   ]
 }

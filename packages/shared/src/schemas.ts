@@ -271,6 +271,18 @@ export const createReportSchema = z.object({
   note: z.string().trim().max(500).optional(),
 });
 
+/** FR-51 yönetici: şikayeti sonuçlandır (not isteğe bağlı, kayıtta kalır). */
+export const resolveReportSchema = z.object({
+  decision: z.enum(["hakli", "haksiz"]),
+  note: z.string().trim().max(500).optional(),
+});
+export const adminReportListSchema = z.object({
+  status: z.enum(["acik", "kapali"]).default("acik"),
+  page: z.coerce.number().int().min(1).default(1),
+});
+/** FR-51 yönetici: hesabı askıya al (sebep zorunlu; kayıtta kalır). */
+export const suspendUserSchema = z.object({ reason: z.string().trim().min(5, "Sebebi en az 5 karakterle yazın").max(500) });
+
 export type UpdateMeInput = z.infer<typeof updateMeSchema>;
 export type AddRolesInput = z.infer<typeof addRolesSchema>;
 export type CreateCompanyInput = z.infer<typeof createCompanySchema>;
@@ -295,3 +307,6 @@ export type UpdateCapacityInput = z.infer<typeof updateCapacitySchema>;
 export type CloseCapacityInput = z.infer<typeof closeCapacitySchema>;
 export type LoadSearchInput = z.infer<typeof loadSearchSchema>;
 export type CreateOfferInput = z.infer<typeof createOfferSchema>;
+export type ResolveReportInput = z.infer<typeof resolveReportSchema>;
+export type AdminReportListInput = z.infer<typeof adminReportListSchema>;
+export type SuspendUserInput = z.infer<typeof suspendUserSchema>;

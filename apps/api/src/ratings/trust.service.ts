@@ -4,7 +4,7 @@ import { and, count, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { DB, type Db, type Tx } from "../db/db.module.js";
 import { jobs, loadPosts, ratings, reports, users } from "../db/schema.js";
 
-/** Yönetici şikayeti haklı bulunca verilen durum (FR-51, Faz 3). O akış gelene kadar şikayet bileşeni 0 kalır. */
+/** Yönetici şikayeti haklı bulunca verilen durum (FR-51; admin/admin.service.ts resolveReport). */
 const REPORT_UPHELD = "hakli";
 
 export interface TrustStats {

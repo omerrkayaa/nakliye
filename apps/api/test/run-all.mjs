@@ -5,7 +5,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const log = process.argv[2] ?? "api.log";
-const suites = ["loads", "confirmation", "reports", "vehicles", "matching", "jobs", "ratings", "alerts"];
+const suites = ["loads", "confirmation", "reports", "vehicles", "matching", "jobs", "ratings", "alerts", "admin"];
 let failed = 0;
 for (const s of suites) {
   const file = fileURLToPath(new URL(`./e2e-${s}.mjs`, import.meta.url));

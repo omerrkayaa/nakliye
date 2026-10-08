@@ -94,6 +94,9 @@ export const users = pgTable("users", {
   verificationLevel: smallint("verification_level").notNull().default(0),
   trustScore: real("trust_score").notNull().default(0.25),
   status: varchar("status", { length: 16 }).notNull().default("aktif"),
+  // FR-51: askıya alma kaydı (status = 'askida' iken dolu)
+  suspendedAt: timestamp("suspended_at", { withTimezone: true }),
+  suspendReason: varchar("suspend_reason", { length: 500 }),
   createdAt: createdAt(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
@@ -418,6 +421,9 @@ export const reports = pgTable(
     note: varchar("note", { length: 500 }),
     status: varchar("status", { length: 16 }).notNull().default("acik"),
     resolution: text("resolution"),
+    // FR-51: yönetici kararı
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolvedBy: uuid("resolved_by").references(() => users.id),
     createdAt: createdAt(),
   },
   (t) => [

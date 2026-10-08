@@ -95,6 +95,21 @@ export const REPORT_REASONS = {
 } as const;
 export type ReportReason = keyof typeof REPORT_REASONS;
 
+/** Şikayetin yönetici kararı (FR-51). Yalnız "haklı" güven skoruna girer (BR-30 şikayet terimi). */
+export const REPORT_STATUS_LABELS = {
+  acik: "Açık",
+  hakli: "Haklı bulundu",
+  haksiz: "Haksız bulundu",
+} as const;
+export type ReportStatus = keyof typeof REPORT_STATUS_LABELS;
+
+/** Hesap durumu: askıdaki kullanıcı giriş yapamaz, ilanları yayından kalkar (FR-51). */
+export const USER_STATUS_LABELS = {
+  aktif: "Aktif",
+  askida: "Askıda",
+} as const;
+export type UserStatus = keyof typeof USER_STATUS_LABELS;
+
 export const DOCUMENT_TYPES = {
   ruhsat: "Araç ruhsatı",
   k_belgesi: "K yetki belgesi",

@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { AdminModule } from "./admin/admin.module.js";
 import { AuthModule } from "./auth/auth.module.js";
 import { DbModule } from "./db/db.module.js";
 import { HealthController } from "./health.controller.js";
@@ -24,6 +25,7 @@ import { VehiclesModule } from "./vehicles/vehicles.module.js";
     VehiclesModule,
     JobsModule,
     SchedulerModule,
+    AdminModule,
   ],
   controllers: [HealthController, LocationsController],
 })

@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Inject, Injectable, UnauthorizedException } from "@nestjs/common";
+import { ForbiddenException, HttpException, HttpStatus, Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { randomToken, sha256, sixDigitCode } from "../common/hash.js";
@@ -11,6 +11,8 @@ const OTP_TTL_MS = 3 * 60_000;
 const OTP_MAX_ATTEMPTS = 5;
 const OTP_RESEND_MS = 60_000;
 const REFRESH_TTL_MS = 30 * 24 * 3_600_000;
+// Destek kanalı (W4 iletişim) gelince mesaja eklenmeli
+const SUSPENDED_MESSAGE = "Hesabınız askıya alındı.";
 
 /**
  * Demo hesabı (mobil uygulamayı telefonda denemek için): DEMO_PHONE'a her zaman DEMO_OTP gider.
@@ -66,6 +68,7 @@ export class AuthService {
     let [user] = await this.db.select().from(users).where(eq(users.phone, phone));
     const isNew = !user;
     if (!user) [user] = await this.db.insert(users).values({ phone }).returning();
+    if (user!.status === "askida") throw new ForbiddenException(SUSPENDED_MESSAGE);
 
     return { isNew, ...(await this.issueTokens(user!.id)) };
   }
@@ -82,6 +85,9 @@ export class AuthService {
         ),
       );
     if (!row) throw new UnauthorizedException("Oturum süresi doldu");
+    // Askıya alınan hesabın belirteçleri askıya alırken iptal edilir; bu ikinci kilit (yarışta açık kalanlar için)
+    const [owner] = await this.db.select({ status: users.status }).from(users).where(eq(users.id, row.userId));
+    if (owner?.status === "askida") throw new UnauthorizedException(SUSPENDED_MESSAGE);
     // Yenileme belirteci tek kullanımlıktır (rotation).
     await this.db.update(refreshTokens).set({ revokedAt: new Date() }).where(eq(refreshTokens.id, row.id));
     return this.issueTokens(row.userId);

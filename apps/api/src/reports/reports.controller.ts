@@ -5,7 +5,7 @@ import type { AccessPayload } from "../auth/auth.service.js";
 import { ZodPipe } from "../common/zod.pipe.js";
 import { ReportsService } from "./reports.service.js";
 
-/** Şikayet (UC-13): giriş yapmış herkes. Yönetici kuyruğu (FR-51) Faz 3'te. */
+/** Şikayet (UC-13): giriş yapmış herkes. Yönetici kuyruğu (FR-51): admin/admin.controller.ts */
 @Controller("reports")
 @UseGuards(AuthGuard)
 export class ReportsController {
