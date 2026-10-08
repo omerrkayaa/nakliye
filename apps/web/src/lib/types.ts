@@ -1,5 +1,5 @@
 // API yanıtlarının web'de kullanılan kısmı (apps/api servislerindeki view() çıktıları).
-import type { BodyType, CargoType, JobStatus, LoadStatus, RatingTag, ReportReason, ReportStatus, Role, UserStatus, VehicleType } from "@nakliye/shared";
+import type { BodyType, CargoType, JobStatus, LoadStatus, NotificationType, RatingTag, ReportReason, ReportStatus, Role, UserStatus, VehicleType } from "@nakliye/shared";
 
 export interface Place {
   district: string;
@@ -154,4 +154,15 @@ export interface AdminReport {
     owner: AdminUser | null;
   };
   openOnTarget: number;
+}
+
+/** Bildirim kutusu (GET /notifications) — mobil lib/types.ts ile aynı */
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  data: { type?: string; loadId?: string; jobId?: string; capacityId?: string; offerId?: string; alertId?: string; confirmationId?: string };
+  createdAt: string;
+  readAt: string | null;
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { LogOut, Truck } from "lucide-react";
+import { Bell, LogOut, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import type { Me } from "@/lib/types";
@@ -10,12 +10,14 @@ export default function PanelLayout({ children }: LayoutProps<"/panel">) {
   return (
     <div className="flex flex-1 flex-col">
       <header className="border-b bg-primary text-primary-foreground">
-        <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-4 px-4 sm:gap-6">
-          <Link href="/panel" className="flex items-center gap-2 font-bold">
+        <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4 sm:gap-6">
+          <Link href="/panel" aria-label="Nakliye" className="flex shrink-0 items-center gap-2 font-bold">
             <Truck className="size-5 text-brand-accent" aria-hidden />
-            Nakliye
+            {/* Dar ekranda yalnız simge: menüye yer kalsın */}
+            <span className="hidden sm:inline">Nakliye</span>
           </Link>
-          <nav className="flex gap-4 text-sm">
+          {/* Dar ekranda menü kendi içinde kayar (yönetici + zil ile 390 px'e sığmıyor); sayfa yatay taşmaz */}
+          <nav className="flex min-w-0 gap-4 overflow-x-auto text-sm whitespace-nowrap">
             <Link href="/panel/ilanlar" className="underline-offset-4 hover:underline">
               İlanlarım
             </Link>
@@ -26,9 +28,12 @@ export default function PanelLayout({ children }: LayoutProps<"/panel">) {
               <AdminLink />
             </Suspense>
           </nav>
-          <div className="ml-auto flex items-center gap-3 text-sm">
+          <div className="ml-auto flex shrink-0 items-center gap-3 text-sm">
             <Suspense>
               <UserName />
+            </Suspense>
+            <Suspense>
+              <NotificationBell />
             </Suspense>
             <form action={logoutAction}>
               {/* Dar ekranda yalnız simge (yönetici menüsüyle başlık 390 px'e sığsın); ad ekran okuyucuda kalır */}
@@ -57,4 +62,23 @@ async function AdminLink() {
       Yönetim
     </Link>
   ) : null;
+}
+
+/** Okunmamış bildirim sayısı (push yok; sayfa yüklenince ve işlem sonrası tazelenir) */
+async function NotificationBell() {
+  const { unread } = await api<{ unread: number }>("/notifications");
+  return (
+    <Link
+      href="/panel/bildirimler"
+      aria-label={unread > 0 ? `Bildirimler, ${unread} okunmamış` : "Bildirimler"}
+      className="relative inline-flex size-9 items-center justify-center rounded-md hover:bg-white/10"
+    >
+      <Bell className="size-5" aria-hidden />
+      {unread > 0 && (
+        <span aria-hidden className="absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-brand-accent px-1 text-center text-[10px] leading-4 font-bold text-white">
+          {unread > 99 ? "99+" : unread}
+        </span>
+      )}
+    </Link>
+  );
 }
