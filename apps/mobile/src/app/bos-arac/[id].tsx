@@ -68,7 +68,7 @@ export default function BosAracDetay() {
             matches.data.items.map((m) => (
               <View key={m.loadId} style={{ gap: 4 }}>
                 <Muted>
-                  Size {Math.round(m.originKm)} km{m.destKm !== null ? ` · varış hedefinize ${Math.round(m.destKm)} km` : ""}
+                  Yükleme yeri {Math.round(m.originKm)} km uzakta{m.destKm !== null ? ` · varış hedefinize ${Math.round(m.destKm)} km` : ""}
                 </Muted>
                 <LoadCard
                   load={{ ...m, id: m.loadId, note: null }}
