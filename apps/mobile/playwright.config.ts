@@ -16,6 +16,8 @@ export default defineConfig({
     timezoneId: "Europe/Istanbul",
     viewport: { width: 390, height: 844 },
     actionTimeout: 15_000,
+    // Aralıklı hata görüldü (itiraz testi bir kez, tekrar üretilemedi): hata olursa iz saklansın — npx playwright show-trace
+    trace: "retain-on-failure",
     launchOptions: { args: ["--disable-web-security"] },
   },
   reporter: [["list"]],

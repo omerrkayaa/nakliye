@@ -134,6 +134,8 @@ check("kararlılar açık kuyrukta yok, diğeri duruyor", !mine(r1) && !mine(r2)
 q = await queue("kapali");
 check("kapalı listede kararlar", mine(r1)?.status === "hakli" && mine(r2)?.status === "haksiz" && mine(r2)?.resolution === "Arandı, açtı");
 check("açık sayaç kararla düşer", mine(r1)?.openOnTarget === 0);
+r = await api("GET", "/admin/reports?status=kapali", A);
+check("kapalılar en son karar başta (karar tarihi boş eski kayıtlar sonda)", r.body.items[0]?.id === r1 && r.body.items[1]?.id === r2, JSON.stringify(r.body.items.slice(0, 2).map((x) => [x.id, x.resolvedAt])));
 
 // ── Kullanıcı arama ───────────────────────────────────────────────
 console.log("\nKullanıcı arama (Y2)");

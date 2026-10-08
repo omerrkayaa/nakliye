@@ -49,7 +49,8 @@ export class AdminService {
       .from(reports)
       .innerJoin(reporter, eq(reporter.id, reports.reporterId))
       .where(open ? eq(reports.status, "acik") : ne(reports.status, "acik"))
-      .orderBy(open ? reports.createdAt : desc(reports.resolvedAt))
+      // Kapalılarda karar tarihi boş olan (eski, elle kapatılmış) kayıtlar sona: DESC varsayılanı NULL'ları başa koyar
+      .orderBy(open ? reports.createdAt : sql`${reports.resolvedAt} desc nulls last`)
       .limit(PAGE_SIZE + 1)
       .offset((page - 1) * PAGE_SIZE);
     const items = rows.slice(0, PAGE_SIZE);

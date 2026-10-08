@@ -1,5 +1,5 @@
 // API yanıtlarının web'de kullanılan kısmı (apps/api servislerindeki view() çıktıları).
-import type { BodyType, CargoType, JobStatus, LoadStatus, RatingTag, Role, VehicleType } from "@nakliye/shared";
+import type { BodyType, CargoType, JobStatus, LoadStatus, RatingTag, ReportReason, ReportStatus, Role, UserStatus, VehicleType } from "@nakliye/shared";
 
 export interface Place {
   district: string;
@@ -119,4 +119,39 @@ export interface PublicConfirm {
   priceType: "sabit" | "teklif";
   price: number | null;
   status: LoadStatus;
+}
+
+/** Yönetici: moderasyondaki ilan (GET /admin/loads) — tam numarayla */
+export interface AdminLoad extends LoadDetail {
+  shipper: { displayName: string | null; verified: boolean; phoneMasked: string };
+  shipperPhone: string;
+}
+
+export interface AdminUser {
+  id: string;
+  name: string | null;
+  phone: string;
+  status: UserStatus;
+  trustScore: number;
+  suspendedAt: string | null;
+  suspendReason: string | null;
+}
+
+/** Yönetici: şikayet (GET /admin/reports) */
+export interface AdminReport {
+  id: string;
+  reason: ReportReason;
+  note: string | null;
+  status: ReportStatus;
+  resolution: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+  reporter: { id: string; name: string | null; phone: string };
+  target: {
+    type: "load_post" | "user";
+    id: string;
+    load: { status: LoadStatus; origin: Place; dest: Place } | null;
+    owner: AdminUser | null;
+  };
+  openOnTarget: number;
 }

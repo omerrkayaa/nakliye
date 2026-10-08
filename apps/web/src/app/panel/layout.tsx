@@ -22,14 +22,18 @@ export default function PanelLayout({ children }: LayoutProps<"/panel">) {
             <Link href="/panel/tasimalar" className="underline-offset-4 hover:underline">
               Taşımalar
             </Link>
+            <Suspense>
+              <AdminLink />
+            </Suspense>
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm">
             <Suspense>
               <UserName />
             </Suspense>
             <form action={logoutAction}>
-              <Button type="submit" variant="ghost" size="sm" className="text-primary-foreground hover:bg-white/10 hover:text-primary-foreground">
-                <LogOut aria-hidden /> Çıkış
+              {/* Dar ekranda yalnız simge (yönetici menüsüyle başlık 390 px'e sığsın); ad ekran okuyucuda kalır */}
+              <Button type="submit" variant="ghost" size="sm" aria-label="Çıkış" className="text-primary-foreground hover:bg-white/10 hover:text-primary-foreground">
+                <LogOut aria-hidden /> <span className="hidden sm:inline">Çıkış</span>
               </Button>
             </form>
           </div>
@@ -44,4 +48,13 @@ async function UserName() {
   const me = await api<Me>("/me");
   // Telefon genişliğinde menü sığsın diye ad gizlenir
   return <span className="hidden opacity-90 sm:inline">{me.company?.title ?? me.name ?? `0${me.phone.slice(3)}`}</span>;
+}
+
+async function AdminLink() {
+  const me = await api<Me>("/me");
+  return me.roles.includes("admin") ? (
+    <Link href="/panel/yonetim" className="underline-offset-4 hover:underline">
+      Yönetim
+    </Link>
+  ) : null;
 }
