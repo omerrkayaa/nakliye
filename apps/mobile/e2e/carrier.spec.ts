@@ -45,6 +45,23 @@ test("yük akışı → filtre → detay → teklif → Tekliflerim", async ({ p
 
   await btn(page, /Nazilli, Aydın → Esenyurt/).first().click();
   await expect(vis(page, "Yük sahibi", true)).toBeVisible();
+
+  // F8 paylaş: sistemin paylaşım menüsü (web derlemesinde navigator.share) → metindeki bağlantı web'de aynı ilanı açar
+  await page.evaluate(() => {
+    (navigator as Navigator & { share: unknown }).share = async (d: ShareData) => {
+      (window as unknown as { __shared: ShareData }).__shared = d;
+    };
+  });
+  await vis(page, "Paylaş", true).click();
+  const shared = await page.evaluate(() => (window as unknown as { __shared?: ShareData }).__shared?.text ?? "");
+  expect(shared).toContain("*Nazilli, Aydın → Esenyurt, İstanbul*");
+  expect(shared).not.toMatch(/\+90|\*\*\*/);
+  const link = /http:\/\/localhost:3001\/ilan\/[A-Za-z0-9_-]{10}/.exec(shared)?.[0];
+  expect(link, shared).toBeTruthy();
+  const web = await page.context().newPage();
+  await web.goto(link!);
+  await expect(web.getByRole("heading", { level: 1 })).toHaveText("Nazilli, Aydın → Esenyurt, İstanbul");
+  await web.close();
   const price = page.getByLabel("Fiyat (₺, KDV hariç)").locator("visible=true");
   await expect(price).toHaveValue("24000");
   await price.fill("23500");

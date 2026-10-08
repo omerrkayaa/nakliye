@@ -23,6 +23,8 @@ export interface Province {
 
 export interface LoadItem {
   id: string;
+  /** Paylaşım sayfası kimliği (/ilan/<shareId>, F8) */
+  shareId: string;
   status: LoadStatus;
   origin: Place;
   dest: Place;
@@ -166,3 +168,24 @@ export interface Notification {
   createdAt: string;
   readAt: string | null;
 }
+
+/** Paylaşım sayfası (GET /public/loads/:shareId). Yayından kalkmışsa yalnız güzergâh ve durum. */
+export type SharedLoad =
+  | {
+      shareId: string;
+      status: "teyitli" | "teyit_bekliyor";
+      origin: Place;
+      dest: Place;
+      loadFrom: string;
+      loadTo: string;
+      cargoType: CargoType;
+      weightTon: number;
+      vehicleType: VehicleType;
+      bodyType: BodyType | null;
+      priceType: "sabit" | "teklif";
+      price: number | null;
+      note: string | null;
+      lastConfirmedAt: string | null;
+      shipper: { displayName: string | null; verified: boolean };
+    }
+  | { shareId: string; status: Exclude<LoadStatus, "teyitli" | "teyit_bekliyor">; origin: Place; dest: Place };

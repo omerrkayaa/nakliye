@@ -2,15 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { BODY_TYPES, CARGO_TYPES, VEHICLE_TYPES, VISIBLE_LOAD_STATUSES } from "@nakliye/shared";
+import { BODY_TYPES, CARGO_TYPES, loadShareText, sharePath, VEHICLE_TYPES, VISIBLE_LOAD_STATUSES } from "@nakliye/shared";
 import { LoadStatusBadge } from "@/components/load-status-badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api";
 import { ago, dayRange, place, tl } from "@/lib/format";
+import { SITE_URL } from "@/lib/site";
 import type { LoadDetail, Offer } from "@/lib/types";
 import { ConfirmButton } from "../confirm-button";
 import { CloseButtons } from "./close-buttons";
 import { OffersList } from "./offers-list";
+import { ShareButtons } from "./share-buttons";
 
 export const metadata: Metadata = { title: "İlan" };
 
@@ -76,6 +78,7 @@ async function Load({ params, searchParams }: Pick<PageProps<"/panel/ilanlar/[id
           {(visible || l.status === "moderasyonda") && (
             <div className="flex flex-wrap items-start gap-3 border-t pt-4">
               {visible && <ConfirmButton id={l.id} />}
+              {visible && <ShareButtons url={SITE_URL + sharePath(l.shareId)} text={loadShareText(l, SITE_URL + sharePath(l.shareId))} />}
               <CloseButtons id={l.id} canFind={visible} />
             </div>
           )}

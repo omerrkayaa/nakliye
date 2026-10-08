@@ -5,7 +5,7 @@ import type { Tokens } from "./types";
  * API adresi: EXPO_PUBLIC_API_URL verilmişse o; yoksa Expo geliştirme sunucusunun çalıştığı bilgisayarın adresi, port 3000.
  * Expo Go'da telefon bilgisayara Wi-Fi üzerinden bağlandığı için "localhost" telefonun kendisi olurdu.
  */
-const devHost = Constants.expoConfig?.hostUri?.split(":")[0];
+export const devHost = Constants.expoConfig?.hostUri?.split(":")[0];
 export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? `http://${devHost ?? "localhost"}:3000/api/v1`;
 
 /** API'nin döndürdüğü hata (mesaj kullanıcıya gösterilebilir Türkçe metindir). */

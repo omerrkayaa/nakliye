@@ -30,6 +30,8 @@ export interface Province {
 /** Yük akışı ve yük detayı (GET /loads, GET /loads/:id — sahibi olmayanın gördüğü) */
 export interface Load {
   id: string;
+  /** Paylaşım sayfası kimliği (web /ilan/<shareId>, F8) */
+  shareId: string;
   status: LoadStatus;
   origin: Place;
   dest: Place;

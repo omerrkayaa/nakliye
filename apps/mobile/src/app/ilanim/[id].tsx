@@ -7,6 +7,7 @@ import { LoadStatusBadge } from "@/components/load-status";
 import { Badge, Button, Card, ErrorText, Muted, Status, s } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { confirm } from "@/lib/confirm";
+import { shareLoad } from "@/lib/share";
 import { dayRange, tl } from "@/lib/format";
 import { C } from "@/lib/theme";
 import type { IncomingOffer, MyLoad } from "@/lib/types";
@@ -95,6 +96,7 @@ export default function IlanimDetay() {
         {moderation && <Muted>Yeni hesapların ilk ilanları kısa bir kontrolden sonra yayına çıkar.</Muted>}
         {actionError && <ErrorText>{actionError}</ErrorText>}
         {visible && <Button title="Hâlâ geçerli" icon="checkmark" busy={busy === "confirm"} onPress={stillValid} />}
+        {visible && <Button title="Paylaş (WhatsApp vb.)" icon="share-social-outline" variant="outline" onPress={() => shareLoad(load)} />}
         {(visible || moderation) && (
           <View style={{ flexDirection: "row", gap: 8 }}>
             {visible && <Button title="Araç buldum" variant="outline" busy={busy === "arac_bulundu"} onPress={() => close("arac_bulundu")} style={{ flex: 1 }} />}

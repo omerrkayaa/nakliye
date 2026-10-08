@@ -6,6 +6,7 @@ import { ConfirmBadge, loadSpec, priceText, Route, useCall } from "@/components/
 import { Badge, Button, Card, Chip, ErrorText, Field, Muted, Status, s } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { shareLoad } from "@/lib/share";
 import { dayRange } from "@/lib/format";
 import { C } from "@/lib/theme";
 import type { Load, Vehicle } from "@/lib/types";
@@ -31,6 +32,7 @@ export default function YukDetay() {
           <Text style={{ fontSize: 22, fontWeight: "800", color: C.primary }}>{priceText(load)}</Text>
           {load.note && <Text style={s.text}>{load.note}</Text>}
           <ConfirmBadge load={load} />
+          <Button title="Paylaş" icon="share-social-outline" variant="outline" onPress={() => shareLoad(load)} />
         </Card>
 
         <Card>

@@ -4,10 +4,11 @@ import { ConfirmationService } from "./confirmation.service.js";
 import { AdminLoadsController, LoadsController } from "./loads.controller.js";
 import { LoadsService } from "./loads.service.js";
 import { PublicConfirmController } from "./public-confirm.controller.js";
+import { PublicLoadsController } from "./public-loads.controller.js";
 
 @Module({
   imports: [MatchingModule],
-  controllers: [LoadsController, AdminLoadsController, PublicConfirmController],
+  controllers: [LoadsController, AdminLoadsController, PublicConfirmController, PublicLoadsController],
   providers: [LoadsService, ConfirmationService],
   exports: [LoadsService, ConfirmationService],
 })

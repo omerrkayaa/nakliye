@@ -307,6 +307,20 @@ export class LoadsService {
     await this.answerOpenQuestion(tx, load.id, "arac_bulundu", now);
   }
 
+  /**
+   * Paylaşım sayfası (FR-16, F8): girişsiz, paylaşım kimliğiyle. Numara yok (maskeli bile değil: "Ara" uygulamada,
+   * BR-40 kaydıyla). Henüz yayına çıkmamış (taslak, moderasyon) ilan yok sayılır; yayından kalkmış ilanda yalnız
+   * güzergâh ve durum döner ("bu ilan artık yayında değil").
+   */
+  async getPublic(shareId: string) {
+    const [row] = await this.selectLoads().where(eq(loadPosts.shareId, shareId));
+    if (!row || row.load.status === "taslak" || row.load.status === "moderasyonda") throw new NotFoundException("İlan bulunamadı");
+    const v = this.view(row, false);
+    if (!VISIBLE_LOAD_STATUSES.includes(row.load.status)) return { shareId: v.shareId, status: v.status, origin: v.origin, dest: v.dest };
+    const { id: _id, shipper, distanceKm: _d, ...rest } = v as typeof v & { distanceKm?: number };
+    return { ...rest, shipper: { displayName: shipper.displayName, verified: shipper.verified } };
+  }
+
   // ── Moderasyon (BR-11) ─────────────────────────────────────────────
 
   async moderationQueue(page: number) {
