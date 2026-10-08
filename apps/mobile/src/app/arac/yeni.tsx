@@ -1,0 +1,81 @@
+import { BODY_TYPES, plateSchema, VEHICLE_TYPES, type BodyType, type VehicleType } from "@nakliye/shared";
+import { router } from "expo-router";
+import { useState } from "react";
+import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
+import { Button, Card, Chip, ErrorText, Field, Muted, s } from "@/components/ui";
+import { api, ApiError } from "@/lib/api";
+
+/** A5 — Araç ekle: plaka, araç tipi, kasa tipi, tonaj. Belge fotoğrafları dosya deposu kararıyla (rehber §4). */
+export default function AracYeni() {
+  const [plate, setPlate] = useState("");
+  const [vehicleType, setVehicleType] = useState<VehicleType | null>(null);
+  const [bodyType, setBodyType] = useState<BodyType | null>(null);
+  const [ton, setTon] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    const e: Record<string, string> = {};
+    const p = plateSchema.safeParse(plate);
+    if (!p.success) e.plate = p.error.issues[0]?.message ?? "Geçerli bir plaka girin";
+    if (!vehicleType) e.vehicleType = "Araç tipini seçin";
+    if (!bodyType) e.bodyType = "Kasa tipini seçin";
+    const capacityTon = Number(ton.replace(",", "."));
+    if (!Number.isFinite(capacityTon) || capacityTon <= 0 || capacityTon > 60) e.ton = "Tonajı 0–60 arasında girin";
+    setErrors(e);
+    if (Object.keys(e).length) return;
+
+    setBusy(true);
+    setError(null);
+    try {
+      await api("/vehicles", { method: "POST", body: { plate, vehicleType, bodyType, capacityTon } });
+      router.back();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Araç kaydedilemedi");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <ScrollView contentContainerStyle={{ padding: 12, gap: 12 }} keyboardShouldPersistTaps="handled">
+        <Card style={{ gap: 16 }}>
+          <Field label="Plaka" placeholder="ör. 09 ABC 123" autoCapitalize="characters" autoCorrect={false} value={plate} onChangeText={setPlate} error={errors.plate} />
+          <Choice label="Araç tipi" options={VEHICLE_TYPES} value={vehicleType} onChange={setVehicleType} error={errors.vehicleType} />
+          <Choice label="Kasa tipi" options={BODY_TYPES} value={bodyType} onChange={setBodyType} error={errors.bodyType} />
+          <Field label="Taşıma kapasitesi (ton)" keyboardType="decimal-pad" placeholder="ör. 25" value={ton} onChangeText={setTon} error={errors.ton} />
+          <Muted>Ruhsat, K belgesi ve SRC fotoğrafları sonraki sürümde eklenecek.</Muted>
+        </Card>
+        {error && <ErrorText>{error}</ErrorText>}
+        <Button title="Aracı kaydet" icon="checkmark" busy={busy} onPress={save} />
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+function Choice<K extends string>({
+  label,
+  options,
+  value,
+  onChange,
+  error,
+}: {
+  label: string;
+  options: Record<K, string>;
+  value: K | null;
+  onChange: (k: K) => void;
+  error?: string;
+}) {
+  return (
+    <View style={{ gap: 6 }}>
+      <Text style={s.label}>{label}</Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        {(Object.keys(options) as K[]).map((k) => (
+          <Chip key={k} label={options[k]} selected={value === k} onPress={() => onChange(k)} />
+        ))}
+      </View>
+      {error && <ErrorText>{error}</ErrorText>}
+    </View>
+  );
+}

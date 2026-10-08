@@ -4,7 +4,7 @@ import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { FlatList, RefreshControl, ScrollView, View } from "react-native";
 import { LoadCard, useCall } from "@/components/load-card";
-import { ProvincePicker } from "@/components/province-picker";
+import { Picker } from "@/components/picker";
 import { Button, Chip, Status } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -65,9 +65,9 @@ export default function Yukler() {
       ListHeaderComponent={
         <View style={{ gap: 10 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <ProvincePicker label="Nereden" provinces={provinces} value={from} onChange={setFrom} />
+            <Picker label="Nereden" items={provinces} allLabel="Her yer" value={from} onChange={setFrom} />
             <Ionicons name="arrow-forward" size={20} color={C.muted} />
-            <ProvincePicker label="Nereye" provinces={provinces} value={to} onChange={setTo} />
+            <Picker label="Nereye" items={provinces} allLabel="Her yer" value={to} onChange={setTo} />
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
             {(Object.keys(VEHICLE_TYPES) as VehicleType[]).map((v) => (

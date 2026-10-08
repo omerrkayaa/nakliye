@@ -10,6 +10,10 @@ export const dayRange = (from: string, to: string) => (from === to ? dayText(fro
 
 export const place = (p: { district: string; province: string }) => `${p.district}, ${p.province}`;
 
+/** Boş araç güzergâhı; varış yoksa "her yere giderim" */
+export const capacityRoute = (c: { origin: { district: string; province: string }; dest: { district: string; province: string } | null }) =>
+  `${place(c.origin)} → ${c.dest ? place(c.dest) : "Her yer"}`;
+
 export const tl = (n: number) => `${money.format(n)} ₺`;
 
 /** "az önce", "12 dk önce", "3 sa önce", "2 gün önce" */

@@ -57,6 +57,9 @@ function RootStack() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="yuk/[id]" options={{ title: "Yük detayı" }} />
         <Stack.Screen name="is/[id]" options={{ title: "İş detayı" }} />
+        <Stack.Screen name="arac/yeni" options={{ title: "Araç ekle" }} />
+        <Stack.Screen name="bos-arac/yeni" options={{ title: "Boş araç bildir" }} />
+        <Stack.Screen name="bos-arac/[id]" options={{ title: "Boş aracım" }} />
       </Stack.Protected>
     </Stack>
   );

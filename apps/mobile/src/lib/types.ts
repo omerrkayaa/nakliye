@@ -1,5 +1,5 @@
 // API yanıtlarının mobilde kullanılan kısmı (apps/api servislerindeki view() çıktıları; web'deki types.ts'in nakliyeci tarafı).
-import type { BodyType, CargoType, JobStatus, LoadStatus, Role, VehicleType } from "@nakliye/shared";
+import type { BodyType, CapacityStatus, CargoType, JobStatus, LoadStatus, Role, VehicleType } from "@nakliye/shared";
 
 export interface Place {
   district: string;
@@ -24,6 +24,7 @@ export interface Tokens {
 export interface Province {
   id: number;
   name: string;
+  districts: { id: number; name: string }[];
 }
 
 /** Yük akışı ve yük detayı (GET /loads, GET /loads/:id — sahibi olmayanın gördüğü) */
@@ -52,6 +53,26 @@ export interface Vehicle {
   vehicleType: VehicleType;
   bodyType: BodyType;
   capacityTon: number;
+}
+
+/** Boş araç ilanı (GET /capacity, GET /capacity/:id) — dest null = her yere giderim */
+export interface Capacity {
+  id: string;
+  status: CapacityStatus;
+  vehicle: Vehicle;
+  origin: Place;
+  dest: Place | null;
+  availableFrom: string;
+  availableTo: string;
+  createdAt: string;
+}
+
+/** Boş araca uyan yük (GET /capacity/:id/matches) */
+export interface CapacityMatch extends Omit<Load, "id" | "note" | "distanceKm"> {
+  loadId: string;
+  score: number;
+  originKm: number;
+  destKm: number | null;
 }
 
 /** Nakliyecinin verdiği teklif (GET /offers) */

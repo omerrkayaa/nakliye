@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Tabs } from "expo-router";
 import { C } from "@/lib/theme";
 
-// docs/02 §4 alt sekmeler: Yükler · Dönüş Planı · İlan Ver · İşlerim · Profil — bu dilimde Yükler, İşlerim, Profil.
+// docs/02 §4 alt sekmeler: Yükler · Dönüş Planı · İlan Ver · İşlerim · Profil — İlan Ver (yük sahibi) henüz yok.
 export default function TabsLayout() {
   return (
     <Tabs
@@ -17,6 +17,10 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{ title: "Yükler", tabBarIcon: ({ color, size }) => <Ionicons name="cube-outline" color={color} size={size} /> }}
+      />
+      <Tabs.Screen
+        name="donus"
+        options={{ title: "Dönüş Planı", tabBarIcon: ({ color, size }) => <Ionicons name="repeat-outline" color={color} size={size} /> }}
       />
       <Tabs.Screen
         name="isler"
