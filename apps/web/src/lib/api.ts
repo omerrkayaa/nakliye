@@ -9,6 +9,8 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** Şema hatasında alan → mesaj (formda alanın altında gösterilir) */
+    readonly fields: Record<string, string> = {},
   ) {
     super(message);
   }
@@ -42,8 +44,15 @@ export async function api<T>(path: string, { method = "GET", body, auth = true }
   if (res.status === 401 && auth) redirect(INVALID_SESSION);
   if (res.status === 204) return undefined as T;
   const json: unknown = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(res.status, messageOf(json, res.status));
+  if (!res.ok) throw new ApiError(res.status, messageOf(json, res.status), fieldsOf(json));
   return json as T;
+}
+
+function fieldsOf(json: unknown): Record<string, string> {
+  const errors = (json as { errors?: { path?: unknown; message?: unknown }[] } | null)?.errors ?? [];
+  const out: Record<string, string> = {};
+  for (const e of errors) if (typeof e.path === "string" && typeof e.message === "string" && !(e.path in out)) out[e.path] = e.message;
+  return out;
 }
 
 function messageOf(json: unknown, status: number): string {

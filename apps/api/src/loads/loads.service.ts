@@ -32,7 +32,7 @@ import { and, asc, count, countDistinct, desc, eq, gte, inArray, isNull, lte, ne
 import { alias } from "drizzle-orm/pg-core";
 import { randomBytes } from "node:crypto";
 import { DB, type Db, type Tx } from "../db/db.module.js";
-import { callLogs, capacityPosts, companies, districts, loadConfirmations, loadPosts, matches, provinces, users } from "../db/schema.js";
+import { callLogs, capacityPosts, companies, districts, loadConfirmations, loadPosts, matches, offers, provinces, users } from "../db/schema.js";
 import { MatchingService } from "../matching/matching.service.js";
 
 const PAGE_SIZE = 20;
@@ -95,7 +95,8 @@ export class LoadsService {
       .orderBy(desc(loadPosts.createdAt))
       .limit(PAGE_SIZE + 1)
       .offset((page - 1) * PAGE_SIZE);
-    return this.page(rows, page, (r) => this.view(r, true));
+    const pending = await this.pendingOffers(rows.slice(0, PAGE_SIZE).map((r) => r.load.id));
+    return this.page(rows, page, (r) => ({ ...this.view(r, true), pendingOffers: pending.get(r.load.id) ?? 0 }));
   }
 
   /** İlan detayı. Sahibi her durumda görür; başkaları yalnız görünür ilanları. */
@@ -105,7 +106,19 @@ export class LoadsService {
     if (!row || (!owner && !VISIBLE_LOAD_STATUSES.includes(row.load.status))) {
       throw new NotFoundException("İlan bulunamadı");
     }
-    return this.view(row, owner);
+    if (!owner) return this.view(row, false);
+    return { ...this.view(row, true), pendingOffers: (await this.pendingOffers([id])).get(id) ?? 0 };
+  }
+
+  /** Sahibin ilan listesindeki bekleyen teklif sayısı (P4). */
+  private async pendingOffers(loadIds: string[]) {
+    if (loadIds.length === 0) return new Map<string, number>();
+    const rows = await this.db
+      .select({ id: offers.loadPostId, n: count() })
+      .from(offers)
+      .where(and(inArray(offers.loadPostId, loadIds), eq(offers.status, "beklemede")))
+      .groupBy(offers.loadPostId);
+    return new Map(rows.map((r) => [r.id, r.n]));
   }
 
   // ── Yazma ──────────────────────────────────────────────────────────

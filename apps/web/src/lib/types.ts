@@ -1,5 +1,5 @@
 // API yanıtlarının web'de kullanılan kısmı (apps/api servislerindeki view() çıktıları).
-import type { CargoType, LoadStatus, Role, VehicleType } from "@nakliye/shared";
+import type { BodyType, CargoType, LoadStatus, Role, VehicleType } from "@nakliye/shared";
 
 export interface Place {
   district: string;
@@ -13,6 +13,12 @@ export interface Me {
   roles: Role[];
   verified: boolean;
   company: { title: string } | null;
+}
+
+export interface Province {
+  id: number;
+  name: string;
+  districts: { id: number; name: string }[];
 }
 
 export interface LoadItem {
@@ -29,6 +35,15 @@ export interface LoadItem {
   price: number | null;
   lastConfirmedAt: string | null;
   createdAt: string;
+  /** Yalnız sahibine: bekleyen teklif sayısı */
+  pendingOffers: number;
+}
+
+/** Sahibin gördüğü ilan detayı (GET /loads/:id) */
+export interface LoadDetail extends LoadItem {
+  bodyType: BodyType | null;
+  note: string | null;
+  moderation: "bekliyor" | "onay" | "ret" | null;
 }
 
 export interface Page<T> {

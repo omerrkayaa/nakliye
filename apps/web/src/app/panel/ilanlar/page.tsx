@@ -2,25 +2,30 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { CARGO_TYPES, VEHICLE_TYPES, VISIBLE_LOAD_STATUSES } from "@nakliye/shared";
+import { Plus } from "lucide-react";
 import { LoadStatusBadge } from "@/components/load-status-badge";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { buttonVariants } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api } from "@/lib/api";
 import { ago, dayRange, place, tl } from "@/lib/format";
 import type { LoadItem, Me, Page } from "@/lib/types";
-import { becomeShipperAction } from "../actions";
+import { BecomeShipper } from "../become-shipper";
 import { ConfirmButton } from "./confirm-button";
 
 export const metadata: Metadata = { title: "İlanlarım" };
 
-/** P4 İlanlarım: durum, son teyit, "hâlâ geçerli". (Teklif sayısı, toplu teyit ve kapatma sonraki dilimde.) */
+/** P4 İlanlarım: durum, son teyit, bekleyen teklif, "hâlâ geçerli". Kapatma ilan sayfasında. (Toplu teyit sonraki dilimde.) */
 export default function LoadsPage({ searchParams }: PageProps<"/panel/ilanlar">) {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">İlanlarım</h1>
-        <p className="text-muted-foreground">Yayındaki ilanlar düzenli olarak size teyit ettirilir; cevapsız kalan ilan listeden düşer.</p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">İlanlarım</h1>
+          <p className="text-muted-foreground">Yayındaki ilanlar düzenli olarak size teyit ettirilir; cevapsız kalan ilan listeden düşer.</p>
+        </div>
+        <Link href="/panel/ilanlar/yeni" className={buttonVariants({ className: "h-11 px-5" })}>
+          <Plus aria-hidden /> Yeni ilan
+        </Link>
       </div>
       <Suspense fallback={<p className="text-muted-foreground">Yükleniyor…</p>}>
         <Loads searchParams={searchParams} />
@@ -37,7 +42,14 @@ async function Loads({ searchParams }: Pick<PageProps<"/panel/ilanlar">, "search
   const page = Math.max(1, Number(typeof raw === "string" ? raw : 1) || 1);
   const data = await api<Page<LoadItem>>(`/loads/mine?page=${page}`);
   if (data.items.length === 0 && page === 1) {
-    return <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">Henüz ilanınız yok.</p>;
+    return (
+      <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
+        Henüz ilanınız yok.{" "}
+        <Link href="/panel/ilanlar/yeni" className="font-medium text-primary underline-offset-4 hover:underline">
+          İlk ilanınızı verin
+        </Link>
+      </p>
+    );
   }
 
   return (
@@ -52,6 +64,7 @@ async function Loads({ searchParams }: Pick<PageProps<"/panel/ilanlar">, "search
               <TableHead>Fiyat</TableHead>
               <TableHead>Durum</TableHead>
               <TableHead>Son teyit</TableHead>
+              <TableHead>Teklif</TableHead>
               <TableHead className="text-right">
                 <span className="sr-only">İşlem</span>
               </TableHead>
@@ -61,7 +74,9 @@ async function Loads({ searchParams }: Pick<PageProps<"/panel/ilanlar">, "search
             {data.items.map((l) => (
               <TableRow key={l.id} data-load-id={l.id}>
                 <TableCell className="font-medium">
-                  {place(l.origin)} → {place(l.dest)}
+                  <Link href={`/panel/ilanlar/${l.id}`} className="underline-offset-4 hover:underline">
+                    {place(l.origin)} → {place(l.dest)}
+                  </Link>
                 </TableCell>
                 <TableCell>{dayRange(l.loadFrom, l.loadTo)}</TableCell>
                 <TableCell>
@@ -73,6 +88,15 @@ async function Loads({ searchParams }: Pick<PageProps<"/panel/ilanlar">, "search
                   <LoadStatusBadge status={l.status} />
                 </TableCell>
                 <TableCell>{VISIBLE_LOAD_STATUSES.includes(l.status) ? ago(l.lastConfirmedAt) : "—"}</TableCell>
+                <TableCell>
+                  {l.pendingOffers > 0 ? (
+                    <Link href={`/panel/ilanlar/${l.id}#teklifler`} className="font-semibold text-primary underline-offset-4 hover:underline">
+                      {l.pendingOffers} teklif
+                    </Link>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
                 <TableCell className="text-right">{VISIBLE_LOAD_STATUSES.includes(l.status) && <ConfirmButton id={l.id} />}</TableCell>
               </TableRow>
             ))}
@@ -94,26 +118,5 @@ async function Loads({ searchParams }: Pick<PageProps<"/panel/ilanlar">, "search
         )}
       </nav>
     </div>
-  );
-}
-
-function BecomeShipper() {
-  return (
-    <Card className="max-w-lg">
-      <CardHeader>
-        <CardTitle>Yük sahibi olarak devam edin</CardTitle>
-        <CardDescription>
-          Bu panel yük sahipleri içindir. Hesabınıza yük sahibi rolü eklenir; nakliyeci olarak Android uygulamasını kullanmaya
-          devam edebilirsiniz.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form action={becomeShipperAction}>
-          <Button type="submit" className="h-11">
-            Yük sahibi olarak devam et
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
   );
 }

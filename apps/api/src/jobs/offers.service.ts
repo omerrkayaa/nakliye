@@ -13,6 +13,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { DB, type Db } from "../db/db.module.js";
 import { capacityPosts, companies, districts, loadPosts, matches, offers, provinces, users, vehicles } from "../db/schema.js";
 import { NotificationsService } from "../notifications/notifications.service.js";
+import { TrustService } from "../ratings/trust.service.js";
 
 const PAGE_SIZE = 20;
 const PG_UNIQUE_VIOLATION = "23505";
@@ -29,6 +30,7 @@ export class OffersService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly notifications: NotificationsService,
+    private readonly trust: TrustService,
   ) {}
 
   async create(userId: string, loadId: string, input: CreateOfferInput) {
@@ -93,6 +95,9 @@ export class OffersService {
     const rows = await this.selectOffers()
       .where(eq(offers.loadPostId, loadId))
       .orderBy(sql`case when ${offers.status} = 'beklemede' then 0 else 1 end`, asc(offers.price), asc(offers.createdAt));
+    // P5 karşılaştırma: puan ve tamamlanan iş (profildeki sayılarla aynı kaynak; bir ilanda teklif az olduğu için tek tek)
+    const stats = new Map<string, Awaited<ReturnType<TrustService["stats"]>>>();
+    for (const id of new Set(rows.map((r) => r.offer.carrierId))) stats.set(id, await this.trust.stats(this.db, id));
     return {
       items: rows.map((r) => ({
         id: r.offer.id,
@@ -103,10 +108,12 @@ export class OffersService {
         vehicle: r.vehicle,
         // Kabulden önce numara maskeli (BR-40); kabulle iş detayında açılır (FR-32)
         carrier: {
+          id: r.offer.carrierId,
           displayName: r.companyTitle ?? r.carrier.name,
           verified: isVerifiedBadge(r.carrier.level),
           trustScore: Math.round(r.carrier.trust * 100) / 100,
           phoneMasked: maskPhone(r.carrier.phone),
+          ...this.reputation(stats.get(r.offer.carrierId)!),
         },
       })),
     };
@@ -190,6 +197,15 @@ export class OffersService {
   }
 
   // ── Yardımcılar ────────────────────────────────────────────────────
+
+  /** Görünür puanların düz ortalaması (kör puanlama: açılmamış puan sayılmaz) ve tamamlanan iş. */
+  private reputation(s: Awaited<ReturnType<TrustService["stats"]>>) {
+    return {
+      rating: s.avgStars === null ? null : Math.round(s.avgStars * 10) / 10,
+      ratingCount: s.ratingCount,
+      completedJobs: s.completedJobs,
+    };
+  }
 
   private selectOffers() {
     return this.db

@@ -64,9 +64,59 @@ test("yeni kullanıcı yük sahibi rolünü seçer, boş liste görür", async (
   await expect(page.getByText("Henüz ilanınız yok.")).toBeVisible();
 });
 
-test("ilan listede: güzergâh, fiyat, durum ve son teyit", async () => {
-  loadId = await createLoad((await cookie("nk_at"))!.value, admin);
-  await page.reload();
+const day = (offset: number) => new Date(Date.now() + 3 * 3600e3 + offset * 86400e3).toISOString().slice(0, 10);
+const fillLoadForm = async () => {
+  await page.getByLabel("Kalkış ili", { exact: true }).selectOption({ label: "Muğla" });
+  await page.getByLabel("Kalkış ilçesi", { exact: true }).selectOption({ label: "Menteşe" });
+  await page.getByLabel("Varış ili", { exact: true }).selectOption({ label: "Antalya" });
+  await page.getByLabel("Varış ilçesi", { exact: true }).selectOption({ label: "Muratpaşa" });
+  await page.getByLabel("En erken").fill(day(1));
+  await page.getByLabel("En geç").fill(day(2));
+  await page.getByLabel("Yük cinsi").selectOption({ label: "Palet" });
+  await page.getByLabel("Ağırlık (ton)").fill("7");
+  await page.getByLabel("Araç tipi").selectOption({ label: "Kamyon" });
+  await page.getByLabel("Sabit fiyat veriyorum").check();
+  await page.getByLabel("Tutar (₺, KDV hariç)").fill("12500");
+};
+
+test("ilan formu: boş gönderimde alan hataları", async () => {
+  await page.getByRole("link", { name: "Yeni ilan" }).first().click();
+  await expect(page).toHaveURL(/\/panel\/ilanlar\/yeni$/);
+  await page.getByRole("button", { name: "İlanı yayınla" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Formdaki işaretli alanları düzeltin" })).toBeVisible();
+  await expect(page.getByText("Kalkış ilçesini seçin")).toBeVisible();
+  await expect(page.getByText("Ağırlığı ton olarak girin (en fazla 60)")).toBeVisible();
+  await expect(page.getByLabel("Ağırlık (ton)")).toHaveAttribute("aria-invalid", "true");
+});
+
+test("ilan formu: API hatası gösterilir, girilen değerler korunur", async () => {
+  await fillLoadForm();
+  await page.getByLabel("En geç").fill(day(45)); // aralık 30 günü aşar: API reddeder
+  await page.getByRole("button", { name: "İlanı yayınla" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "en fazla 30 gün" })).toBeVisible();
+  await expect(page.getByLabel("Ağırlık (ton)")).toHaveValue("7");
+  await expect(page.getByLabel("Kalkış ilçesi", { exact: true })).toHaveValue(/\d+/);
+});
+
+test("ilan formu: geçerli ilan oluşur, yeni hesabın ilk ilanı onaya gider (BR-11)", async () => {
+  await page.getByLabel("En geç").fill(day(2));
+  await page.getByRole("button", { name: "İlanı yayınla" }).click();
+  await expect(page).toHaveURL(/\/panel\/ilanlar\/[0-9a-f-]{36}\?yeni=1$/);
+  loadId = page.url().match(/ilanlar\/([0-9a-f-]{36})/)![1]!;
+  await expect(page.getByRole("status")).toContainText("kısa bir kontrolden sonra yayına çıkar");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Menteşe, Muğla → Muratpaşa, Antalya");
+  await expect(page.getByText("Onay bekliyor")).toBeVisible();
+  await expect(page.getByText("Palet, 7 ton")).toBeVisible();
+  await expect(page.getByText("12.500 ₺")).toBeVisible();
+  // Moderasyondaki ilan yalnız iptal edilebilir, teyit edilemez
+  await expect(page.getByRole("button", { name: "Hâlâ geçerli" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Araç buldum, kapat" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "İlanı iptal et" })).toBeVisible();
+});
+
+test("onaylanan ilan listede: güzergâh, fiyat, durum ve son teyit", async () => {
+  await api("POST", `/admin/loads/${loadId}/review`, admin, { decision: "onay" });
+  await page.goto("/panel/ilanlar");
   await expect(row()).toContainText("Menteşe, Muğla → Muratpaşa, Antalya");
   await expect(row()).toContainText("12.500 ₺");
   await expect(row()).toContainText("Teyitli");
@@ -90,6 +140,20 @@ test("API hatası satırda gösterilir (yükleme tarihi geçmiş)", async () => 
   await row().getByRole("button", { name: "Hâlâ geçerli" }).click();
   await expect(row().getByRole("alert")).toContainText("Yükleme tarihi geçmiş");
   psql(`update load_posts set load_from = current_date + 1, load_to = current_date + 2 where id='${loadId}'`);
+});
+
+test("ilan sayfasından iptal: onay sorulur, vazgeçilirse bir şey olmaz", async () => {
+  const other = await createLoad((await cookie("nk_at"))!.value, admin);
+  await page.goto(`/panel/ilanlar/${other}`);
+  page.once("dialog", (d) => d.dismiss());
+  await page.getByRole("button", { name: "Araç buldum, kapat" }).click();
+  await expect(page.getByText("Teyitli")).toBeVisible();
+  expect(psql(`select status from load_posts where id='${other}'`)).toBe("teyitli");
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "İlanı iptal et" }).click();
+  await expect(page.getByText("İptal", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "İlanı iptal et" })).toHaveCount(0);
+  expect(psql(`select status from load_posts where id='${other}'`)).toBe("iptal");
 });
 
 test("erişim çerezi düşünce refresh ile sessizce yenilenir (refresh de döner)", async () => {

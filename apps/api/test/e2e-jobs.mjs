@@ -101,6 +101,13 @@ check("ikinci geri çekme 409", (await api("POST", `/offers/${O2}/withdraw`, C2)
 r = await offer(C2, L, V2, 4800);
 O2 = r.body.id;
 check("geri çektikten sonra yeni teklif verilebilir", r.status === 201);
+const mineLoad = async () => (await api("GET", "/loads/mine", S)).body.items.find((x) => x.id === L);
+check("İlanlarım: bekleyen teklif sayısı (geri çekilen sayılmaz)", (await mineLoad())?.pendingOffers === 2, JSON.stringify(await mineLoad()));
+check("ilan detayı (sahibi): bekleyen teklif sayısı", (await api("GET", `/loads/${L}`, S)).body.pendingOffers === 2);
+check("başkası ilan detayında teklif sayısını görmez", !("pendingOffers" in (await api("GET", `/loads/${L}`, C2)).body));
+r = await api("GET", `/loads/${L}/offers`, S);
+const oc = r.body.items?.find((o) => o.id === O1)?.carrier;
+check("teklifte nakliyecinin puanı ve tamamlanan işi (P5)", oc?.completedJobs === 0 && oc.rating === null && oc.ratingCount === 0 && typeof oc.id === "string", JSON.stringify(oc));
 
 // ── Kabul ─────────────────────────────────────────────────────────
 console.log("\nKabul → iş (FR-31, FR-32)");
@@ -108,6 +115,7 @@ check("başka yük sahibi kabul edemez 404", (await api("POST", `/offers/${O1}/a
 r = await api("POST", `/offers/${O1}/accept`, S);
 const J = r.body.job?.id, CODE = r.body.deliveryCode;
 check("kabul: iş oluştu + teslim kodu (yalnız bu yanıtta)", r.status === 201 && /^\d{6}$/.test(CODE) && r.body.job.status === "anlasildi", JSON.stringify(r.body).slice(0, 200));
+check("kabulden sonra bekleyen teklif kalmaz", (await mineLoad())?.pendingOffers === 0);
 check("teslim kodu yük sahibine SMS'le gitti", log().includes(`[SMS → ${phone(1)}] Nakliye teslim kodunuz: ${CODE}`));
 check("kod DB'de düz saklanmıyor", psql(`select count(*) from jobs where delivery_code_hash='${CODE}'`) === "0");
 check("ilan kapandı", loadStatus(L) === "kapandi");
