@@ -12,6 +12,16 @@ const OTP_MAX_ATTEMPTS = 5;
 const OTP_RESEND_MS = 60_000;
 const REFRESH_TTL_MS = 30 * 24 * 3_600_000;
 
+/**
+ * Demo hesabı (mobil uygulamayı telefonda denemek için): DEMO_PHONE'a her zaman DEMO_OTP gider.
+ * Yalnız SMS konsola yazılırken (geliştirme) geçerli; gerçek sağlayıcı bağlanınca kendiliğinden kapanır.
+ */
+function demoCode(phone: string): string | null {
+  const { DEMO_PHONE, DEMO_OTP, SMS_PROVIDER = "console" } = process.env;
+  if (SMS_PROVIDER !== "console" || !DEMO_PHONE || !/^\d{6}$/.test(DEMO_OTP ?? "")) return null;
+  return phone === DEMO_PHONE ? DEMO_OTP! : null;
+}
+
 export interface AccessPayload {
   sub: string;
   roles: string[];
@@ -35,7 +45,7 @@ export class AuthService {
       throw new HttpException("Yeni kod için biraz bekleyin", HttpStatus.TOO_MANY_REQUESTS);
     }
 
-    const code = sixDigitCode();
+    const code = demoCode(phone) ?? sixDigitCode();
     const row = { phone, codeHash: this.otpHash(phone, code), expiresAt: new Date(Date.now() + OTP_TTL_MS), attempts: 0 };
     await this.db.insert(otpCodes).values(row).onConflictDoUpdate({ target: otpCodes.phone, set: row });
     await this.sms.send(phone, `Nakliye giriş kodunuz: ${code}. Kimseyle paylaşmayın.`);
