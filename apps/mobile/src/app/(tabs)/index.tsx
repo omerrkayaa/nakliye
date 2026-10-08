@@ -1,19 +1,28 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { VEHICLE_TYPES, type VehicleType } from "@nakliye/shared";
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { FlatList, RefreshControl, ScrollView, View } from "react-native";
 import { LoadCard, useCall } from "@/components/load-card";
 import { Picker } from "@/components/picker";
-import { Button, Chip, Status } from "@/components/ui";
+import { Badge, Button, Chip, Status } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { readFeed, saveFeed } from "@/lib/feed-cache";
+import { ago } from "@/lib/format";
 import { useProvinces } from "@/lib/provinces";
 import { C } from "@/lib/theme";
 import type { Load, Page } from "@/lib/types";
 
+/** İlk sekme: yalnız yük sahibi olan kullanıcı yük akışını değil kendi ilanlarını görür */
+export default function YuklerTab() {
+  const { me } = useAuth();
+  if (!me?.roles.includes("carrier")) return <Redirect href="/ilanlar" />;
+  return <Yukler />;
+}
+
 /** A6 — Yük akışı: Nereden → Nereye, araç tipi çipleri, kart listesi */
-export default function Yukler() {
+function Yukler() {
   const { me } = useAuth();
   const provinces = useProvinces();
   const { call, busyId } = useCall();
@@ -25,6 +34,8 @@ export default function Yukler() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Ağ yokken gösterilen kayıtlı listenin zamanı (null: liste canlı)
+  const [staleAt, setStaleAt] = useState<string | null>(null);
 
   const load = useCallback(
     async (p: number) => {
@@ -39,8 +50,18 @@ export default function Yukler() {
         setItems((cur) => (p === 1 ? res.items : [...cur, ...res.items]));
         setPage(p);
         setHasMore(res.hasMore);
+        setStaleAt(null);
+        if (p === 1 && !from && !to && !vehicle) void saveFeed(res.items);
       } catch (e) {
         setError(e instanceof ApiError ? e.message : "Yükler alınamadı");
+        if (p === 1) {
+          // İlk sayfa gelmediyse eldeki liste bu filtreye ait değil: göstermeye devam etme.
+          // Bağlantı yoksa filtresiz görünümde son kayıtlı liste gösterilir (filtreliyken kayıt filtreye uymaz).
+          const cached = e instanceof ApiError && e.status === 0 && !from && !to && !vehicle ? await readFeed() : null;
+          setItems(cached?.items ?? []);
+          setHasMore(false);
+          setStaleAt(cached?.at ?? null);
+        }
       } finally {
         setLoading(false);
       }
@@ -64,6 +85,7 @@ export default function Yukler() {
       refreshControl={<RefreshControl refreshing={loading && page === 1 && items.length > 0} onRefresh={() => load(1)} colors={[C.primary]} />}
       ListHeaderComponent={
         <View style={{ gap: 10 }}>
+          {staleAt && <Badge tone="warn" icon="cloud-offline-outline" label={`Çevrimdışısınız · son güncelleme ${ago(staleAt)}; ilanlar değişmiş olabilir`} />}
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <Picker label="Nereden" items={provinces} allLabel="Her yer" value={from} onChange={setFrom} />
             <Ionicons name="arrow-forward" size={20} color={C.muted} />

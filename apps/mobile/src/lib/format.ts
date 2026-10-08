@@ -26,3 +26,9 @@ export function ago(iso: string | null, now = Date.now()): string {
   if (h < 24) return `${h} sa önce`;
   return `${Math.round(h / 24)} gün önce`;
 }
+
+/** "+905551234567" → "0555 123 45 67" (biçim tanınmazsa olduğu gibi) */
+export function phoneText(p: string): string {
+  const m = /^\+90(\d{3})(\d{3})(\d{2})(\d{2})$/.exec(p);
+  return m ? `0${m[1]} ${m[2]} ${m[3]} ${m[4]}` : p;
+}

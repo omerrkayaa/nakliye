@@ -1,8 +1,9 @@
 import { BODY_TYPES, plateSchema, VEHICLE_TYPES, type BodyType, type VehicleType } from "@nakliye/shared";
 import { router } from "expo-router";
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
-import { Button, Card, Chip, ErrorText, Field, Muted, s } from "@/components/ui";
+import { KeyboardAvoidingView, Platform, ScrollView } from "react-native";
+import { Choice } from "@/components/choice";
+import { Button, Card, ErrorText, Field, Muted } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 
 /** A5 — Araç ekle: plaka, araç tipi, kasa tipi, tonaj. Belge fotoğrafları dosya deposu kararıyla (rehber §4). */
@@ -51,31 +52,5 @@ export default function AracYeni() {
         <Button title="Aracı kaydet" icon="checkmark" busy={busy} onPress={save} />
       </ScrollView>
     </KeyboardAvoidingView>
-  );
-}
-
-function Choice<K extends string>({
-  label,
-  options,
-  value,
-  onChange,
-  error,
-}: {
-  label: string;
-  options: Record<K, string>;
-  value: K | null;
-  onChange: (k: K) => void;
-  error?: string;
-}) {
-  return (
-    <View style={{ gap: 6 }}>
-      <Text style={s.label}>{label}</Text>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-        {(Object.keys(options) as K[]).map((k) => (
-          <Chip key={k} label={options[k]} selected={value === k} onPress={() => onChange(k)} />
-        ))}
-      </View>
-      {error && <ErrorText>{error}</ErrorText>}
-    </View>
   );
 }

@@ -14,6 +14,8 @@ interface AuthState {
   signIn: (t: Tokens) => Promise<void>;
   signOut: () => Promise<void>;
   addRoles: (roles: Role[]) => Promise<void>;
+  /** Profil (ad, firma) değişince /me'yi yeniden oku */
+  refreshMe: () => Promise<void>;
   /** Açılışta sunucuya ulaşılamadıysa tekrar dene */
   retry: () => void;
 }
@@ -91,6 +93,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
         const t = await api<Tokens>("/auth/refresh", { method: "POST", body: { refreshToken }, auth: false });
         bindSession(t, onTokens);
         onTokens(t);
+        setMe(await api<Me>("/me"));
+      },
+      refreshMe: async () => {
         setMe(await api<Me>("/me"));
       },
       retry: () => {

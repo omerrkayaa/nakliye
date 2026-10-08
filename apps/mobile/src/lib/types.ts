@@ -1,5 +1,5 @@
 // API yanıtlarının mobilde kullanılan kısmı (apps/api servislerindeki view() çıktıları; web'deki types.ts'in nakliyeci tarafı).
-import type { BodyType, CapacityStatus, CargoType, JobStatus, LoadStatus, Role, VehicleType } from "@nakliye/shared";
+import type { BodyType, CapacityStatus, CargoType, JobStatus, LoadStatus, NotificationType, RatingTag, Role, VehicleType } from "@nakliye/shared";
 
 export interface Place {
   district: string;
@@ -102,6 +102,23 @@ export interface Job {
   cancelReason: string | null;
 }
 
+export interface RatingView {
+  stars: number;
+  tags: RatingTag[];
+  comment: string | null;
+  at: string;
+}
+
+/** GET /jobs/:id — puan bloğuyla (kör puanlama: karşı tarafın puanı görünür olana kadar yalnız { revealed: false }) */
+export interface JobDetail extends Job {
+  rating: {
+    deadline: string | null;
+    canRate: boolean;
+    given: RatingView | null;
+    received: ({ revealed: true } & RatingView) | { revealed: false } | null;
+  };
+}
+
 export interface Page<T> {
   items: T[];
   page: number;
@@ -118,4 +135,33 @@ export interface RouteAlert {
   vehicleType: VehicleType | null;
   active: boolean;
   createdAt: string;
+}
+
+/** Bildirim kutusu (A14) — GET /notifications */
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  data: { type?: string; loadId?: string; jobId?: string; capacityId?: string; offerId?: string; alertId?: string; confirmationId?: string };
+  createdAt: string;
+  readAt: string | null;
+}
+
+/** Yük sahibinin kendi ilanı (GET /loads/mine, GET /loads/:id sahibi) */
+export interface MyLoad extends Omit<Load, "shipper" | "distanceKm"> {
+  createdAt: string;
+  pendingOffers: number;
+  moderation?: "bekliyor" | "onay" | "ret" | null;
+}
+
+/** Yük sahibinin ilanına gelen teklif (GET /loads/:id/offers) */
+export interface IncomingOffer {
+  id: string;
+  status: "beklemede" | "kabul" | "ret" | "geri_cekildi";
+  price: number;
+  note: string | null;
+  createdAt: string;
+  vehicle: { vehicleType: VehicleType; bodyType: BodyType; capacityTon: number };
+  carrier: { id: string; displayName: string | null; verified: boolean; rating: number | null; ratingCount: number; completedJobs: number };
 }

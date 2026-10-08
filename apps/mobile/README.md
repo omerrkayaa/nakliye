@@ -1,13 +1,19 @@
 # Nakliye — Android uygulaması (Expo)
 
-Expo SDK 57 · Expo Router · React Native 0.86. Ağırlıkla şoför/nakliyeci ekranları (docs/02 §4).
+Expo SDK 57 · Expo Router · React Native 0.86. Nakliyeci ve yük sahibi ekranları (docs/02 §4); sekmeler role göre:
+nakliyeci **Yükler · Dönüş Planı**, yük sahibi **İlanlarım** (ilan verme oradan), ortak **İşlerim · Profil**. Bildirimler sağ üstteki zilde.
+
+Henüz yok: gerçek push bildirimi (FCM; Firebase projesi ve geliştirme derlemesi gerekir — Expo Go Android'de uzak bildirimi
+desteklemiyor), belge fotoğrafı yükleme (dosya deposu kararı). Bildirimler uygulama içi kutuda.
 
 ## Telefonda demo (Expo Go)
 
 1. Bilgisayarda: veritabanı + API açık olmalı (`apps/api`, port 3000). Demo verisi: `cd apps/api && npm run db:seed-demo`.
 2. `cd apps/mobile && npx expo start`
 3. Telefona Play Store'dan **Expo Go** kurun, telefon bilgisayarla **aynı Wi-Fi**'da olsun, terminaldeki QR kodu okutun.
-4. Giriş ekranında **Demo hesabıyla gir** (numara `0555 010 20 30`, kod `123456`; yalnız geliştirmede).
+4. Giriş ekranında **Demo hesabıyla gir** (numara `0555 010 20 30`, kod `123456`; yalnız geliştirmede) — demo nakliyeci.
+   Yük sahibi tarafını denemek için kendi numaranızla girip "Yük sahibiyim"i seçin; SMS kodu API'nin konsol çıktısında
+   (`[SMS → +90…] Nakliye giriş kodunuz: …`). Yeni hesabın ilk ilanı yönetici onayı bekler (BR-11).
 
 Bağlanamazsa:
 - Windows Güvenlik Duvarı Node.js'e özel ağda izin vermeli (3000 ve 8081 portları).
@@ -21,5 +27,6 @@ Bağlanamazsa:
 | `npx expo start` | Geliştirme sunucusu (Expo Go) |
 | `npx expo start --web` | Tarayıcıda dene (API CORS açmadığı için yalnız test tarayıcısında, güvenlik kapalı) |
 | `npm run typecheck` / `npx expo lint` | Tip ve lint kontrolü |
+| `npm run test:e2e` | Uçtan uca testler (6 test; Playwright, sistem Chrome, 390 px). Ön koşul: API `JOBS_ENABLED=false` ile çalışıyor ve çıktısı `apps/api/api.log`'da; `CI=1 npx expo start --web --port 8081` açık (**CI=1'de dosya izlenmez: kod değişince yeniden başlatın**). Demo verisini kendisi tazeler. `SHOTS=<klasör>` verilirse ekran görüntüsü alır. |
 
 Paket eklerken `npx expo install <paket>` kullanın (SDK uyumlu sürüm). React sürümü kökteki `overrides` ile 19.2.3'e sabit: React Native tam sürüm eşleşmesi ister, web de aynı sürümü kullanır.

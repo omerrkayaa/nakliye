@@ -4,37 +4,60 @@ import { useState } from "react";
 import { KeyboardAvoidingView, Linking, Platform, ScrollView, Text, View } from "react-native";
 import { jobBadge } from "@/components/job-badge";
 import { Route } from "@/components/load-card";
+import { RatingSection } from "@/components/rating-section";
 import { Badge, Button, Card, ErrorText, Field, Muted, Status, s } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
-import { dayRange, tl } from "@/lib/format";
-import type { Job } from "@/lib/types";
+import { confirm } from "@/lib/confirm";
+import { dayRange, phoneText, tl } from "@/lib/format";
+import { C } from "@/lib/theme";
+import type { JobDetail } from "@/lib/types";
 import { useApi } from "@/lib/use-api";
 
 const BEFORE_DELIVERY = ["anlasildi", "yuklendi", "yolda"];
 
-/** A12 — İş detayı ve teslim: durum adımları, alıcıdan alınan kodla teslim (F3) */
+/** A12 — İş detayı ve teslim: durum adımları, alıcıdan alınan kodla teslim (F3); yük sahibi tarafı web P6 ile aynı (FR-33, FR-34, BR-31, BR-32) */
 export default function IsDetay() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data: job, error, loading, reload, setData } = useApi<Job>(`/jobs/${id}`);
+  const { data: job, error, loading, reload, setData } = useApi<JobDetail>(`/jobs/${id}`);
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [cancelOpen, setCancelOpen] = useState(false);
   const [reason, setReason] = useState("");
+  const [disputeOpen, setDisputeOpen] = useState(false);
+  const [disputeReason, setDisputeReason] = useState("");
+  // Yeni teslim kodu yalnız bu yanıtta döner (DB'de hash)
+  const [newCode, setNewCode] = useState<string | null>(null);
 
   if (!job) return <Status loading={loading} error={error} onRetry={reload} />;
 
-  async function act(key: string, path: string, body?: unknown) {
+  async function act(key: string, path: string, body?: unknown, question?: [string, string]) {
+    if (question && !(await confirm(question[0], question[1], "Evet"))) return;
     setBusy(key);
     setActionError(null);
     try {
-      const updated = await api<Job>(`/jobs/${id}/${path}`, { method: "POST", body });
+      const updated = await api<JobDetail>(`/jobs/${id}/${path}`, { method: "POST", body });
       setData(updated);
       setCode("");
       setCancelOpen(false);
+      setDisputeOpen(false);
     } catch (e) {
       setActionError(e instanceof ApiError ? e.message : "İşlem yapılamadı");
       await reload();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function makeCode() {
+    if (!(await confirm("Yeni teslim kodu", "Yeni teslim kodu oluşturulsun mu? Eski kod geçersiz olur.", "Oluştur"))) return;
+    setBusy("code");
+    setActionError(null);
+    try {
+      setNewCode((await api<{ deliveryCode: string }>(`/jobs/${id}/delivery-code`, { method: "POST" })).deliveryCode);
+      await reload();
+    } catch (e) {
+      setActionError(e instanceof ApiError ? e.message : "Kod oluşturulamadı");
     } finally {
       setBusy(null);
     }
@@ -64,7 +87,7 @@ export default function IsDetay() {
             <Text style={s.text}>{job.counterpart.displayName ?? "—"}</Text>
             {job.counterpart.verified && <Badge tone="ok" icon="shield-checkmark" label="Doğrulanmış" />}
           </View>
-          <Button title={`Ara · ${job.counterpart.phone}`} icon="call" variant="call" onPress={() => Linking.openURL(`tel:${job.counterpart.phone}`)} />
+          <Button title={`Ara · ${phoneText(job.counterpart.phone)}`} icon="call" variant="call" onPress={() => Linking.openURL(`tel:${job.counterpart.phone}`)} />
         </Card>
 
         {actionError && <ErrorText>{actionError}</ErrorText>}
@@ -91,6 +114,45 @@ export default function IsDetay() {
           </Card>
         )}
 
+        {!carrier && open && (
+          <Card style={{ gap: 12 }}>
+            <Text accessibilityRole="header" style={s.title}>
+              Teslim
+            </Text>
+            <Muted>Teslim kodunu yükü teslim alacak kişiye verin; nakliyeci teslimde bu kodu girer.</Muted>
+            {newCode && (
+              <View accessibilityRole="summary" style={{ gap: 4 }}>
+                <Text style={s.label}>Yeni teslim kodunuz</Text>
+                <Text style={{ fontSize: 30, fontWeight: "800", letterSpacing: 8, color: C.text }}>{newCode}</Text>
+                <Muted>Eski kod artık geçersiz. Kod SMS ile de gönderildi.</Muted>
+              </View>
+            )}
+            <Button
+              title="Teslimi elle onayla"
+              icon="checkmark-done"
+              busy={busy === "complete"}
+              onPress={() => act("complete", "complete", undefined, ["Teslimi onayla", "Yükün teslim alındığını onaylıyor musunuz? Taşıma tamamlanır (kod girilmeden)."])}
+            />
+            {!newCode && <Button title="Yeni teslim kodu" variant="outline" icon="key-outline" busy={busy === "code"} onPress={makeCode} />}
+          </Card>
+        )}
+
+        {!carrier && job.status === "teslim_edildi" && (
+          <Card style={{ gap: 12 }}>
+            <Text style={s.text}>Nakliyeci teslim ettiğini bildirdi. Sorun yoksa tamamlayın; {JOB_PARAMS.autoCompleteH} saat içinde itiraz edilmezse kendiliğinden tamamlanır.</Text>
+            <Button title="Sorun yok, tamamla" icon="checkmark-circle" variant="accent" busy={busy === "complete"} onPress={() => act("complete", "complete", undefined, ["Taşımayı tamamla", "Taşıma tamamlansın mı? Sonra itiraz edilemez."])} />
+            {disputeOpen ? (
+              <>
+                <Field label="Sorun nedir?" value={disputeReason} onChangeText={setDisputeReason} multiline maxLength={500} placeholder="ör. Eksik ya da hasarlı yük" style={{ minHeight: 72, textAlignVertical: "top", paddingTop: 12 }} />
+                <Button title="İtirazı gönder" variant="danger" busy={busy === "dispute"} onPress={() => act("dispute", "dispute", { reason: disputeReason })} />
+                <Button title="Vazgeç" variant="outline" onPress={() => setDisputeOpen(false)} />
+              </>
+            ) : (
+              <Button title="İtiraz et" variant="outline" icon="alert-circle-outline" onPress={() => setDisputeOpen(true)} />
+            )}
+          </Card>
+        )}
+
         {open &&
           (cancelOpen ? (
             <Card style={{ gap: 12 }}>
@@ -103,7 +165,9 @@ export default function IsDetay() {
             <Button title="İşi iptal et" variant="danger" onPress={() => setCancelOpen(true)} />
           ))}
 
-        {job.status === "teslim_edildi" && <Muted>Teslim kaydedildi. Yük sahibi 48 saat içinde itiraz etmezse iş tamamlanır.</Muted>}
+        {carrier && job.status === "teslim_edildi" && <Muted>Teslim kaydedildi. Yük sahibi {JOB_PARAMS.autoCompleteH} saat içinde itiraz etmezse iş tamamlanır.</Muted>}
+
+        <RatingSection job={job} onRated={reload} />
       </ScrollView>
     </KeyboardAvoidingView>
   );

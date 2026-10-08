@@ -5,6 +5,7 @@ import { jobBadge } from "@/components/job-badge";
 import { Route } from "@/components/load-card";
 import { Badge, Button, Card, Chip, ErrorText, Muted, Status } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { dayRange, tl } from "@/lib/format";
 import { C } from "@/lib/theme";
 import type { Job, MyOffer, Page } from "@/lib/types";
@@ -19,11 +20,14 @@ const TABS: [Tab, string][] = [
 
 /** A11 — İşlerim: teklif verdiklerim / anlaştıklarım / tamamlananlar */
 export default function Isler() {
-  const [tab, setTab] = useState<Tab>("offers");
+  const { me } = useAuth();
+  const carrier = me?.roles.includes("carrier") ?? false;
+  // Teklif vermek nakliyeciye özgü: yük sahibi doğrudan taşımalarını görür
+  const [tab, setTab] = useState<Tab>(carrier ? "offers" : "active");
   return (
     <View style={{ flex: 1 }}>
       <View style={{ flexDirection: "row", gap: 8, padding: 12, paddingBottom: 0 }}>
-        {TABS.map(([k, label]) => (
+        {TABS.filter(([k]) => carrier || k !== "offers").map(([k, label]) => (
           <Chip key={k} label={label} selected={tab === k} onPress={() => setTab(k)} />
         ))}
       </View>
@@ -110,7 +114,7 @@ function Jobs({ scope }: { scope: "active" | "past" }) {
           loading={loading}
           error={error}
           onRetry={reload}
-          empty={scope === "active" ? "Süren işiniz yok. Teklifiniz kabul edilince burada görünür." : "Geçmiş işiniz yok."}
+          empty={scope === "active" ? "Süren işiniz yok. Bir teklif kabul edilince burada görünür." : "Geçmiş işiniz yok."}
         />
       }
     />

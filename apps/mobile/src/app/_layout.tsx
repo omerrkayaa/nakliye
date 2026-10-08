@@ -62,6 +62,9 @@ function RootStack() {
         <Stack.Screen name="bos-arac/[id]" options={{ title: "Boş aracım" }} />
         <Stack.Screen name="alarm/index" options={{ title: "Rota alarmları" }} />
         <Stack.Screen name="alarm/yeni" options={{ title: "Yeni rota alarmı" }} />
+        <Stack.Screen name="bildirimler" options={{ title: "Bildirimler" }} />
+        <Stack.Screen name="ilan/yeni" options={{ title: "İlan ver" }} />
+        <Stack.Screen name="ilanim/[id]" options={{ title: "İlanım" }} />
       </Stack.Protected>
     </Stack>
   );
