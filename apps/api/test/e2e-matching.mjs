@@ -140,8 +140,8 @@ check("eski çift yeniden bildirilmez", (await matchNotes(C1, (n) => n.data.load
 
 console.log("\n6. Saatlik sınır (BR-22: 5)");
 const before = (await matchNotes(C2)).length;
-const many = [];
-for (let i = 0; i < 6; i++) many.push(await load(S, EDREMIT, 6, 7));
+// Eşzamanlı: sınır sayımı ile ekleme arasındaki yarışı da sınar (kilitsizken 6-7 bildirim gidiyordu)
+const many = await Promise.all(Array.from({ length: 6 }, () => load(S, EDREMIT, 6, 7)));
 await until(async () => many.every((id) => psql(`select matched_at is not null from load_posts where id='${id}'`) === "t"), 8000);
 const c2Notes = (await matchNotes(C2)).length;
 check("6 uygun yükün hepsi eşleşti", many.every((id) => pairs(id) === "1"));

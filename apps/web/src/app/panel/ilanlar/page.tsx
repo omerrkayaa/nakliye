@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { CARGO_TYPES, VEHICLE_TYPES, VISIBLE_LOAD_STATUSES } from "@nakliye/shared";
-import { Plus } from "lucide-react";
+import { FileSpreadsheet, Plus } from "lucide-react";
 import { LoadStatusBadge } from "@/components/load-status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -23,9 +23,14 @@ export default function LoadsPage({ searchParams }: PageProps<"/panel/ilanlar">)
           <h1 className="text-2xl font-bold">İlanlarım</h1>
           <p className="text-muted-foreground">Yayındaki ilanlar düzenli olarak size teyit ettirilir; cevapsız kalan ilan listeden düşer.</p>
         </div>
-        <Link href="/panel/ilanlar/yeni" className={buttonVariants({ className: "h-11 px-5" })}>
-          <Plus aria-hidden /> Yeni ilan
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/panel/ilanlar/toplu" className={buttonVariants({ variant: "outline", className: "h-11 px-5" })}>
+            <FileSpreadsheet aria-hidden /> Excel ile toplu ilan
+          </Link>
+          <Link href="/panel/ilanlar/yeni" className={buttonVariants({ className: "h-11 px-5" })}>
+            <Plus aria-hidden /> Yeni ilan
+          </Link>
+        </div>
       </div>
       <Suspense fallback={<p className="text-muted-foreground">Yükleniyor…</p>}>
         <Loads searchParams={searchParams} />

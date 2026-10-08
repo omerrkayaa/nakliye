@@ -308,6 +308,30 @@ export class LoadsService {
   }
 
   /**
+   * Toplu ilan (FR-11, Excel): satırlar sırayla ve birbirinden bağımsız açılır — hatalı satır diğerlerini
+   * durdurmaz. Her satır tekli ilanla aynı yoldan geçer (tarih kuralları, BR-11 moderasyonu, eşleştirme).
+   */
+  async createBulk(userId: string, items: unknown[], now = new Date()) {
+    const results: ({ row: number; id: string; status: LoadStatus } | { row: number; error: string })[] = [];
+    for (const [i, raw] of items.entries()) {
+      const parsed = createLoadSchema.safeParse(raw);
+      if (!parsed.success) {
+        const issue = parsed.error.issues[0];
+        results.push({ row: i + 1, error: `${issue?.path.join(".") || "satır"}: ${issue?.message ?? "geçersiz"}` });
+        continue;
+      }
+      try {
+        const l = await this.create(userId, parsed.data, now);
+        results.push({ row: i + 1, id: l.id, status: l.status });
+      } catch (e) {
+        if (!(e instanceof HttpException)) throw e;
+        results.push({ row: i + 1, error: e.message });
+      }
+    }
+    return { created: results.filter((r) => "id" in r).length, failed: results.filter((r) => "error" in r).length, results };
+  }
+
+  /**
    * Paylaşım sayfası (FR-16, F8): girişsiz, paylaşım kimliğiyle. Numara yok (maskeli bile değil: "Ara" uygulamada,
    * BR-40 kaydıyla). Henüz yayına çıkmamış (taslak, moderasyon) ilan yok sayılır; yayından kalkmış ilanda yalnız
    * güzergâh ve durum döner ("bu ilan artık yayında değil").

@@ -74,9 +74,13 @@ async function load(t, { approve = true } = {}) {
   if (r.body.status === "moderasyonda" && approve) await api("POST", `/admin/loads/${r.body.id}/review`, A, { decision: "onay" });
   return r.body.id;
 }
+// Plaka çalıştırmaya özel (rastgele 3 hane birkaç çalıştırmada eski aktif plakayla çakıştı, araç açılmadı)
+let plates = 0;
 async function vehicle(t) {
-  const plate = `57 AD ${100 + Math.floor(Math.random() * 899)}`;
-  return (await api("POST", "/vehicles", t, { plate, vehicleType: "kamyon", bodyType: "tenteli", capacityTon: 10 })).body.id;
+  const plate = `57 AD ${run}${++plates}`;
+  const r = await api("POST", "/vehicles", t, { plate, vehicleType: "kamyon", bodyType: "tenteli", capacityTon: 10 });
+  if (r.status !== 201) throw new Error(`Araç açılamadı (${plate}): ${JSON.stringify(r.body)}`);
+  return r.body.id;
 }
 
 // ── Yetki ─────────────────────────────────────────────────────────

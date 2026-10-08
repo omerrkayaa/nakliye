@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import {
+  bulkLoadSchema,
   closeLoadSchema,
   confirmLoadSchema,
   createLoadSchema,
@@ -7,6 +8,7 @@ import {
   pageSchema,
   reviewLoadSchema,
   updateLoadSchema,
+  type BulkLoadInput,
   type CloseLoadInput,
   type ConfirmLoadInput,
   type CreateLoadInput,
@@ -47,6 +49,13 @@ export class LoadsController {
   @Roles("shipper")
   create(@CurrentUser() user: AccessPayload, @Body(new ZodPipe(createLoadSchema)) body: CreateLoadInput) {
     return this.loads.create(user.sub, body);
+  }
+
+  /** FR-11 Excel toplu ilan (web paneli dosyayı okuyup satırları gönderir; dosya saklanmaz) */
+  @Post("bulk")
+  @Roles("shipper")
+  bulk(@CurrentUser() user: AccessPayload, @Body(new ZodPipe(bulkLoadSchema)) body: BulkLoadInput) {
+    return this.loads.createBulk(user.sub, body.items);
   }
 
   @Patch(":id")

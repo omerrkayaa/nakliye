@@ -131,6 +131,13 @@ export const createLoadSchema = z
   .refine((v) => v.loadFrom <= v.loadTo, { message: "Bitiş tarihi başlangıçtan önce olamaz", path: ["loadTo"] })
   .refine((v) => v.priceType === "teklif" || v.price !== null, { message: "Sabit fiyatta tutar zorunlu", path: ["price"] });
 
+/** FR-11 Excel ile toplu ilan: tek istekte en fazla BULK_LOAD_MAX satır. Satırlar serviste tek tek doğrulanır
+ * (biri hatalıysa diğerleri yine açılır), bu yüzden burada yalnız dizi sınırı. */
+export const BULK_LOAD_MAX = 100;
+export const bulkLoadSchema = z.object({
+  items: z.array(z.unknown()).min(1, "En az bir satır gönderin").max(BULK_LOAD_MAX, `Tek seferde en fazla ${BULK_LOAD_MAX} ilan`),
+});
+
 /**
  * İlan düzenleme: kalkış/varış değiştirilemez (başka bir ilan olur, eşleşmeler bozulur).
  * Tarih/fiyat tutarlılığı API'de mevcut ilanla birleştirilip createLoadSchema ile yeniden denetlenir.
@@ -310,3 +317,4 @@ export type CreateOfferInput = z.infer<typeof createOfferSchema>;
 export type ResolveReportInput = z.infer<typeof resolveReportSchema>;
 export type AdminReportListInput = z.infer<typeof adminReportListSchema>;
 export type SuspendUserInput = z.infer<typeof suspendUserSchema>;
+export type BulkLoadInput = z.infer<typeof bulkLoadSchema>;
