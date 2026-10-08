@@ -107,3 +107,15 @@ export interface Page<T> {
   page: number;
   hasMore: boolean;
 }
+
+/** Rota alarmı (A8) — GET /alerts */
+export interface RouteAlert {
+  id: string;
+  origin: Place & { districtId: number };
+  originRadiusKm: number;
+  dest: (Place & { districtId: number }) | null;
+  destRadiusKm: number;
+  vehicleType: VehicleType | null;
+  active: boolean;
+  createdAt: string;
+}

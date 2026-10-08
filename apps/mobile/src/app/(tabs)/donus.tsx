@@ -20,6 +20,7 @@ export default function Donus() {
         <View style={{ gap: 8 }}>
           <Muted>Aracınız nerede, ne zaman boşalıyor? Bildirin; yolunuza uyan yükleri gösterelim ve yük sahiplerine haber verelim.</Muted>
           <Button title="Boş araç bildir" icon="add-circle" variant="accent" onPress={() => router.push("/bos-arac/yeni")} />
+          <Button title="Rota alarmlarım" icon="notifications-outline" variant="outline" onPress={() => router.push("/alarm")} />
         </View>
       }
       renderItem={({ item: c }) => (
