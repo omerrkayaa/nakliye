@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { BODY_TYPES, CARGO_TYPES, loadShareText, sharePath, VEHICLE_TYPES, VISIBLE_LOAD_STATUSES } from "@nakliye/shared";
 import { LoadStatusBadge } from "@/components/load-status-badge";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api";
 import { ago, dayRange, place, tl } from "@/lib/format";
@@ -80,6 +81,13 @@ async function Load({ params, searchParams }: Pick<PageProps<"/panel/ilanlar/[id
               {visible && <ConfirmButton id={l.id} />}
               {visible && <ShareButtons url={SITE_URL + sharePath(l.shareId)} text={loadShareText(l, SITE_URL + sharePath(l.shareId))} />}
               <CloseButtons id={l.id} canFind={visible} />
+            </div>
+          )}
+          {!visible && l.status !== "moderasyonda" && (
+            <div className="border-t pt-4">
+              <Link href={`/panel/ilanlar/yeni?kopya=${l.id}`} className={buttonVariants({ variant: "outline", className: "h-11" })}>
+                Benzerini yayınla
+              </Link>
             </div>
           )}
         </CardContent>

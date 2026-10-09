@@ -3,7 +3,8 @@
  * - Demo nakliyeci: DEMO_PHONE (.env; giriş kodu DEMO_OTP), rolü nakliyeci, bir tırı var.
  * - 3 örnek yük sahibi (uydurma firma adları) ve bugünden itibaren 5 gün içine yayılmış teyitli ilanlar.
  *
- * Tekrar çalıştırılabilir: önceki demo ilanlarından açık kalanlar iptal edilir, yenileri yazılır (son teyit = şimdi).
+ * Tekrar çalıştırılabilir: önceki demo ilanlarından açık kalanlar ve demo nakliyecinin teslim edilmemiş işleri iptal edilir,
+ * yeni ilanlar yazılır (son teyit = şimdi).
  * Teyit zamanlayıcısı açıksa ilanlar ~40 saat sonra düşer (soruya cevap veren yok); demodan önce yeniden çalıştırın.
  *
  * Çalıştırma (apps/api içinden): npm run db:seed-demo
@@ -91,6 +92,14 @@ try {
     [shipperIds],
   );
 
+  // Demo nakliyecinin teslim edilmemiş işleri: araç meşguliyeti kuralı yüzünden tır o günlerde teklif veremezdi
+  // (yarıda kalan bir test ya da denemeden kalan iş demoyu kilitlemesin). Demo sıfırlaması olduğu için skor yenilenmez.
+  const { rowCount: jobsCancelled } = await client.query(
+    `UPDATE jobs SET status = 'iptal', cancel_reason = 'Demo verisi tazelendi'
+     WHERE carrier_id = $1 AND status IN ('anlasildi', 'yuklendi', 'yolda')`,
+    [carrierId],
+  );
+
   const today = trDayStart(trDay(now));
   const day = (offset: number) => trDay(new Date(today.getTime() + offset * 86_400_000 + 3_600_000));
   for (const [s, origin, dest, offset, span, cargo, ton, vehicle, body, price, note] of LOADS) {
@@ -108,7 +117,7 @@ try {
     );
   }
   await client.query("COMMIT");
-  console.log(`Demo hazır: nakliyeci ${DEMO_PHONE}, ${LOADS.length} ilan yazıldı, ${cancelled} eski demo ilanı iptal edildi.`);
+  console.log(`Demo hazır: nakliyeci ${DEMO_PHONE}, ${LOADS.length} ilan yazıldı, ${cancelled} eski demo ilanı, ${jobsCancelled} yarım kalan demo işi iptal edildi.`);
 } catch (e) {
   await client.query("ROLLBACK");
   throw e;

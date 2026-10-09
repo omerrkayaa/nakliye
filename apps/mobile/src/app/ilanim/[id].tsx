@@ -103,6 +103,9 @@ export default function IlanimDetay() {
             <Button title="İptal et" variant="danger" busy={busy === "iptal"} onPress={() => close("iptal")} style={{ flex: 1 }} />
           </View>
         )}
+        {!visible && !moderation && (
+          <Button title="Benzerini yayınla" icon="copy-outline" variant="outline" onPress={() => router.push(`/ilan/yeni?kopya=${load.id}`)} />
+        )}
       </Card>
 
       {!moderation && (

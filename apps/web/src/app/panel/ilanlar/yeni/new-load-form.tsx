@@ -16,9 +16,9 @@ const options = (o: Record<string, string>) =>
   ));
 
 /** İl → ilçe seçimi (ilçe kimliği gönderilir). */
-function PlacePicker({ id, label, provinces, error }: { id: string; label: string; provinces: Province[]; error?: string }) {
-  const [province, setProvince] = useState("");
-  const [district, setDistrict] = useState("");
+function PlacePicker({ id, label, provinces, error, initial }: { id: string; label: string; provinces: Province[]; error?: string; initial?: Spot }) {
+  const [province, setProvince] = useState(initial ? String(initial.provinceId) : "");
+  const [district, setDistrict] = useState(initial ? String(initial.districtId) : "");
   const districts = provinces.find((p) => String(p.id) === province)?.districts ?? [];
   return (
     <fieldset className="grid gap-3 sm:grid-cols-2">
@@ -55,10 +55,16 @@ function PlacePicker({ id, label, provinces, error }: { id: string; label: strin
   );
 }
 
+type Spot = { provinceId: number; districtId: number };
+type Values = { loadFrom: string; loadTo: string; cargoType: string; weightTon: string; vehicleType: string; bodyType: string; priceType: string; price: string; note: string };
+/** "Benzerini yayınla": eski ilandan doldurulan başlangıç değerleri */
+export type LoadDraft = Partial<Values> & { origin?: Spot; dest?: Spot };
+
 /** P3 ilan oluştur. Alanlar kontrollü ve form sıfırlanmadan gönderilir: hata dönünce girilenler kaybolmaz. */
-export function NewLoadForm({ provinces, today, maxDay }: { provinces: Province[]; today: string; maxDay: string }) {
+export function NewLoadForm({ provinces, today, maxDay, draft }: { provinces: Province[]; today: string; maxDay: string; draft?: LoadDraft }) {
   const [state, action, pending] = useActionState<FormState, FormData>(createLoadAction, {});
-  const [v, setV] = useState({ loadFrom: today, loadTo: today, cargoType: "", weightTon: "", vehicleType: "", bodyType: "", priceType: "teklif", price: "", note: "" });
+  const { origin, dest, ...draftValues } = draft ?? {};
+  const [v, setV] = useState<Values>({ loadFrom: today, loadTo: today, cargoType: "", weightTon: "", vehicleType: "", bodyType: "", priceType: "teklif", price: "", note: "", ...draftValues });
   const set = (k: keyof typeof v) => (e: { target: { value: string } }) => setV((s) => ({ ...s, [k]: e.target.value }));
   const f = state.fields ?? {};
 
@@ -66,8 +72,8 @@ export function NewLoadForm({ provinces, today, maxDay }: { provinces: Province[
     <form className="space-y-8" noValidate onSubmit={submitWithoutReset(action)}>
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">Güzergâh</h2>
-        <PlacePicker id="originDistrictId" label="Kalkış" provinces={provinces} error={f.originDistrictId} />
-        <PlacePicker id="destDistrictId" label="Varış" provinces={provinces} error={f.destDistrictId} />
+        <PlacePicker id="originDistrictId" label="Kalkış" provinces={provinces} error={f.originDistrictId} initial={origin} />
+        <PlacePicker id="destDistrictId" label="Varış" provinces={provinces} error={f.destDistrictId} initial={dest} />
       </section>
 
       <section className="space-y-4">

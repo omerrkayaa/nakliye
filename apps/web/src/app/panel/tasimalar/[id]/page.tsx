@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { BadgeCheck, Phone, Star } from "lucide-react";
 import { BODY_TYPES, CARGO_TYPES, RATING_TAGS, VEHICLE_TYPES } from "@nakliye/shared";
 import { JobStatusBadge } from "@/components/job-status-badge";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api";
 import { dayRange, place, tl } from "@/lib/format";
@@ -167,7 +168,19 @@ function StatusNote({ j }: { j: JobDetail }) {
     case "itirazli":
       return <p className={`${box} border-destructive/30 bg-destructive/5`}>İtirazınız alındı; yönetici inceleyecek.</p>;
     case "iptal":
-      return <p className={box}>Taşıma iptal edildi{j.cancelReason ? `: “${j.cancelReason}”` : "."}</p>;
+      return (
+        <div className={`${box} space-y-3`}>
+          <p>Taşıma iptal edildi{j.cancelReason ? `: “${j.cancelReason}”` : "."}</p>
+          {j.role === "shipper" && (
+            <>
+              <p className="text-muted-foreground">İlanınız iptalle birlikte kapandı. Aynı yük için yeniden teklif almak isterseniz yeniden yayınlayın.</p>
+              <Link href={`/panel/ilanlar/yeni?kopya=${j.load.id}`} className={buttonVariants({ className: "h-11" })}>
+                İlanı yeniden yayınla
+              </Link>
+            </>
+          )}
+        </div>
+      );
     default:
       return null;
   }

@@ -1,6 +1,6 @@
 import { BODY_TYPES, CARGO_TYPES, createLoadSchema, VEHICLE_TYPES, type BodyType, type CargoType, type VehicleType } from "@nakliye/shared";
-import { router } from "expo-router";
-import { useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
 import { Choice } from "@/components/choice";
 import { DayChips, dayFromToday, DistrictField } from "@/components/place-fields";
@@ -8,6 +8,7 @@ import { Button, Card, Chip, ErrorText, Field, Muted, s } from "@/components/ui"
 import { api, ApiError } from "@/lib/api";
 import { dayRange } from "@/lib/format";
 import { useProvinces } from "@/lib/provinces";
+import type { MyLoad } from "@/lib/types";
 
 const SPANS = [1, 2, 3, 5];
 const PRICE_TYPES = { teklif: "Teklif alayım", sabit: "Sabit fiyat" } as const;
@@ -24,9 +25,11 @@ const FIELD_MESSAGES: Record<string, string> = {
 };
 
 const num = (v: string) => (v.trim() === "" ? Number.NaN : Number(v.replace(",", ".")));
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86_400_000);
 
-/** A17 — İlan ver: tek ekran (docs/02: 3 dokunuşta iş). İlk ilanlar moderasyona düşebilir (BR-11). */
+/** A17 — İlan ver: tek ekran (docs/02: 3 dokunuşta iş). İlk ilanlar moderasyona düşebilir (BR-11). `?kopya=<ilan>`: eski ilandan doldurulur. */
 export default function IlanYeni() {
+  const { kopya } = useLocalSearchParams<{ kopya?: string }>();
   const provinces = useProvinces();
   const [origin, setOrigin] = useState<number | null>(null);
   const [dest, setDest] = useState<number | null>(null);
@@ -42,6 +45,32 @@ export default function IlanYeni() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // "Benzerini yayınla": eski ilanın bilgileri. Gün seçimi bugünden 7 gün olduğu için tarih o aralığa çekilir.
+  useEffect(() => {
+    if (!kopya) return;
+    api<MyLoad>(`/loads/${kopya}`)
+      .then((l) => {
+        if (!("pendingOffers" in l)) return; // yalnız kendi ilanı (API yayındaki ilanı herkese döner; sahibine teklif sayısını ekler)
+        const today = dayFromToday(0);
+        const offset = Math.min(Math.max(daysBetween(today, l.loadFrom), 0), 6);
+        const length = daysBetween(l.loadFrom, l.loadTo) + 1;
+        setOrigin(l.origin.districtId);
+        setDest(l.dest.districtId);
+        setFrom(dayFromToday(offset));
+        setSpan(SPANS.includes(length) ? length : 1);
+        setCargoType(l.cargoType);
+        setWeight(String(l.weightTon).replace(".", ","));
+        setVehicleType(l.vehicleType);
+        setBodyType(l.bodyType);
+        setPriceType(l.priceType);
+        setPrice(l.price === null ? "" : String(l.price));
+        setNote(l.note ?? "");
+        setCopied(true);
+      })
+      .catch(() => undefined); // bulunamazsa boş form
+  }, [kopya]);
 
   const to = new Date(new Date(`${from}T12:00:00Z`).getTime() + (span - 1) * 86_400_000).toISOString().slice(0, 10);
 
@@ -84,10 +113,11 @@ export default function IlanYeni() {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerStyle={{ padding: 12, gap: 12 }} keyboardShouldPersistTaps="handled">
+        {copied && <Muted>Bilgiler eski ilanınızdan dolduruldu. Yükleme gününü kontrol edip yayınlayın.</Muted>}
         <Card style={{ gap: 16 }}>
-          <DistrictField label="Nereden?" provinces={provinces} value={origin} onChange={setOrigin} />
+          <DistrictField key={copied ? "o-kopya" : "o"} label="Nereden?" provinces={provinces} value={origin} onChange={setOrigin} />
           {errors.originDistrictId && <ErrorText>{errors.originDistrictId}</ErrorText>}
-          <DistrictField label="Nereye?" provinces={provinces} value={dest} onChange={setDest} />
+          <DistrictField key={copied ? "d-kopya" : "d"} label="Nereye?" provinces={provinces} value={dest} onChange={setDest} />
           {errors.destDistrictId && <ErrorText>{errors.destDistrictId}</ErrorText>}
           <DayChips label="Yükleme günü" value={from} onChange={setFrom} />
           <View style={{ gap: 6 }}>

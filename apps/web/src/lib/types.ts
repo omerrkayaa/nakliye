@@ -43,6 +43,8 @@ export interface LoadItem {
 
 /** Sahibin gördüğü ilan detayı (GET /loads/:id) */
 export interface LoadDetail extends LoadItem {
+  origin: Place & { districtId: number; provinceId: number };
+  dest: Place & { districtId: number; provinceId: number };
   bodyType: BodyType | null;
   note: string | null;
   moderation: "bekliyor" | "onay" | "ret" | null;

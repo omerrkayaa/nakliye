@@ -1,5 +1,5 @@
 import { CARGO_TYPES, JOB_PARAMS } from "@nakliye/shared";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Linking, Platform, ScrollView, Text, View } from "react-native";
 import { jobBadge } from "@/components/job-badge";
@@ -79,6 +79,12 @@ export default function IsDetay() {
           {job.agreedPrice !== null && <Text style={[s.title]}>{tl(job.agreedPrice)}</Text>}
           {job.load.note && <Text style={s.text}>{job.load.note}</Text>}
           {job.cancelReason && <Muted>İptal sebebi: {job.cancelReason}</Muted>}
+          {job.status === "iptal" && !carrier && (
+            <>
+              <Muted>İlanınız iptalle birlikte kapandı. Aynı yük için yeniden teklif almak isterseniz yeniden yayınlayın.</Muted>
+              <Button title="İlanı yeniden yayınla" icon="refresh" onPress={() => router.push(`/ilan/yeni?kopya=${job.load.id}`)} />
+            </>
+          )}
         </Card>
 
         <Card>

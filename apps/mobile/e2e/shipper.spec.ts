@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { acceptDialogs, adminToken, api, apiLoad, apiUser, btn, collectErrors, demoLogin, demoToken, districtId, noHorizontalOverflow, otpFor, phone, pickDistrict, shot, smsCodes, vis } from "./helpers";
+import { acceptDialogs, adminToken, api, apiLoad, apiUser, btn, collectErrors, demoLogin, demoToken, districtId, noHorizontalOverflow, otpFor, phone, pickDistrict, psql, shot, smsCodes, vis } from "./helpers";
 
 // Yük sahibi (yeni hesap, arayüzden OTP girişi) tam döngü: profil → ilan ver → moderasyon → BR-05 teyit sorusu
 // bildirimden cevaplanır → teklif bildirimi → kabul + teslim kodu → yeni kod → nakliyeci teslim eder → tamamla →
@@ -225,4 +225,41 @@ test("yük sahibi: teslim edilen taşımaya itiraz (sebep zorunlu)", async ({ pa
   // Kısa sebebin API'de reddi (400) tarayıcı konsoluna düşer; beklenen tek hata o
   expect(errors.filter((e) => !e.includes("status of 400"))).toEqual([]);
   expect(errors.filter((e) => e.includes("status of 400"))).toHaveLength(1);
+});
+
+test("yük sahibi: iptal edilen işin ilanı eski bilgilerle yeniden yayınlanır", async ({ page }) => {
+  const errors = collectErrors(page);
+  const me = phone(41);
+  const admin = await adminToken(phone(49));
+  const demo = await demoToken();
+
+  // Hazırlık API'den: ilan → demo teklif → kabul → yük sahibi iptal eder
+  const shipper = await apiUser(me, ["shipper"]);
+  const loadId = await apiLoad(shipper, admin, await districtId("Manisa", "Turgutlu"), await districtId("İzmir", "Torbalı"));
+  const vehicles = (await api<{ id: string }[]>("GET", "/vehicles", demo)).body;
+  const offer = (await api<{ id: string }>("POST", `/loads/${loadId}/offers`, demo, { vehicleId: vehicles[0]!.id, price: 8000 })).body;
+  const acc = (await api<{ job: { id: string } }>("POST", `/offers/${offer.id}/accept`, shipper)).body;
+  expect((await api("POST", `/jobs/${acc.job.id}/cancel`, shipper, { reason: "Yük ertelendi" })).status).toBe(200);
+
+  await page.goto("/");
+  await page.getByLabel("Cep telefonu").locator("visible=true").fill(`0${me.slice(3)}`);
+  await vis(page, "SMS kodu gönder").click();
+  await page.getByLabel("SMS kodu").locator("visible=true").fill(await otpFor(me));
+  await vis(page, "Giriş yap").click();
+  await page.getByRole("tab", { name: /İşlerim/ }).click();
+  await vis(page, "Geçmiş", true).click();
+  await btn(page, /Turgutlu, Manisa/).first().click();
+  await vis(page, "İlanı yeniden yayınla").click();
+  await expect(vis(page, /^Bilgiler eski ilanınızdan dolduruldu/)).toBeVisible();
+  await expect(btn(page, "İl: Manisa")).toBeVisible();
+  await expect(btn(page, "İlçe: Turgutlu")).toBeVisible();
+  await expect(btn(page, "İlçe: Torbalı")).toBeVisible();
+  await expect(page.getByLabel("Ağırlık (ton)").locator("visible=true")).toHaveValue("10");
+  await vis(page, "İlanı yayınla").click();
+  // Yeni hesap (BR-11): yeniden yayınlanan ilan da moderasyona düşer
+  await expect(vis(page, /^Yeni hesapların ilk ilanları/)).toBeVisible({ timeout: 20_000 });
+  const fresh = psql(`select id from load_posts where shipper_id=(select id from users where phone='${me}') and id<>'${loadId}'`);
+  const cols = "origin_district_id, dest_district_id, cargo_type, weight_ton, vehicle_type, price_type, load_from, load_to";
+  expect(psql(`select ${cols} from load_posts where id='${fresh}'`)).toBe(psql(`select ${cols} from load_posts where id='${loadId}'`));
+  expect(errors).toEqual([]);
 });

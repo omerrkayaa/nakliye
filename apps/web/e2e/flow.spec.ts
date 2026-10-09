@@ -13,7 +13,7 @@ let admin: string;
 let S: Awaited<ReturnType<typeof apiUser>>;
 let C1: Awaited<ReturnType<typeof apiUser>>;
 let C2: Awaited<ReturnType<typeof apiUser>>;
-let V1: string, V2: string, L: string, O1: string, J1: string, code: string;
+let V1: string, V2: string, L: string, O1: string, J1: string, code: string, cancelledLoad: string;
 
 const vehicle = async (token: string, plate: string) =>
   (await api("POST", "/vehicles", token, { plate, vehicleType: "kamyon", bodyType: "tenteli", capacityTon: 10 })).body.id!;
@@ -166,6 +166,43 @@ test("iptal: sebep yazılır, durum ve zaman çizelgesinde görünür", async ()
   await expect(page.getByText("Taşıma iptal edildi: “Yük hazır olmadı”")).toBeVisible();
   await expect(page.getByText("Taşıma iptal edildi", { exact: true })).toBeVisible();
   expect(psql(`select cancelled_by from jobs where id='${j.id}'`)).toBe(S.id);
+  cancelledLoad = psql(`select load_post_id from jobs where id='${j.id}'`);
+});
+
+test("iptal edilen taşımadan ilan yeniden yayınlanır: form eski ilanla dolu gelir", async () => {
+  await page.getByRole("link", { name: "İlanı yeniden yayınla" }).click();
+  await expect(page).toHaveURL(new RegExp(`/panel/ilanlar/yeni\\?kopya=${cancelledLoad}$`));
+  await expect(page.getByText("Bilgiler eski ilanınızdan dolduruldu")).toBeVisible();
+  await expect(page.getByLabel("Kalkış ili")).toHaveValue("48");
+  await expect(page.getByLabel("Kalkış ilçesi").locator("option:checked")).toHaveText("Menteşe");
+  await expect(page.getByLabel("Varış ilçesi").locator("option:checked")).toHaveText("Muratpaşa");
+  await expect(page.getByLabel("Yük cinsi")).toHaveValue("palet");
+  await expect(page.getByLabel("Ağırlık (ton)")).toHaveValue("7");
+  await expect(page.getByLabel("Araç tipi")).toHaveValue("kamyon");
+  await expect(page.getByLabel("Sabit fiyat veriyorum")).toBeChecked();
+  await expect(page.getByLabel("Tutar (₺, KDV hariç)")).toHaveValue("12500");
+  await page.getByRole("button", { name: "İlanı yayınla" }).click();
+  await expect(page).toHaveURL(/\/panel\/ilanlar\/[0-9a-f-]{36}\?yeni=1$/);
+  const fresh = page.url().split("/").at(-1)!.split("?")[0]!;
+  expect(fresh).not.toBe(cancelledLoad);
+  const cols = "origin_district_id, dest_district_id, cargo_type, weight_ton, vehicle_type, price_type, price";
+  expect(psql(`select ${cols} from load_posts where id='${fresh}'`)).toBe(psql(`select ${cols} from load_posts where id='${cancelledLoad}'`));
+  expect(psql(`select status from load_posts where id='${cancelledLoad}'`)).toBe("kapandi");
+});
+
+test("yayında olmayan ilanda 'Benzerini yayınla'; yayındakinde yok", async () => {
+  await page.goto(`/panel/ilanlar/${L}`);
+  await expect(page.getByRole("link", { name: "Benzerini yayınla" })).toHaveAttribute("href", `/panel/ilanlar/yeni?kopya=${L}`);
+  const live = await createLoad(S.accessToken, admin);
+  await page.goto(`/panel/ilanlar/${live}`);
+  await expect(page.getByRole("button", { name: "Hâlâ geçerli" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Benzerini yayınla" })).toHaveCount(0);
+  // Başkasının ilanı kopyalanamaz: boş form
+  const other = await apiUser(phone(104), "shipper");
+  const foreign = await createLoad(other.accessToken, admin);
+  await page.goto(`/panel/ilanlar/yeni?kopya=${foreign}`);
+  await expect(page.getByLabel("Yük cinsi")).toHaveValue("");
+  await expect(page.getByText("Bilgiler eski ilanınızdan dolduruldu")).toHaveCount(0);
 });
 
 test("itiraz: teslimden sonra sebeple; yönetici incelemesine düşer", async () => {

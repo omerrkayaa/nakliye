@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { LOAD_DATE_LIMITS, trDay } from "@nakliye/shared";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { getLocations } from "@/lib/locations";
-import type { Me } from "@/lib/types";
+import type { LoadDetail, Me } from "@/lib/types";
 import { BecomeShipper } from "../../become-shipper";
-import { NewLoadForm } from "./new-load-form";
+import { NewLoadForm, type LoadDraft } from "./new-load-form";
 
 export const metadata: Metadata = { title: "Yeni ilan" };
 
-/** P3 ilan oluştur (tek ekran, docs/02 ilke 4). Excel ile toplu ilan (F5) sonraki dilimde. */
-export default function NewLoadPage() {
+/** P3 ilan oluştur (tek ekran, docs/02 ilke 4). `?kopya=<ilan>`: eski ilanın bilgileriyle dolu gelir ("Benzerini yayınla"). */
+export default function NewLoadPage({ searchParams }: PageProps<"/panel/ilanlar/yeni">) {
   return (
     <div className="max-w-3xl space-y-6">
       <div>
@@ -18,17 +18,57 @@ export default function NewLoadPage() {
         <p className="text-muted-foreground">İlanınız yayında kaldığı sürece düzenli olarak &quot;hâlâ geçerli mi?&quot; diye sorulur.</p>
       </div>
       <Suspense fallback={<p className="text-muted-foreground">Yükleniyor…</p>}>
-        <Form />
+        <Form searchParams={searchParams} />
       </Suspense>
     </div>
   );
 }
 
-async function Form() {
+async function Form({ searchParams }: Pick<PageProps<"/panel/ilanlar/yeni">, "searchParams">) {
   // Önce oturum (dinamik): önbellekli il listesi derlemede değil istekte çağrılsın
   const me = await api<Me>("/me");
   if (!me.roles.includes("shipper")) return <BecomeShipper />;
   const now = new Date();
+  const today = trDay(now);
   const maxDay = trDay(new Date(now.getTime() + LOAD_DATE_LIMITS.maxDaysAhead * 86_400_000));
-  return <NewLoadForm provinces={await getLocations()} today={trDay(now)} maxDay={maxDay} />;
+  const { kopya } = await searchParams;
+  const draft = typeof kopya === "string" ? await copyOf(kopya, today) : undefined;
+  return (
+    <>
+      {draft && (
+        <p role="status" className="rounded-lg border bg-muted/40 p-4 text-sm">
+          Bilgiler eski ilanınızdan dolduruldu. Yükleme tarihlerini kontrol edip yayınlayın.
+        </p>
+      )}
+      <NewLoadForm provinces={await getLocations()} today={today} maxDay={maxDay} draft={draft} />
+    </>
+  );
+}
+
+/**
+ * Yalnız kendi ilanı kopyalanır: API yayındaki ilanı herkese döner, sahibine ayrıca bekleyen teklif sayısını ekler
+ * (başkasının ilanını kopyalayıp yayınlamak sahte ilan üretmeyi kolaylaştırırdı). Bulunamazsa boş form; geçmiş tarihler bugüne çekilir.
+ */
+async function copyOf(id: string, today: string): Promise<LoadDraft | undefined> {
+  let l: LoadDetail;
+  try {
+    l = await api<LoadDetail>(`/loads/${encodeURIComponent(id)}`);
+  } catch (e) {
+    if (e instanceof ApiError && (e.status === 404 || e.status === 400)) return undefined;
+    throw e;
+  }
+  if (!("pendingOffers" in l)) return undefined;
+  return {
+    origin: { provinceId: l.origin.provinceId, districtId: l.origin.districtId },
+    dest: { provinceId: l.dest.provinceId, districtId: l.dest.districtId },
+    loadFrom: l.loadFrom < today ? today : l.loadFrom,
+    loadTo: l.loadTo < today ? today : l.loadTo,
+    cargoType: l.cargoType,
+    weightTon: String(l.weightTon).replace(".", ","),
+    vehicleType: l.vehicleType,
+    bodyType: l.bodyType ?? "",
+    priceType: l.priceType,
+    price: l.price === null ? "" : String(l.price),
+    note: l.note ?? "",
+  };
 }

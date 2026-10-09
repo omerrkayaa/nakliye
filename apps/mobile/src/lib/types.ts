@@ -152,6 +152,8 @@ export interface Notification {
 
 /** Yük sahibinin kendi ilanı (GET /loads/mine, GET /loads/:id sahibi) */
 export interface MyLoad extends Omit<Load, "shipper" | "distanceKm"> {
+  origin: Place & { districtId: number };
+  dest: Place & { districtId: number };
   createdAt: string;
   pendingOffers: number;
   moderation?: "bekliyor" | "onay" | "ret" | null;
