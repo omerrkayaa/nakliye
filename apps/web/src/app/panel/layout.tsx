@@ -27,6 +27,12 @@ export default function PanelLayout({ children }: LayoutProps<"/panel">) {
             <Link href="/panel/tasimalar" className="underline-offset-4 hover:underline">
               Taşımalar
             </Link>
+            <Link href="/panel/nakliyecilerim" className="underline-offset-4 hover:underline">
+              Nakliyecilerim
+            </Link>
+            <Link href="/panel/firma" className="underline-offset-4 hover:underline">
+              Firma
+            </Link>
             <Suspense>
               <AdminLink />
             </Suspense>
@@ -55,7 +61,11 @@ export default function PanelLayout({ children }: LayoutProps<"/panel">) {
 async function UserName() {
   const me = await api<Me>("/me");
   // Telefon genişliğinde menü sığsın diye ad gizlenir
-  return <span className="hidden opacity-90 sm:inline">{me.company?.title ?? me.name ?? `0${me.phone.slice(3)}`}</span>;
+  return (
+    <Link href="/panel/firma" className="hidden opacity-90 underline-offset-4 hover:underline sm:inline">
+      {me.company?.title ?? me.name ?? `0${me.phone.slice(3)}`}
+    </Link>
+  );
 }
 
 async function AdminLink() {

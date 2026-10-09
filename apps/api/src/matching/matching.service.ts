@@ -19,7 +19,7 @@ import { and, eq, gte, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { AlertsService } from "../alerts/alerts.service.js";
 import { DB, type Db } from "../db/db.module.js";
-import { capacityPosts, companies, districts, loadPosts, matches, provinces, users, vehicles } from "../db/schema.js";
+import { capacityPosts, companies, districts, favoriteCarriers, loadPosts, matches, provinces, users, vehicles } from "../db/schema.js";
 import { NotificationsService, type NotifyLimit } from "../notifications/notifications.service.js";
 
 const P = DEFAULT_MATCH_PARAMS;
@@ -107,6 +107,21 @@ export class MatchingService {
     // Bildirim yalnız teyitli ilan için (F1: gördüğün yük şu an geçerli)
     if (load.status === "teyitli" && load.loadTo >= trDay(now)) {
       const route = await this.loadRoute(load.id);
+      // P7: önce yük sahibinin favori nakliyecilerine (mesafe şartı yok, saatlik sınıra girmez). ref_key eşleşmeyle
+      // ortak: aynı yük için nakliyeciye tek bildirim; ilan yeniden eşleştirilse de tekrar gitmez.
+      const favorites = await this.db
+        .select({ carrierId: favoriteCarriers.carrierId })
+        .from(favoriteCarriers)
+        .where(eq(favoriteCarriers.shipperId, load.shipperId));
+      for (const f of favorites) {
+        await this.notifications.notify(f.carrierId, {
+          type: "favorite_load",
+          refKey: `match:load:${load.id}`,
+          title: "Çalıştığınız yük sahibinden yeni ilan",
+          body: `${route}, ${dayText(load.loadFrom)} yükleme, ${load.weightTon} ton`,
+          data: { type: "match", loadId: load.id },
+        });
+      }
       for (const c of await this.candidatesForLoad(load, now)) {
         if (!(await this.newPair(load.id, c.cap.id, c.m.score))) continue;
         fresh++;

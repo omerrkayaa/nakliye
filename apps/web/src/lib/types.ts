@@ -12,7 +12,7 @@ export interface Me {
   name: string | null;
   roles: Role[];
   verified: boolean;
-  company: { title: string } | null;
+  company: { title: string; taxNo: string | null; taxOffice: string | null; address: string | null; verified: boolean } | null;
 }
 
 export interface Province {
@@ -158,6 +158,19 @@ export interface AdminReport {
     owner: AdminUser | null;
   };
   openOnTarget: number;
+}
+
+/** P7: birlikte iş yapılan nakliyeci (GET /me/carriers) */
+export interface CarrierRelation {
+  id: string;
+  displayName: string | null;
+  phone: string;
+  verified: boolean;
+  favorite: boolean;
+  jobsWithYou: number;
+  completedWithYou: number;
+  lastJobAt: string;
+  reputation: { rating: number | null; ratingCount: number; completedJobs: number };
 }
 
 /** Yük sahibinin gösterge özeti (GET /loads/mine/summary, P2) */

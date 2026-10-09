@@ -453,3 +453,15 @@ export const appParams = pgTable("app_params", {
   value: jsonb("value").notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// P7 "Nakliyecilerim": yük sahibinin favori nakliyecileri (yalnız birlikte iş yapılmış olanlar). Yeni ilanı yayına
+// çıkınca onlara mesafe şartı olmadan haber verilir.
+export const favoriteCarriers = pgTable(
+  "favorite_carriers",
+  {
+    shipperId: uuid("shipper_id").notNull().references(() => users.id),
+    carrierId: uuid("carrier_id").notNull().references(() => users.id),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.shipperId, t.carrierId] }), index("favorite_carriers_carrier_idx").on(t.carrierId)],
+);

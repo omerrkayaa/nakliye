@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query, UseGuards } from "@nestjs/common";
 import {
   cancelJobSchema,
   createOfferSchema,
@@ -16,10 +16,34 @@ import {
 import { AuthGuard, CurrentUser, Roles } from "../auth/auth.guard.js";
 import type { AccessPayload } from "../auth/auth.service.js";
 import { ZodPipe } from "../common/zod.pipe.js";
+import { CarriersService } from "./carriers.service.js";
 import { JobsService } from "./jobs.service.js";
 import { OffersService } from "./offers.service.js";
 
 const uuid = new ParseUUIDPipe({ version: "4" });
+
+/** P7 Nakliyecilerim: birlikte iş yapılan nakliyeciler ve favoriler */
+@Controller("me/carriers")
+@UseGuards(AuthGuard)
+@Roles("shipper")
+export class CarriersController {
+  constructor(private readonly carriers: CarriersService) {}
+
+  @Get()
+  list(@CurrentUser() user: AccessPayload) {
+    return this.carriers.list(user.sub);
+  }
+
+  @Put(":id/favorite")
+  favorite(@CurrentUser() user: AccessPayload, @Param("id", uuid) id: string) {
+    return this.carriers.setFavorite(user.sub, id, true);
+  }
+
+  @Delete(":id/favorite")
+  unfavorite(@CurrentUser() user: AccessPayload, @Param("id", uuid) id: string) {
+    return this.carriers.setFavorite(user.sub, id, false);
+  }
+}
 
 /** Teklifler (FR-30, FR-31) */
 @Controller()

@@ -92,6 +92,13 @@
       "when": 1791488495797,
       "tag": "0012_admin_reports_suspend",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791545307349,
+      "tag": "0013_favorite_carriers",
+      "breakpoints": true
     }
   ]
 }
