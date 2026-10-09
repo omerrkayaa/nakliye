@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo, useState } from "react";
 import { FlatList, Modal, Pressable, Text, TextInput, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { s } from "@/components/ui";
 import { C, TOUCH } from "@/lib/theme";
 
@@ -61,29 +61,32 @@ export function Picker({
         </Text>
       </Pressable>
       <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
-          <View style={{ flexDirection: "row", alignItems: "center", padding: 12, gap: 8 }}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Kapat" onPress={() => setOpen(false)} style={{ width: TOUCH, height: TOUCH, alignItems: "center", justifyContent: "center" }}>
-              <Ionicons name="close" size={26} color={C.text} />
-            </Pressable>
-            <TextInput
-              autoFocus
-              accessibilityLabel={`${label} ara`}
-              placeholder="Ara"
-              placeholderTextColor={C.muted}
-              value={q}
-              onChangeText={setQ}
-              style={[s.input, { flex: 1 }]}
+        {/* iOS'ta Modal ayrı pencere: dıştaki sağlayıcının çentik payı buraya gelmiyor, X saatin üstüne biniyordu (iPhone testi). */}
+        <SafeAreaProvider>
+          <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+            <View style={{ flexDirection: "row", alignItems: "center", padding: 12, gap: 8 }}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Kapat" onPress={() => setOpen(false)} style={{ width: TOUCH, height: TOUCH, alignItems: "center", justifyContent: "center" }}>
+                <Ionicons name="close" size={26} color={C.text} />
+              </Pressable>
+              <TextInput
+                autoFocus
+                accessibilityLabel={`${label} ara`}
+                placeholder="Ara"
+                placeholderTextColor={C.muted}
+                value={q}
+                onChangeText={setQ}
+                style={[s.input, { flex: 1 }]}
+              />
+            </View>
+            <FlatList
+              data={list}
+              keyExtractor={(p) => String(p.id)}
+              keyboardShouldPersistTaps="handled"
+              ListHeaderComponent={allLabel && !q ? <Row text={allLabel} onPress={() => pick(null)} selected={value === null} /> : null}
+              renderItem={({ item }) => <Row text={item.name} onPress={() => pick(item.id)} selected={item.id === value} />}
             />
-          </View>
-          <FlatList
-            data={list}
-            keyExtractor={(p) => String(p.id)}
-            keyboardShouldPersistTaps="handled"
-            ListHeaderComponent={allLabel && !q ? <Row text={allLabel} onPress={() => pick(null)} selected={value === null} /> : null}
-            renderItem={({ item }) => <Row text={item.name} onPress={() => pick(item.id)} selected={item.id === value} />}
-          />
-        </SafeAreaView>
+          </SafeAreaView>
+        </SafeAreaProvider>
       </Modal>
     </>
   );

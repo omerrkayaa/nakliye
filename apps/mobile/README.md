@@ -20,6 +20,10 @@ Bağlanamazsa:
 - Bilgisayarda birden çok ağ adresi var (WSL 172.31.x). QR yanlış adresi gösterirse:
   `REACT_NATIVE_PACKAGER_HOSTNAME=<bilgisayarın Wi-Fi IP'si> npx expo start`
 - API adresi Metro'nun adresinden türetilir (`<aynı IP>:3000`); farklıysa `EXPO_PUBLIC_API_URL` verin.
+- Okul/iş ağları (ör. eduroam) cihazların birbirini görmesine izin vermeyebilir: telefonun hotspot'una bilgisayarı bağlayın
+  (aradaki trafik mobil veriden düşmez; bilgisayarda "Ölçülü bağlantı"yı açın: `netsh wlan set profileparameter name="<ağ adı>" cost=Fixed`).
+- **iPhone (2026-10-09 denendi):** App Store'daki Expo Go, "You need to be signed in" der → ücretsiz Expo hesabıyla hem Expo Go'da
+  hem bilgisayarda `npx expo login` (PowerShell betik engeli verirse `npx.cmd expo login`). QR yoksa Safari'ye `exp://<IP>:8081` yazın.
 
 ## Komutlar
 | Komut | Ne yapar |
