@@ -50,6 +50,13 @@ describe("vehicleFitError (FR-30)", () => {
     expect(vehicleFitError(load, { vehicleType: "tir", bodyType: "tenteli", capacityTon: 25 })).toBeNull();
     expect(vehicleFitError({ ...load, bodyType: null }, { vehicleType: "tir", bodyType: "frigo", capacityTon: 25 })).toBeNull();
   });
+  it("büyük araç küçük tip isteyen ilana uyar (kapasite yeterse), küçük araç büyüğe uymaz", () => {
+    const small = { vehicleType: "kamyonet" as const, bodyType: null, weightTon: 3 };
+    expect(vehicleFitError(small, { vehicleType: "kamyon", bodyType: "tenteli", capacityTon: 12 })).toBeNull();
+    expect(vehicleFitError(small, { vehicleType: "tir", bodyType: "tenteli", capacityTon: 25 })).toBeNull();
+    expect(vehicleFitError({ ...small, vehicleType: "kamyon" }, { vehicleType: "kamyonet", bodyType: "tenteli", capacityTon: 12 })).toMatch(/küçük/);
+    expect(vehicleFitError({ ...small, weightTon: 3 }, { vehicleType: "kamyon", bodyType: "tenteli", capacityTon: 2 })).toMatch(/kapasite/);
+  });
   it("tip, kasa ve kapasite uyuşmazlığını söyler", () => {
     expect(vehicleFitError(load, { vehicleType: "panelvan", bodyType: "tenteli", capacityTon: 25 })).toMatch(/Araç tipi/);
     expect(vehicleFitError(load, { vehicleType: "tir", bodyType: "frigo", capacityTon: 25 })).toMatch(/Kasa/);

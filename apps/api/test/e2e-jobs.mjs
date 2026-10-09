@@ -81,14 +81,27 @@ console.log("\nTeklif (FR-30)");
 const K1 = (await api("POST", "/capacity", C1, { vehicleId: V1, originDistrictId: MENTESE, destDistrictId: null, availableFrom: trDay(1), availableTo: trDay(3) })).body.id;
 const L = await load();
 check("yük sahibi teklif veremez 403", (await offer(S, L, V1, 5000)).status === 403);
-let r = await offer(C2, L, Vbad, 4000);
-check("uymayan araçla teklif 400", r.status === 400 && r.body.message.includes("Araç tipi"), JSON.stringify(r.body));
+// Büyük araç küçük tip isteyen ilana teklif verebilir (panelvan ilanına kamyonet); ayrı ilanda, sonra iptal
+const Lsmall = await load();
+let r = await offer(C2, Lsmall, Vbad, 4000);
+check("büyük araçla küçük tip ilana teklif verilir", r.status === 201, JSON.stringify(r.body));
+psql(`update load_posts set status='iptal' where id='${Lsmall}'`);
+await api("POST", `/offers/${r.body.id}/withdraw`, C2);
+// Küçük araç büyük tip isteyen ilana uymaz (kamyonet ilanına panelvan)
+const Lbig = (await api("POST", "/loads", S, {
+  originDistrictId: MENTESE, destDistrictId: MURATPASA, loadFrom: trDay(1), loadTo: trDay(2), cargoType: "genel",
+  weightTon: 2, vehicleType: "kamyonet", bodyType: null, priceType: "teklif", price: null,
+})).body;
+if (Lbig.status === "moderasyonda") await api("POST", `/admin/loads/${Lbig.id}/review`, A, { decision: "onay" });
+r = await offer(C1, Lbig.id, V1, 4000);
+check("küçük araçla büyük tip ilana teklif 400", r.status === 400 && r.body.message === "Araç tipi ilanda istenenden küçük", JSON.stringify(r.body));
+psql(`update load_posts set status='iptal' where id='${Lbig.id}'`);
 check("başkasının aracıyla teklif 404", (await offer(C2, L, V1, 4000)).status === 404);
 r = await offer(C1, L, V1, 5000);
 const O1 = r.body.id;
 check("teklif verildi", r.status === 201 && r.body.status === "beklemede" && r.body.price === 5000);
 check("ikinci bekleyen teklif 409", (await offer(C1, L, V1, 4900)).status === 409);
-check("yük sahibine 'yeni teklif' bildirimi", (await notes(S, "offer_new")).length === 1);
+check("yük sahibine 'yeni teklif' bildirimi", (await notes(S, "offer_new")).some((n) => n.data.offerId === O1));
 let O2 = (await offer(C2, L, V2, 4500)).body.id;
 r = await api("GET", `/loads/${L}/offers`, S);
 check("yük sahibi teklifleri görür: ucuz önce", r.body.items?.map((o) => o.price).join() === "4500,5000", JSON.stringify(r.body).slice(0, 150));

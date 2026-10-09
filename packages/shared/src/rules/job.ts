@@ -1,5 +1,5 @@
 // İş (taşıma) kuralları — docs/03 FR-30…34, BR-31, BR-32, §6 iş durum diyagramı
-import type { BodyType, JobStatus, VehicleType } from "../constants.js";
+import { vehicleCanCarry, type BodyType, type JobStatus, type VehicleType } from "../constants.js";
 
 export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   anlasildi: "Anlaşıldı",
@@ -53,7 +53,7 @@ export function vehicleFitError(
   load: { vehicleType: VehicleType; bodyType: BodyType | null; weightTon: number },
   vehicle: { vehicleType: VehicleType; bodyType: BodyType; capacityTon: number },
 ): string | null {
-  if (vehicle.vehicleType !== load.vehicleType) return "Araç tipi ilanda istenen tiple uyuşmuyor";
+  if (!vehicleCanCarry(vehicle.vehicleType, load.vehicleType)) return "Araç tipi ilanda istenenden küçük";
   if (load.bodyType && vehicle.bodyType !== load.bodyType) return "Kasa tipi ilanda istenen kasayla uyuşmuyor";
   if (vehicle.capacityTon < load.weightTon) return "Aracın kapasitesi yük ağırlığından düşük";
   return null;

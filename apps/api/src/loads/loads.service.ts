@@ -20,6 +20,7 @@ import {
   nextReminderAt,
   trDay,
   trDayStart,
+  typesCarriedBy,
   VISIBLE_LOAD_STATUSES,
   EDITABLE_LOAD_STATUSES,
   type ConfirmationAnswer,
@@ -65,7 +66,8 @@ export class LoadsService {
     if (q.fromProvinceId) where.push(eq(op.id, q.fromProvinceId));
     if (q.toProvinceId) where.push(eq(dp.id, q.toProvinceId));
     if (q.date) where.push(lte(loadPosts.loadFrom, q.date), gte(loadPosts.loadTo, q.date));
-    if (q.vehicleType) where.push(eq(loadPosts.vehicleType, q.vehicleType));
+    // Filtredeki tip nakliyecinin aracıdır: o aracın taşıyabileceği (aynı ya da daha küçük tip isteyen) ilanlar
+    if (q.vehicleType) where.push(inArray(loadPosts.vehicleType, typesCarriedBy(q.vehicleType)));
     // Kasa tipi belirtilmemiş yük her kasaya uyar
     if (q.bodyType) where.push(or(isNull(loadPosts.bodyType), eq(loadPosts.bodyType, q.bodyType))!);
     if (q.maxWeightTon) where.push(lte(loadPosts.weightTon, q.maxWeightTon));

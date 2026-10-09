@@ -1,7 +1,7 @@
 // Kural tabanlı eşleştirme — docs/03 BR-20, BR-21; docs/04 §4
 // Veritabanında aday bulma PostGIS ile yapılır; bu modül aynı kuralın referans uygulamasıdır
 // (skor hesabı, testler ve tez simülasyonu bunu kullanır).
-import type { BodyType, VehicleType } from "../constants.js";
+import { vehicleCanCarry, type BodyType, type VehicleType } from "../constants.js";
 import { haversineKm, type LatLng } from "../geo.js";
 
 export interface MatchParams {
@@ -68,7 +68,8 @@ export function matchLoadWithCapacity(
   trust: number,
   p: MatchParams = DEFAULT_MATCH_PARAMS,
 ): MatchResult {
-  if (cap.vehicle.type !== load.vehicleType) return { candidate: false, reason: "arac_tipi" };
+  // Büyük araç küçük tip isteyen yükü taşıyabilir (kapasite ayrıca aranır; doluluk puanı doğru boyutu öne alır)
+  if (!vehicleCanCarry(cap.vehicle.type, load.vehicleType)) return { candidate: false, reason: "arac_tipi" };
   if (load.bodyType && cap.vehicle.bodyType !== load.bodyType) return { candidate: false, reason: "kasa_tipi" };
   if (cap.vehicle.capacityTon < load.weightTon) return { candidate: false, reason: "kapasite" };
 

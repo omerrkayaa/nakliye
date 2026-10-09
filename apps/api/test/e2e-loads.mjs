@@ -97,10 +97,10 @@ check("onay → teyitli", r.body.status === "teyitli" && r.body.moderation === "
 
 console.log("\nArama filtreleri");
 /** Tüm sayfaları tarar: önceki test çalıştırmalarının ilanları L1'i ilk sayfadan itebilir. */
-async function findAll(qs) {
+async function findAll(qs, id = L1) {
   for (let page = 1; page <= 100; page++) {
     const body = (await api("GET", `/loads?${qs}${qs ? "&" : ""}page=${page}`, C)).body;
-    const hit = body.items?.find((l) => l.id === L1);
+    const hit = body.items?.find((l) => l.id === id);
     if (hit || !body.hasMore) return hit;
   }
 }
@@ -109,7 +109,7 @@ check("filtresiz bulunur", await has(""));
 check("fromProvinceId=35 bulunur, =9 bulunmaz", (await has("fromProvinceId=35")) && !(await has("fromProvinceId=9")));
 check("toProvinceId=9 bulunur", await has("toProvinceId=9"));
 check("tarih aralık içinde bulunur, dışında bulunmaz", (await has(`date=${trDay(2)}`)) && !(await has(`date=${trDay(5)}`)));
-check("araç tipi uyuşmazsa bulunmaz", !(await has("vehicleType=kamyonet")));
+check("araç tipi uyuşmazsa bulunmaz (kamyonet tır yükünü taşıyamaz)", !(await has("vehicleType=kamyonet")));
 check("kasa tipi belirtilmemiş yük her kasaya uyar", await has("bodyType=frigo"));
 check("tonaj sınırı", (await has("maxWeightTon=20")) && !(await has("maxWeightTon=10")));
 const nearItem = await findAll("near=38.42,27.13&radiusKm=20");
@@ -167,6 +167,13 @@ check("kapalı ilan teyit 409", (await api("POST", `/loads/${L1}/confirm`, S, { 
 check("kapalı ilan düzenleme 409", (await api("PATCH", `/loads/${L1}`, S, { note: "x" })).status === 409);
 check("kapalı ilan nakliyeciye 404", (await api("GET", `/loads/${L1}`, C)).status === 404);
 check("geçersiz uuid 400", (await api("GET", `/loads/abc`, C)).status === 400);
+
+console.log("\nAraç büyüklüğü (büyük araç küçük yükü taşır)");
+// Filtredeki tip nakliyecinin aracı: büyük araç küçük tip isteyen ilanı da görür
+const Lk = (await api("POST", "/loads", S, { ...base, vehicleType: "kamyon", weightTon: 8 })).body.id;
+if (psql(`select status from load_posts where id='${Lk}'`) === "moderasyonda") await api("POST", `/admin/loads/${Lk}/review`, A, { decision: "onay" });
+check("tır filtresi kamyon isteyen ilanı da gösterir, kamyonet filtresi göstermez", Boolean(await findAll("vehicleType=tir", Lk)) && !(await findAll("vehicleType=kamyonet", Lk)));
+psql(`update load_posts set status='iptal' where id='${Lk}'`);
 
 console.log("\nFiyat aralığı (F7)");
 check("girişsiz 401", (await api("GET", `/price-estimate?from=${KONAK}&to=${EFELER}&vehicleType=tir`)).status === 401);

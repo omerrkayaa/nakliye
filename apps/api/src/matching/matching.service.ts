@@ -7,6 +7,8 @@ import {
   matchLoadWithCapacity,
   MAX_MATCH_NOTIFICATIONS_PER_HOUR,
   trDay,
+  typesCarriedBy,
+  typesThatCarry,
   VISIBLE_LOAD_STATUSES,
   type BodyType,
   type CapacityForMatch,
@@ -286,7 +288,7 @@ export class MatchingService {
           gte(capacityPosts.availableTo, trDay(now)),
           eq(vehicles.status, "aktif"),
           ne(capacityPosts.carrierId, load.shipperId), // kendi kendine eşleşme yok
-          eq(vehicles.vehicleType, load.vehicleType),
+          inArray(vehicles.vehicleType, typesThatCarry(load.vehicleType as VehicleType)), // büyük araç küçük yükü taşır
           load.bodyType ? eq(vehicles.bodyType, load.bodyType) : undefined,
           gte(vehicles.capacityTon, load.weightTon),
           datesOverlap(capacityPosts.availableFrom, capacityPosts.availableTo, load.loadFrom, load.loadTo),
@@ -331,7 +333,7 @@ export class MatchingService {
           inArray(loadPosts.status, [...statuses]),
           gte(loadPosts.loadTo, trDay(now)),
           ne(loadPosts.shipperId, cap.carrierId),
-          eq(loadPosts.vehicleType, vehicle.vehicleType),
+          inArray(loadPosts.vehicleType, typesCarriedBy(vehicle.vehicleType as VehicleType)),
           or(isNull(loadPosts.bodyType), eq(loadPosts.bodyType, vehicle.bodyType)),
           lte(loadPosts.weightTon, vehicle.capacityTon),
           datesOverlap(cap.availableFrom, cap.availableTo, loadPosts.loadFrom, loadPosts.loadTo),

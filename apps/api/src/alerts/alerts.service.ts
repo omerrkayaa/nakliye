@@ -1,9 +1,12 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { ROUTE_ALERT_PARAMS, type CreateRouteAlertInput, type UpdateRouteAlertInput } from "@nakliye/shared";
+import { ROUTE_ALERT_PARAMS, VEHICLE_SIZE_ORDER, type CreateRouteAlertInput, type UpdateRouteAlertInput } from "@nakliye/shared";
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { DB, type Db } from "../db/db.module.js";
 import { districts, provinces, routeAlerts } from "../db/schema.js";
+
+/** Araç büyüklük sırası SQL dizisi olarak (array_position ile karşılaştırma) */
+const SIZE_ORDER_SQL = sql.raw(`array[${VEHICLE_SIZE_ORDER.map((t) => `'${t}'`).join(", ")}]`);
 
 const od = alias(districts, "od");
 const op = alias(provinces, "op");
@@ -60,7 +63,9 @@ export class AlertsService {
       left join districts d on d.id = ra.dest_district_id
       where ra.active
         and ra.user_id <> l.shipper_id
-        and (ra.vehicle_type is null or ra.vehicle_type = l.vehicle_type)
+        -- alarmdaki araç ilandakiyle aynı ya da daha büyükse uyar (büyük araç küçük yükü taşır)
+        and (ra.vehicle_type is null
+             or array_position(${SIZE_ORDER_SQL}, ra.vehicle_type::text) >= array_position(${SIZE_ORDER_SQL}, l.vehicle_type::text))
         and ST_DWithin(o.geom::geography, l.origin_geom::geography, ra.origin_radius_km * 1000)
         and (ra.dest_district_id is null or ST_DWithin(d.geom::geography, l.dest_geom::geography, ra.dest_radius_km * 1000))
       order by ra.user_id, ra.created_at

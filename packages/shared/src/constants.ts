@@ -12,6 +12,19 @@ export const VEHICLE_TYPES = {
 } as const;
 export type VehicleType = keyof typeof VEHICLE_TYPES;
 
+/**
+ * Araç büyüklük sırası, küçükten büyüğe (karar 2026-10-09): büyük araç, ilanda istenen daha küçük tipteki yükü
+ * taşıyabilir (kapasite ve kasa şartı ayrıca aranır); küçük araç büyük tip isteyen ilana uymaz.
+ */
+export const VEHICLE_SIZE_ORDER: readonly VehicleType[] = ["panelvan", "kamyonet", "kamyon", "kirkayak", "tir"];
+/** Araç, ilanda istenen tipteki yükü taşıyabilir mi (aynı ya da daha büyük tip)? */
+export const vehicleCanCarry = (vehicle: VehicleType, requested: VehicleType) =>
+  VEHICLE_SIZE_ORDER.indexOf(vehicle) >= VEHICLE_SIZE_ORDER.indexOf(requested);
+/** Bu araç tipinin taşıyabileceği ilan tipleri (kendisi ve daha küçükler) */
+export const typesCarriedBy = (vehicle: VehicleType) => VEHICLE_SIZE_ORDER.filter((t) => vehicleCanCarry(vehicle, t));
+/** Bu ilan tipini taşıyabilecek araç tipleri (kendisi ve daha büyükler) */
+export const typesThatCarry = (requested: VehicleType) => VEHICLE_SIZE_ORDER.filter((t) => vehicleCanCarry(t, requested));
+
 export const BODY_TYPES = {
   tenteli: "Tenteli",
   acik: "Açık kasa",

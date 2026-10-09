@@ -38,9 +38,18 @@ describe("matchLoadWithCapacity (BR-20, BR-21)", () => {
     }
   });
 
-  it("araç tipi farklıysa reddeder", () => {
+  it("araç ilanda istenenden küçükse reddeder", () => {
     const r = matchLoadWithCapacity(load, { ...cap, vehicle: { ...cap.vehicle, type: "kamyon" } }, 1);
     expect(r).toEqual({ candidate: false, reason: "arac_tipi" });
+  });
+
+  it("büyük araç küçük tip isteyen yüke uyar; doluluk düştüğü için skoru doğru boyuttaki araçtan düşük", () => {
+    const smallLoad = { ...load, vehicleType: "kamyon" as const, weightTon: 8 };
+    const right = matchLoadWithCapacity(smallLoad, { ...cap, vehicle: { ...cap.vehicle, type: "kamyon", capacityTon: 10 } }, 1);
+    const big = matchLoadWithCapacity(smallLoad, { ...cap, vehicle: { ...cap.vehicle, type: "tir", capacityTon: 25 } }, 1);
+    expect(big.candidate).toBe(true);
+    expect(right.candidate).toBe(true);
+    if (big.candidate && right.candidate) expect(big.score).toBeLessThan(right.score);
   });
 
   it("kasa tipi farklıysa reddeder, yük kasa istemiyorsa kabul eder", () => {

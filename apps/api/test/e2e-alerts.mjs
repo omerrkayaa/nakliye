@@ -130,8 +130,12 @@ check("30 km'lik alarm 29,8 km'deki yükü yakalar (C2)", (await notesFor(C2, L1
 
 const L2 = await load(S, PAZAR, KARS);
 check("kalkış yarıçap dışında (53,4 > 50) bildirim yok", (await notesFor(C1, L2)).length === 0);
+// Büyük araç küçük tip isteyen yükü taşır: tır alarmı kamyon yükünü yakalar, kamyonet alarmı yakalamaz
+const C5 = await user(phone(7), ["carrier"]);
+await alert(C5, { originDistrictId: HOPA, destDistrictId: KARS, vehicleType: "kamyonet" });
 const L3 = await load(S, FINDIKLI, KARS, "kamyon");
-check("araç tipi uymuyor: bildirim yok", (await notesFor(C1, L3)).length === 0);
+check("tır alarmı kamyon isteyen yükü yakalar", (await notesFor(C1, L3)).length === 1);
+check("kamyonet alarmı kamyon isteyen yükü yakalamaz", (await notesFor(C5, L3)).length === 0);
 check("araç tipi seçmeyen alarm her tipi yakalar", (await notesFor(C2, L3)).length === 1);
 const L4 = await load(S, FINDIKLI, RIZE);
 check("varış yarıçap dışında: bildirim yok", (await notesFor(C1, L4)).length === 0);

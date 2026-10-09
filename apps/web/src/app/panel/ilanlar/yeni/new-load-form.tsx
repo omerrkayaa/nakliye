@@ -140,7 +140,7 @@ export function NewLoadForm({ provinces, today, maxDay, draft }: { provinces: Pr
           <Field label="Ağırlık (ton)" htmlFor="weightTon" error={f.weightTon}>
             <Input id="weightTon" name="weightTon" inputMode="decimal" placeholder="Örn. 12" value={v.weightTon} onChange={set("weightTon")} className="h-11" {...invalid("weightTon", f.weightTon)} />
           </Field>
-          <Field label="Araç tipi" htmlFor="vehicleType" error={f.vehicleType}>
+          <Field label="Araç tipi" htmlFor="vehicleType" error={f.vehicleType} hint="Yeten en küçük aracı seçin; bu tip ya da daha büyük araçlar teklif verebilir.">
             <select id="vehicleType" name="vehicleType" className={selectClass} value={v.vehicleType} onChange={set("vehicleType")} {...invalid("vehicleType", f.vehicleType)}>
               <option value="">Seçin</option>
               {options(VEHICLE_TYPES)}

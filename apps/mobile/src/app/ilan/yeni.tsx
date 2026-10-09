@@ -136,6 +136,7 @@ export default function IlanYeni() {
           <Choice label="Yük cinsi" options={CARGO_TYPES} value={cargoType} onChange={setCargoType} error={errors.cargoType} />
           <Field label="Ağırlık (ton)" keyboardType="decimal-pad" placeholder="ör. 20" value={weight} onChangeText={setWeight} error={errors.weightTon} />
           <Choice label="Araç tipi" options={VEHICLE_TYPES} value={vehicleType} onChange={setVehicleType} error={errors.vehicleType} />
+          <Muted>Yeten en küçük aracı seçin; bu tip ya da daha büyük araçlar teklif verebilir.</Muted>
           <Choice label="Kasa tipi" options={BODY_TYPES} value={bodyType} onChange={setBodyType} allLabel="Fark etmez" />
         </Card>
 
