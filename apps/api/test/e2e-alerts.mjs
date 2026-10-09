@@ -154,7 +154,9 @@ check("ikinci alarm kuruldu (A1 ile aynı yüke uyar)", (await alert(C1, { origi
 const L7 = await load(S, FINDIKLI, SELIM);
 check("iki alarmı uyan yük için tek bildirim", (await until(async () => (await notesFor(C1, L7)).length >= 1)) && (await notesFor(C1, L7)).length === 1);
 const V3 = (await api("POST", "/vehicles", C3, { plate: `08 AL ${run}`, vehicleType: "tir", bodyType: "tenteli", capacityTon: 25 })).body.id;
-await api("POST", "/capacity", C3, { vehicleId: V3, originDistrictId: HOPA, destDistrictId: null, availableFrom: trDay(0), availableTo: trDay(3) });
+const K3 = (await api("POST", "/capacity", C3, { vehicleId: V3, originDistrictId: HOPA, destDistrictId: null, availableFrom: trDay(0), availableTo: trDay(3) })).body.id;
+// Boş araç ilanının arka plan eşleştirmesi bitsin: yoksa sonraki yükü o yakalar (yük tarafının eşleşme bildirimi gitmez)
+await until(async () => psql(`select matched_at is not null from capacity_posts where id='${K3}'`) === "t");
 check("boş araç ilanı olan nakliyeci alarm kurdu", (await alert(C3, { originDistrictId: HOPA })).status === 201);
 const L8 = await load(S, ARHAVI, KARS);
 r = await notesFor(C3, L8);
