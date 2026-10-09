@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 // Paketin giriş noktası: Türkçe hata haritası içe aktarılınca kurulur (API, web ve mobil bu yoldan alır)
 import { createLoadSchema, createVehicleSchema, suspendUserSchema } from "../src/index.js";
 
@@ -17,6 +18,10 @@ describe("Türkçe zod hata mesajları", () => {
   it("sayı sınırları", () => {
     const m = messages(createVehicleSchema.safeParse({ plate: "34 ABC 123", vehicleType: "tir", bodyType: "tenteli", capacityTon: 500 }));
     expect(m.capacityTon).toMatch(/^En fazla \d+ olabilir$/);
+  });
+
+  it("tam sayı", () => {
+    expect(z.number().int().safeParse(1.5).error?.issues[0]?.message).toBe("Tam sayı girin");
   });
 
   it("şemanın kendi mesajı korunur", () => {

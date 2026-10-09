@@ -9,6 +9,7 @@ export const trErrorMap: ZodErrorMap = (issue, ctx) => {
   switch (issue.code) {
     case ZodIssueCode.invalid_type:
       if (issue.received === "undefined" || issue.received === "null") return { message: "Bu alan zorunlu" };
+      if (issue.expected === "integer") return { message: "Tam sayı girin" };
       if (issue.expected === "number" || issue.expected === "bigint") return { message: "Sayı girin" };
       if (issue.expected === "date") return { message: "Geçerli bir tarih girin" };
       return { message: "Geçersiz değer" };
@@ -24,8 +25,6 @@ export const trErrorMap: ZodErrorMap = (issue, ctx) => {
       if (issue.type === "array") return { message: `En fazla ${n(issue.maximum)} seçim yapılabilir` };
       if (issue.type === "number" || issue.type === "bigint") return { message: issue.inclusive ? `En fazla ${n(issue.maximum)} olabilir` : `${n(issue.maximum)} değerinden küçük olmalı` };
       return { message: "Değer çok büyük" };
-    case ZodIssueCode.not_integer:
-      return { message: "Tam sayı girin" };
     case ZodIssueCode.invalid_string:
       if (issue.validation === "uuid") return { message: "Geçersiz kimlik" };
       if (issue.validation === "email") return { message: "Geçerli bir e-posta girin" };
