@@ -32,7 +32,7 @@ import { and, asc, count, countDistinct, desc, eq, gte, inArray, isNull, lte, ne
 import { alias } from "drizzle-orm/pg-core";
 import { randomBytes } from "node:crypto";
 import { DB, type Db, type Tx } from "../db/db.module.js";
-import { callLogs, capacityPosts, companies, districts, loadConfirmations, loadPosts, matches, offers, provinces, users } from "../db/schema.js";
+import { callLogs, capacityPosts, companies, districts, jobEvents, jobs, loadConfirmations, loadPosts, matches, offers, provinces, users } from "../db/schema.js";
 import { MatchingService } from "../matching/matching.service.js";
 import { TrustService } from "../ratings/trust.service.js";
 
@@ -112,6 +112,57 @@ export class LoadsService {
     }
     if (!owner) return this.withReputation(this.view(row, false), (await this.trust.reputationMany([row.load.shipperId])).get(row.load.shipperId)!);
     return { ...this.view(row, true), pendingOffers: (await this.pendingOffers([id])).get(id) ?? 0 };
+  }
+
+  /**
+   * P2 gösterge paneli (docs/02): yayındaki ve teyit bekleyen ilanlar, moderasyondakiler, bekleyen teklifler (ilan
+   * başına), süren taşımalar ve bu ay (Türkiye saati) tamamlanan/iptal edilen taşımalar. Listeler kısa (en çok 5).
+   */
+  async summary(userId: string) {
+    const [counts] = await this.db
+      .select({
+        visible: sql<number>`count(*) filter (where ${loadPosts.status} in ('teyitli', 'teyit_bekliyor'))::int`,
+        awaiting: sql<number>`count(*) filter (where ${loadPosts.status} = 'teyit_bekliyor')::int`,
+        moderation: sql<number>`count(*) filter (where ${loadPosts.status} = 'moderasyonda')::int`,
+      })
+      .from(loadPosts)
+      .where(eq(loadPosts.shipperId, userId));
+    const awaitingRows = await this.selectLoads()
+      .where(and(eq(loadPosts.shipperId, userId), eq(loadPosts.status, "teyit_bekliyor")))
+      .orderBy(asc(loadPosts.lastConfirmedAt))
+      .limit(5);
+    const offerRows = await this.db
+      .select({ id: offers.loadPostId, n: count() })
+      .from(offers)
+      .innerJoin(loadPosts, eq(loadPosts.id, offers.loadPostId))
+      .where(and(eq(loadPosts.shipperId, userId), eq(offers.status, "beklemede"), inArray(loadPosts.status, [...VISIBLE_LOAD_STATUSES])))
+      .groupBy(offers.loadPostId)
+      .orderBy(desc(count()));
+    const withOffers = offerRows.length
+      ? await this.selectLoads().where(inArray(loadPosts.id, offerRows.slice(0, 5).map((r) => r.id)))
+      : [];
+    const byId = new Map(withOffers.map((r) => [r.load.id, r]));
+    const [j] = await this.db
+      .select({
+        active: sql<number>`count(*) filter (where ${jobs.status} in ('anlasildi', 'yuklendi', 'yolda', 'teslim_edildi', 'itirazli'))::int`,
+        completed: sql<number>`count(*) filter (where ${jobs.status} = 'tamamlandi' and date_trunc('month', ${jobs.completedAt} at time zone 'Europe/Istanbul') = date_trunc('month', now() at time zone 'Europe/Istanbul'))::int`,
+        cancelled: sql<number>`count(*) filter (where ${jobs.status} = 'iptal' and exists (select 1 from ${jobEvents} e where e.job_id = ${jobs.id} and e.type = 'iptal' and date_trunc('month', e.created_at at time zone 'Europe/Istanbul') = date_trunc('month', now() at time zone 'Europe/Istanbul')))::int`,
+      })
+      .from(jobs)
+      .where(eq(jobs.shipperId, userId));
+    const brief = (r: Awaited<ReturnType<LoadsService["selectLoads"]>>[number]) => {
+      const v = this.view(r, true);
+      return { id: v.id, status: v.status, origin: v.origin, dest: v.dest, loadFrom: v.loadFrom, loadTo: v.loadTo, lastConfirmedAt: v.lastConfirmedAt };
+    };
+    return {
+      loads: counts!,
+      awaitingConfirmation: awaitingRows.map(brief),
+      offers: {
+        pending: offerRows.reduce((a, r) => a + r.n, 0),
+        loads: offerRows.slice(0, 5).flatMap((r) => (byId.has(r.id) ? [{ ...brief(byId.get(r.id)!), pendingOffers: r.n }] : [])),
+      },
+      jobs: j!,
+    };
   }
 
   /** Sahibin ilan listesindeki bekleyen teklif sayısı (P4). */

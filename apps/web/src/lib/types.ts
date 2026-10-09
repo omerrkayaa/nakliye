@@ -160,6 +160,14 @@ export interface AdminReport {
   openOnTarget: number;
 }
 
+/** Yük sahibinin gösterge özeti (GET /loads/mine/summary, P2) */
+export interface ShipperSummary {
+  loads: { visible: number; awaiting: number; moderation: number };
+  awaitingConfirmation: { id: string; status: LoadStatus; origin: Place; dest: Place; loadFrom: string; loadTo: string; lastConfirmedAt: string | null }[];
+  offers: { pending: number; loads: { id: string; origin: Place; dest: Place; loadFrom: string; loadTo: string; pendingOffers: number }[] };
+  jobs: { active: number; completed: number; cancelled: number };
+}
+
 /** Yönetici: tez metrikleri (GET /admin/metrics, Y5) */
 export interface AdminMetrics {
   weeklyClosed: { week: string; closed: number }[];

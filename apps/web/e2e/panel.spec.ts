@@ -50,7 +50,7 @@ test("OTP ile giriş: yanlış kod hata verir, doğru kodla panel açılır; dı
   await expect(page.locator("#login-error")).toHaveText("Kod hatalı");
   await codeInput.fill(code);
   await page.getByRole("button", { name: "Giriş yap" }).click();
-  await expect(page).toHaveURL(/\/panel\/ilanlar$/);
+  await expect(page).toHaveURL(/\/panel$/);
 });
 
 test("belirteçler httpOnly çerezde; sayfa JavaScript'i göremez", async () => {
@@ -59,8 +59,10 @@ test("belirteçler httpOnly çerezde; sayfa JavaScript'i göremez", async () => 
   expect(await page.evaluate(() => document.cookie)).not.toContain("nk_");
 });
 
-test("yeni kullanıcı yük sahibi rolünü seçer, boş liste görür", async () => {
+test("yeni kullanıcı yük sahibi rolünü seçer, boş gösterge ve boş liste görür", async () => {
   await page.getByRole("button", { name: "Yük sahibi olarak devam et" }).click();
+  await expect(page.getByText("Yayında ilanınız yok.")).toBeVisible();
+  await page.getByRole("link", { name: "İlanlarım", exact: true }).click();
   await expect(page.getByText("Henüz ilanınız yok.")).toBeVisible();
 });
 
@@ -178,6 +180,25 @@ test("toplu teyit: seçilenler ya da tümü; seçim yoksa uyarı", async () => {
   psql(`update load_posts set status='iptal' where id in ('${b1}','${b2}')`);
 });
 
+test("gösterge (P2): sayılar API ile aynı; teyit bekleyen ilan buradan teyit edilir", async () => {
+  psql(`update load_posts set status='teyit_bekliyor', last_confirmed_at = now() - interval '30 hours' where id='${loadId}'`);
+  await page.goto("/panel");
+  const s = (await api<{ loads: { visible: number; awaiting: number }; offers: { pending: number }; jobs: { completed: number } }>("GET", "/loads/mine/summary", (await cookie("nk_at"))!.value)).body;
+  expect(s.loads.awaiting).toBe(1);
+  const tile = (label: string) => page.getByRole("link").filter({ hasText: label });
+  await expect(tile("Yayındaki ilan")).toContainText(String(s.loads.visible));
+  await expect(tile("Teyit bekleyen")).toContainText("1");
+  await expect(tile("Bekleyen teklif")).toContainText(String(s.offers.pending));
+  await expect(tile("Bu ay tamamlanan taşıma")).toContainText(String(s.jobs.completed));
+  const item = page.locator(`#teyit li[data-load-id="${loadId}"]`);
+  await expect(item).toContainText("Menteşe, Muğla → Muratpaşa, Antalya");
+  await expect(item).toContainText("son teyit 1 gün önce");
+  await item.getByRole("button", { name: "Hâlâ geçerli" }).click();
+  await expect(page.locator("#teyit")).toHaveCount(0);
+  await expect(tile("Teyit bekleyen")).toContainText("Hepsi güncel");
+  expect(psql(`select status from load_posts where id='${loadId}'`)).toBe("teyitli");
+});
+
 test("erişim çerezi düşünce refresh ile sessizce yenilenir (refresh de döner)", async () => {
   const oldRefresh = (await cookie("nk_rt"))!.value;
   await context.clearCookies({ name: "nk_at" });
@@ -190,7 +211,8 @@ test("erişim çerezi düşünce refresh ile sessizce yenilenir (refresh de dön
 
 test("girişliyken /giris panele yönlendirir", async () => {
   await page.goto("/giris");
-  await expect(page).toHaveURL(/\/panel\/ilanlar$/);
+  await expect(page).toHaveURL(/\/panel$/);
+  await expect(page.getByRole("heading", { name: "Gösterge" })).toBeVisible();
 });
 
 test("API belirteci reddederse girişe düşer, döngü olmaz", async () => {

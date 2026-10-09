@@ -226,7 +226,7 @@ test("Geçmiş sekmesi: tamamlanan, iptal ve itirazlı taşımalar", async () =>
 
 test("telefon genişliğinde (390 px) panel sayfalarında yatay taşma yok", async () => {
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const path of [`/panel/tasimalar/${J1}`, "/panel/tasimalar", `/panel/ilanlar/${L}`, "/panel/ilanlar/yeni"]) {
+  for (const path of ["/panel", `/panel/tasimalar/${J1}`, "/panel/tasimalar", `/panel/ilanlar/${L}`, "/panel/ilanlar/yeni"]) {
     await page.goto(path);
     await page.locator("main h1").first().waitFor();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

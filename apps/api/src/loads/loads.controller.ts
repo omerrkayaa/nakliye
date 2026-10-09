@@ -40,6 +40,13 @@ export class LoadsController {
     return this.loads.mine(user.sub, q.page);
   }
 
+  /** P2 gösterge paneli özeti (":id"den önce) */
+  @Get("mine/summary")
+  @Roles("shipper")
+  summary(@CurrentUser() user: AccessPayload) {
+    return this.loads.summary(user.sub);
+  }
+
   @Get(":id")
   get(@CurrentUser() user: AccessPayload, @Param("id", uuid) id: string) {
     return this.loads.get(user.sub, id);

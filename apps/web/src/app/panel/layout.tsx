@@ -18,6 +18,9 @@ export default function PanelLayout({ children }: LayoutProps<"/panel">) {
           </Link>
           {/* Dar ekranda menü kendi içinde kayar (yönetici + zil ile 390 px'e sığmıyor); sayfa yatay taşmaz */}
           <nav className="flex min-w-0 gap-4 overflow-x-auto text-sm whitespace-nowrap">
+            <Link href="/panel" className="underline-offset-4 hover:underline">
+              Gösterge
+            </Link>
             <Link href="/panel/ilanlar" className="underline-offset-4 hover:underline">
               İlanlarım
             </Link>
