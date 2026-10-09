@@ -4,6 +4,7 @@
 // Kullanım (apps/api içinden): node dist/main.js > api.log 2>&1 &   sonra   node test/e2e-loads.mjs api.log
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { corridorEstimate } from "@nakliye/shared";
 
 const LOG = process.argv[2];
 const B = "http://localhost:3000/api/v1";
@@ -166,6 +167,18 @@ check("kapalı ilan teyit 409", (await api("POST", `/loads/${L1}/confirm`, S, { 
 check("kapalı ilan düzenleme 409", (await api("PATCH", `/loads/${L1}`, S, { note: "x" })).status === 409);
 check("kapalı ilan nakliyeciye 404", (await api("GET", `/loads/${L1}`, C)).status === 404);
 check("geçersiz uuid 400", (await api("GET", `/loads/abc`, C)).status === 400);
+
+console.log("\nFiyat aralığı (F7)");
+check("girişsiz 401", (await api("GET", `/price-estimate?from=${KONAK}&to=${EFELER}&vehicleType=tir`)).status === 401);
+r = await api("GET", `/price-estimate?from=${KONAK}&to=${EFELER}&vehicleType=tir`, C);
+const straight = Number(psql(`select ST_Distance(o.geom::geography, d.geom::geography) / 1000 from districts o, districts d where o.id=${KONAK} and d.id=${EFELER}`));
+const want = corridorEstimate(straight, "tir");
+check("Konak → Efeler tır: shared formülüyle aynı aralık", r.status === 200 && r.body.distanceKm === want.distanceKm && r.body.min === want.min && r.body.max === want.max && r.body.approximate === true, JSON.stringify([r.body, want]));
+check("mesafe makul (90–200 km) ve aralık sıralı", r.body.distanceKm > 90 && r.body.distanceKm < 200 && r.body.min < r.body.max, JSON.stringify(r.body));
+check("kamyonet tırdan ucuz", (await api("GET", `/price-estimate?from=${KONAK}&to=${EFELER}&vehicleType=kamyonet`, C)).body.max < r.body.max);
+r = await api("GET", `/price-estimate?from=${KONAK}&to=${EFELER}&vehicleType=ucak`, C);
+check("geçersiz araç tipi 400 (Türkçe)", r.status === 400 && r.body.errors?.[0]?.message === "Listeden bir seçenek seçin", JSON.stringify(r.body));
+check("olmayan ilçe 404", (await api("GET", `/price-estimate?from=99999&to=${EFELER}&vehicleType=tir`, C)).status === 404);
 
 console.log(`\nSonuç: ${pass} geçti, ${fail} kaldı`);
 process.exitCode = fail ? 1 : 0;

@@ -34,6 +34,23 @@ export const DEFAULT_PRICE_PARAMS: PriceParams = {
   },
 };
 
+/**
+ * Kuş uçuşu → karayolu mesafe katsayısı [T]. Yol motoru (OSRM vb.) yok; Türkiye'de şehirlerarası karayolu kuş uçuşunun
+ * kabaca 1,2–1,4 katı. Gerçek iş fiyatları biriktikçe formülle birlikte düzeltilmeli (docs/04 §7).
+ */
+export const ROAD_FACTOR = 1.3;
+
+export interface CorridorEstimate extends PriceEstimate {
+  /** Tahmini karayolu mesafesi (km, yuvarlanmış) */
+  distanceKm: number;
+}
+
+/** F7 koridor aralığı: ilçe merkezleri arası kuş uçuşu mesafe × ROAD_FACTOR üzerinden. Otoyol/köprü ücreti dahil değil. */
+export function corridorEstimate(straightKm: number, vehicleType: VehicleType, p: PriceParams = DEFAULT_PRICE_PARAMS): CorridorEstimate {
+  const distanceKm = Math.round(straightKm * ROAD_FACTOR);
+  return { distanceKm, ...estimatePrice(distanceKm, vehicleType, 0, p) };
+}
+
 export interface PriceEstimate {
   cost: number;
   min: number;

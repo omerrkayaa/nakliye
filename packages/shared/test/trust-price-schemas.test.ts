@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { trustScore, isVerifiedBadge, smoothedStars } from "../src/rules/trust.js";
-import { estimatePrice } from "../src/rules/price.js";
+import { corridorEstimate, estimatePrice, ROAD_FACTOR } from "../src/rules/price.js";
 import { createLoadSchema, phoneSchema, plateSchema } from "../src/schemas.js";
 
 describe("trustScore (BR-30)", () => {
@@ -50,6 +50,12 @@ describe("estimatePrice (F7)", () => {
 
   it("küçük araç daha ucuzdur", () => {
     expect(estimatePrice(600, "kamyonet").cost).toBeLessThan(estimatePrice(600, "tir").cost);
+  });
+
+  it("koridor: kuş uçuşu mesafe yol katsayısıyla büyür, otoyol ücreti eklenmez", () => {
+    const c = corridorEstimate(400, "tir");
+    expect(c.distanceKm).toBe(Math.round(400 * ROAD_FACTOR));
+    expect({ cost: c.cost, min: c.min, max: c.max }).toEqual(estimatePrice(c.distanceKm, "tir", 0));
   });
 });
 

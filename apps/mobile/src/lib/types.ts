@@ -33,8 +33,9 @@ export interface Load {
   /** Paylaşım sayfası kimliği (web /ilan/<shareId>, F8) */
   shareId: string;
   status: LoadStatus;
-  origin: Place;
-  dest: Place;
+  /** İlçe kimliği API yanıtında var (eski çevrimdışı kayıtta olmayabilir) */
+  origin: Place & { districtId?: number };
+  dest: Place & { districtId?: number };
   loadFrom: string;
   loadTo: string;
   cargoType: CargoType;
@@ -133,6 +134,13 @@ export interface Page<T> {
   items: T[];
   page: number;
   hasMore: boolean;
+}
+
+/** F7 tahmini fiyat aralığı — GET /price-estimate */
+export interface PriceEstimate {
+  distanceKm: number;
+  min: number;
+  max: number;
 }
 
 /** Rota alarmı (A8) — GET /alerts */

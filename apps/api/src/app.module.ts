@@ -6,6 +6,7 @@ import { HealthController } from "./health.controller.js";
 import { JobsModule } from "./jobs/jobs.module.js";
 import { LoadsModule } from "./loads/loads.module.js";
 import { LocationsController } from "./locations.controller.js";
+import { PriceController } from "./price.controller.js";
 import { MatchingModule } from "./matching/matching.module.js";
 import { NotificationsModule } from "./notifications/notifications.module.js";
 import { ReportsModule } from "./reports/reports.module.js";
@@ -27,6 +28,6 @@ import { VehiclesModule } from "./vehicles/vehicles.module.js";
     SchedulerModule,
     AdminModule,
   ],
-  controllers: [HealthController, LocationsController],
+  controllers: [HealthController, LocationsController, PriceController],
 })
 export class AppModule {}

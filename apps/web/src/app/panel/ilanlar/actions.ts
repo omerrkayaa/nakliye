@@ -63,6 +63,22 @@ export async function createLoadAction(_prev: FormState, form: FormData): Promis
   redirect(`/panel/ilanlar/${id}?yeni=1`);
 }
 
+export interface PriceEstimate {
+  distanceKm: number;
+  min: number;
+  max: number;
+}
+
+/** F7: güzergâh ve araç tipine göre tahmini fiyat aralığı (formdan, seçim değiştikçe). Hata olursa sessizce yok. */
+export async function estimatePriceAction(from: number, to: number, vehicleType: string): Promise<PriceEstimate | null> {
+  try {
+    const q = new URLSearchParams({ from: String(from), to: String(to), vehicleType });
+    return await api<PriceEstimate>(`/price-estimate?${q}`);
+  } catch {
+    return null;
+  }
+}
+
 /** "Hâlâ geçerli" (F1, BR-02): ilan teyit edilir, son teyit yenilenir. */
 export async function confirmLoadAction(_prev: FormState, form: FormData): Promise<FormState> {
   const id = String(form.get("id") ?? "");

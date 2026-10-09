@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
 import { Choice } from "@/components/choice";
+import { PriceHint } from "@/components/price-hint";
 import { DayChips, dayFromToday, DistrictField } from "@/components/place-fields";
 import { Button, Card, Chip, ErrorText, Field, Muted, s } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
@@ -140,6 +141,7 @@ export default function IlanYeni() {
 
         <Card style={{ gap: 16 }}>
           <Choice label="Fiyat" options={PRICE_TYPES} value={priceType} onChange={(k) => k && setPriceType(k)} />
+          <PriceHint from={origin} to={dest} vehicleType={vehicleType} />
           {priceType === "sabit" && (
             <Field label="Tutar (₺, KDV hariç)" keyboardType="number-pad" placeholder="ör. 24000" value={price} onChangeText={setPrice} error={errors.price} />
           )}

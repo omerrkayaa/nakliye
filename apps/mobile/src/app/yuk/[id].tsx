@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
 import { ConfirmBadge, loadSpec, priceText, Route, useCall } from "@/components/load-card";
+import { PriceHint } from "@/components/price-hint";
 import { Badge, Button, Card, Chip, ErrorText, Field, Muted, Status, s } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -112,6 +113,7 @@ function OfferForm({ load }: { load: Load }) {
         )}
       </View>
       <Field label="Fiyat (₺, KDV hariç)" keyboardType="number-pad" value={price} onChangeText={setPrice} placeholder="ör. 24000" />
+      <PriceHint from={load.origin.districtId} to={load.dest.districtId} vehicleType={load.vehicleType} />
       <Field label="Not (isteğe bağlı)" value={note} onChangeText={setNote} maxLength={280} multiline placeholder="ör. Yarın sabah yükleyebilirim" style={{ minHeight: 72, textAlignVertical: "top", paddingTop: 12 }} />
       {error && <ErrorText>{error}</ErrorText>}
       <Button title="Teklifi gönder" variant="accent" icon="send" busy={busy} onPress={submit} disabled={!vehicles?.length} />

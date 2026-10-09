@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { BODY_TYPES, CARGO_TYPES, VEHICLE_TYPES } from "@nakliye/shared";
 import { Field, invalid, selectClass, submitWithoutReset } from "@/components/field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Province } from "@/lib/types";
-import { createLoadAction, type FormState } from "../actions";
+import { tl } from "@/lib/format";
+import { createLoadAction, estimatePriceAction, type FormState, type PriceEstimate } from "../actions";
 
 const options = (o: Record<string, string>) =>
   Object.entries(o).map(([v, label]) => (
@@ -16,7 +17,21 @@ const options = (o: Record<string, string>) =>
   ));
 
 /** İl → ilçe seçimi (ilçe kimliği gönderilir). */
-function PlacePicker({ id, label, provinces, error, initial }: { id: string; label: string; provinces: Province[]; error?: string; initial?: Spot }) {
+function PlacePicker({
+  id,
+  label,
+  provinces,
+  error,
+  initial,
+  onDistrict,
+}: {
+  id: string;
+  label: string;
+  provinces: Province[];
+  error?: string;
+  initial?: Spot;
+  onDistrict: (districtId: string) => void;
+}) {
   const [province, setProvince] = useState(initial ? String(initial.provinceId) : "");
   const [district, setDistrict] = useState(initial ? String(initial.districtId) : "");
   const districts = provinces.find((p) => String(p.id) === province)?.districts ?? [];
@@ -31,6 +46,7 @@ function PlacePicker({ id, label, provinces, error, initial }: { id: string; lab
           onChange={(e) => {
             setProvince(e.target.value);
             setDistrict("");
+            onDistrict("");
           }}
         >
           <option value="">İl seçin</option>
@@ -42,7 +58,18 @@ function PlacePicker({ id, label, provinces, error, initial }: { id: string; lab
         </select>
       </Field>
       <Field label={`${label} ilçesi`} htmlFor={id} error={error}>
-        <select id={id} name={id} className={selectClass} value={district} onChange={(e) => setDistrict(e.target.value)} disabled={!province} {...invalid(id, error)}>
+        <select
+          id={id}
+          name={id}
+          className={selectClass}
+          value={district}
+          onChange={(e) => {
+            setDistrict(e.target.value);
+            onDistrict(e.target.value);
+          }}
+          disabled={!province}
+          {...invalid(id, error)}
+        >
           <option value="">{province ? "İlçe seçin" : "Önce il seçin"}</option>
           {districts.map((d) => (
             <option key={d.id} value={d.id}>
@@ -67,13 +94,26 @@ export function NewLoadForm({ provinces, today, maxDay, draft }: { provinces: Pr
   const [v, setV] = useState<Values>({ loadFrom: today, loadTo: today, cargoType: "", weightTon: "", vehicleType: "", bodyType: "", priceType: "teklif", price: "", note: "", ...draftValues });
   const set = (k: keyof typeof v) => (e: { target: { value: string } }) => setV((s) => ({ ...s, [k]: e.target.value }));
   const f = state.fields ?? {};
+  // F7: kalkış, varış ve araç seçilince tahmini fiyat aralığı
+  const [route, setRoute] = useState({ from: origin ? String(origin.districtId) : "", to: dest ? String(dest.districtId) : "" });
+  const [estimate, setEstimate] = useState<PriceEstimate | null>(null);
+  useEffect(() => {
+    let live = true;
+    if (route.from && route.to && v.vehicleType) {
+      void estimatePriceAction(Number(route.from), Number(route.to), v.vehicleType).then((e) => live && setEstimate(e));
+    }
+    return () => {
+      live = false;
+    };
+  }, [route.from, route.to, v.vehicleType]);
+  const shownEstimate = route.from && route.to && v.vehicleType ? estimate : null;
 
   return (
     <form className="space-y-8" noValidate onSubmit={submitWithoutReset(action)}>
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">Güzergâh</h2>
-        <PlacePicker id="originDistrictId" label="Kalkış" provinces={provinces} error={f.originDistrictId} initial={origin} />
-        <PlacePicker id="destDistrictId" label="Varış" provinces={provinces} error={f.destDistrictId} initial={dest} />
+        <PlacePicker id="originDistrictId" label="Kalkış" provinces={provinces} error={f.originDistrictId} initial={origin} onDistrict={(d) => setRoute((r) => ({ ...r, from: d }))} />
+        <PlacePicker id="destDistrictId" label="Varış" provinces={provinces} error={f.destDistrictId} initial={dest} onDistrict={(d) => setRoute((r) => ({ ...r, to: d }))} />
       </section>
 
       <section className="space-y-4">
@@ -117,6 +157,18 @@ export function NewLoadForm({ provinces, today, maxDay, draft }: { provinces: Pr
 
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">Fiyat</h2>
+        {shownEstimate && (
+          <p data-testid="price-estimate" className="rounded-lg border bg-muted/40 p-3 text-sm">
+            Bu güzergâhta tahmini fiyat aralığı:{" "}
+            <strong className="font-semibold">
+              {tl(shownEstimate.min)} – {tl(shownEstimate.max)}
+            </strong>
+            <span className="text-muted-foreground">
+              {" "}
+              (yaklaşık {shownEstimate.distanceKm} km; yakıt, şoför ve araç gideri üzerinden, otoyol/köprü hariç)
+            </span>
+          </p>
+        )}
         <div role="radiogroup" aria-label="Fiyat türü" className="flex flex-wrap gap-6">
           {[
             ["teklif", "Teklif alayım"],

@@ -293,6 +293,12 @@ export const resolveDisputeSchema = z.object({
   note: z.string().trim().min(5, "Kararın gerekçesini en az 5 karakterle yazın").max(500),
 });
 export const adminDisputeListSchema = adminReportListSchema;
+/** F7 fiyat aralığı sorgusu: kalkış ve varış ilçesi + araç tipi */
+export const priceEstimateSchema = z.object({
+  from: z.coerce.number().int().positive(),
+  to: z.coerce.number().int().positive(),
+  vehicleType: vehicleTypeSchema,
+});
 /** FR-51 yönetici: hesabı askıya al (sebep zorunlu; kayıtta kalır). */
 export const suspendUserSchema = z.object({ reason: z.string().trim().min(5, "Sebebi en az 5 karakterle yazın").max(500) });
 
@@ -324,4 +330,5 @@ export type ResolveReportInput = z.infer<typeof resolveReportSchema>;
 export type AdminReportListInput = z.infer<typeof adminReportListSchema>;
 export type SuspendUserInput = z.infer<typeof suspendUserSchema>;
 export type ResolveDisputeInput = z.infer<typeof resolveDisputeSchema>;
+export type PriceEstimateInput = z.infer<typeof priceEstimateSchema>;
 export type BulkLoadInput = z.infer<typeof bulkLoadSchema>;

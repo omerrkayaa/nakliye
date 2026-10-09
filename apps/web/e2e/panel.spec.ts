@@ -102,6 +102,14 @@ test("ilan formu: API hatası gösterilir, girilen değerler korunur", async () 
 
 test("ilan formu: geçerli ilan oluşur, yeni hesabın ilk ilanı onaya gider (BR-11)", async () => {
   await page.getByLabel("En geç").fill(day(2));
+  // F7: güzergâh ve araç seçili → tahmini aralık API'dekiyle aynı
+  const token = (await cookie("nk_at"))!.value;
+  const ids = (await api<{ name: string; districts: { id: number; name: string }[] }[]>("GET", "/locations")).body;
+  const d = (prov: string, name: string) => ids.find((p) => p.name === prov)!.districts.find((x) => x.name === name)!.id;
+  const est = (await api<{ min: number; max: number; distanceKm: number }>("GET", `/price-estimate?from=${d("Muğla", "Menteşe")}&to=${d("Antalya", "Muratpaşa")}&vehicleType=kamyon`, token)).body;
+  const tr = (n: number) => `${n.toLocaleString("tr-TR")} ₺`;
+  await expect(page.getByTestId("price-estimate")).toContainText(`${tr(est.min)} – ${tr(est.max)}`);
+  await expect(page.getByTestId("price-estimate")).toContainText(`yaklaşık ${est.distanceKm} km`);
   await page.getByRole("button", { name: "İlanı yayınla" }).click();
   await expect(page).toHaveURL(/\/panel\/ilanlar\/[0-9a-f-]{36}\?yeni=1$/);
   loadId = page.url().match(/ilanlar\/([0-9a-f-]{36})/)![1]!;
