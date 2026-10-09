@@ -6,10 +6,11 @@ import type { Me } from "@/lib/types";
 const TABS = [
   ["/panel/yonetim/moderasyon", "İlan moderasyonu"],
   ["/panel/yonetim/sikayetler", "Şikayetler"],
+  ["/panel/yonetim/itirazlar", "İtirazlar"],
   ["/panel/yonetim/kullanicilar", "Kullanıcılar"],
 ] as const;
 
-/** Yönetici paneli (Y2–Y4). Yetki API'de (admin rolü); burada yalnız yönetici olmayana sayfa gösterilmez. */
+/** Yönetici paneli (Y2–Y4, itirazlar). Yetki API'de (admin rolü); burada yalnız yönetici olmayana sayfa gösterilmez. */
 export default function AdminLayout({ children }: LayoutProps<"/panel/yonetim">) {
   return (
     <div className="space-y-6">

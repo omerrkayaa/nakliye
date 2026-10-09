@@ -33,6 +33,15 @@ describe("iş durum makinesi (FR-33, BR-31, BR-32)", () => {
     expect(canJobTransition("tamamlandi", "iptal", "shipper")).toBe(false);
     expect(canJobTransition("iptal", "anlasildi", "system")).toBe(false);
   });
+
+  it("itirazı yalnız yönetici çözer: tamamlandı ya da iptal", () => {
+    expect(canJobTransition("itirazli", "tamamlandi", "admin")).toBe(true);
+    expect(canJobTransition("itirazli", "iptal", "admin")).toBe(true);
+    expect(canJobTransition("itirazli", "tamamlandi", "shipper")).toBe(false);
+    expect(canJobTransition("itirazli", "iptal", "carrier")).toBe(false);
+    expect(canJobTransition("itirazli", "tamamlandi", "system")).toBe(false);
+    expect(canJobTransition("teslim_edildi", "tamamlandi", "admin")).toBe(false);
+  });
 });
 
 describe("vehicleFitError (FR-30)", () => {

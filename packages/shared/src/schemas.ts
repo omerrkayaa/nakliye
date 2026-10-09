@@ -287,6 +287,12 @@ export const adminReportListSchema = z.object({
   status: z.enum(["acik", "kapali"]).default("acik"),
   page: z.coerce.number().int().min(1).default(1),
 });
+/** Yönetici itiraz kararı (BR-32 sonrası): teslim geçerli → tamamlandı, geçersiz → iptal. Not zorunlu (iki tarafa gider). */
+export const resolveDisputeSchema = z.object({
+  outcome: z.enum(["tamamlandi", "iptal"]),
+  note: z.string().trim().min(5, "Kararın gerekçesini en az 5 karakterle yazın").max(500),
+});
+export const adminDisputeListSchema = adminReportListSchema;
 /** FR-51 yönetici: hesabı askıya al (sebep zorunlu; kayıtta kalır). */
 export const suspendUserSchema = z.object({ reason: z.string().trim().min(5, "Sebebi en az 5 karakterle yazın").max(500) });
 
@@ -317,4 +323,5 @@ export type CreateOfferInput = z.infer<typeof createOfferSchema>;
 export type ResolveReportInput = z.infer<typeof resolveReportSchema>;
 export type AdminReportListInput = z.infer<typeof adminReportListSchema>;
 export type SuspendUserInput = z.infer<typeof suspendUserSchema>;
+export type ResolveDisputeInput = z.infer<typeof resolveDisputeSchema>;
 export type BulkLoadInput = z.infer<typeof bulkLoadSchema>;

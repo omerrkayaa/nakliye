@@ -29,7 +29,7 @@ const EVENT: Record<string, string> = {
   hatali_kod: "Hatalı teslim kodu denendi",
   yeni_kod: "Yeni teslim kodu oluşturuldu",
 };
-const BY = { shipper: "siz", carrier: "nakliyeci", system: "sistem" } as const;
+const BY = { shipper: "siz", carrier: "nakliyeci", system: "sistem", admin: "yönetici" } as const;
 
 /** P6 taşıma detayı: karşı taraf (numara açık, FR-32), araç, durum işlemleri, puanlama, zaman çizelgesi. */
 export default function JobPage({ params }: PageProps<"/panel/tasimalar/[id]">) {
@@ -137,6 +137,7 @@ async function JobView({ params }: Pick<PageProps<"/panel/tasimalar/[id]">, "par
                 {" "}
                 · {at(e.at)} · {BY[e.by]}
                 {typeof e.meta?.reason === "string" ? ` · “${e.meta.reason}”` : ""}
+                {typeof e.meta?.note === "string" ? ` · “${e.meta.note}”` : ""}
               </span>
             </li>
           ))}

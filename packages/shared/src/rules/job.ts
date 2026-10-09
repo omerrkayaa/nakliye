@@ -33,15 +33,16 @@ export const VEHICLE_BUSY_JOB_STATUSES: readonly JobStatus[] = ["anlasildi", "yu
  * - Yük sahibi elle tamamlayabilir (BR-31: kod girilemediyse) ve teslimden sonra 48 saat içinde itiraz edebilir.
  * - İptal: teslimden önce iki taraf da (sebep zorunlu, iptal oranına yazılır).
  * - Sistem: teslimden 48 saat sonra otomatik tamamlar (BR-32).
+ * - Yönetici itirazı çözer: teslim geçerliyse tamamlandı, değilse iptal (iptal nakliyecinin hanesine yazılır).
  */
-type Actor = "carrier" | "shipper" | "system";
+type Actor = "carrier" | "shipper" | "system" | "admin";
 const T: Record<JobStatus, Partial<Record<JobStatus, readonly Actor[]>>> = {
   anlasildi: { yuklendi: ["carrier"], yolda: ["carrier"], teslim_edildi: ["carrier"], tamamlandi: ["shipper"], iptal: ["carrier", "shipper"] },
   yuklendi: { yolda: ["carrier"], teslim_edildi: ["carrier"], tamamlandi: ["shipper"], iptal: ["carrier", "shipper"] },
   yolda: { teslim_edildi: ["carrier"], tamamlandi: ["shipper"], iptal: ["carrier", "shipper"] },
   teslim_edildi: { tamamlandi: ["shipper", "system"], itirazli: ["shipper"] },
   tamamlandi: {},
-  itirazli: {}, // yönetici çözer (Faz 3)
+  itirazli: { tamamlandi: ["admin"], iptal: ["admin"] },
   iptal: {},
 };
 

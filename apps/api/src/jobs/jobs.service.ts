@@ -17,8 +17,10 @@ import {
   JOB_PARAMS,
   JOB_STATUS_LABELS,
   VISIBLE_LOAD_STATUSES,
+  type AdminReportListInput,
   type JobStatus,
   type JobListInput,
+  type ResolveDisputeInput,
 } from "@nakliye/shared";
 import { and, asc, desc, eq, gte, inArray, lt, lte, ne, notInArray, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -37,7 +39,7 @@ import { vehicleBusy, vehicleBusyMessage } from "./vehicle-busy.js";
 const PAGE_SIZE = 20;
 const HOUR = 3_600_000;
 type JobRow = typeof jobs.$inferSelect;
-type Actor = "carrier" | "shipper" | "system";
+type Actor = "carrier" | "shipper" | "system" | "admin";
 
 const od = alias(districts, "od");
 const op = alias(provinces, "op");
@@ -183,7 +185,7 @@ export class JobsService {
       events: events.map((e) => ({
         type: e.type,
         at: e.at,
-        by: e.actorId === null ? "system" : e.actorId === row.job.shipperId ? "shipper" : "carrier",
+        by: e.actorId === null ? "system" : e.actorId === row.job.shipperId ? "shipper" : e.actorId === row.job.carrierId ? "carrier" : "admin",
         meta: e.meta,
       })),
     };
@@ -268,6 +270,74 @@ export class JobsService {
     await this.trust.refresh(job.shipperId, job.carrierId);
     await this.tell(job, actor === "shipper" ? "carrier" : "shipper", `İş iptal edildi: ${reason}`);
     return this.get(userId, jobId);
+  }
+
+  // ── İtiraz çözümü (yönetici) ───────────────────────────────────────
+
+  /**
+   * İtirazlı işler: açıklar itiraz tarihine göre eskiden yeniye, sonuçlananlar karar tarihine göre yeniden eskiye.
+   * Yönetici iki tarafı arayıp karar verir: numaralar, plaka, itiraz sebebi ve teslim zamanı görünür.
+   */
+  async listDisputes({ status, page }: AdminReportListInput) {
+    const open = status === "acik";
+    const disputedAt = sql`(select min(${jobEvents.createdAt}) from ${jobEvents} where ${jobEvents.jobId} = ${jobs.id} and ${jobEvents.type} = 'itirazli')`;
+    const decidedAt = sql`(select max(${jobEvents.createdAt}) from ${jobEvents} where ${jobEvents.jobId} = ${jobs.id} and ${jobEvents.type} in ('tamamlandi', 'iptal'))`;
+    const rows = await this.selectJobs()
+      .where(open ? eq(jobs.status, "itirazli") : and(ne(jobs.status, "itirazli"), sql`${disputedAt} is not null`))
+      .orderBy(open ? sql`${disputedAt} asc` : sql`${decidedAt} desc`)
+      .limit(PAGE_SIZE + 1)
+      .offset((page - 1) * PAGE_SIZE);
+    const items = rows.slice(0, PAGE_SIZE);
+    const events = items.length
+      ? await this.db
+          .select({ jobId: jobEvents.jobId, type: jobEvents.type, meta: jobEvents.meta, at: jobEvents.createdAt })
+          .from(jobEvents)
+          .where(and(inArray(jobEvents.jobId, items.map((r) => r.job.id)), inArray(jobEvents.type, ["itirazli", "tamamlandi", "iptal"])))
+          .orderBy(asc(jobEvents.createdAt))
+      : [];
+    return {
+      items: items.map((r) => {
+        const own = events.filter((e) => e.jobId === r.job.id);
+        const dispute = own.find((e) => e.type === "itirazli");
+        const decision = own.find((e) => e.type !== "itirazli" && dispute && e.at >= dispute.at);
+        const party = (p: typeof r.shipper, id: string) => ({ id, displayName: p.company ?? p.name, phone: p.phone, verified: isVerifiedBadge(p.level) });
+        return {
+          id: r.job.id,
+          status: r.job.status,
+          agreedPrice: r.job.agreedPrice,
+          load: { ...r.load, origin: r.origin, dest: r.dest },
+          vehicle: r.vehicle,
+          shipper: party(r.shipper, r.job.shipperId),
+          carrier: party(r.carrier, r.job.carrierId),
+          deliveredAt: r.job.deliveredAt,
+          dispute: dispute ? { reason: (dispute.meta as { reason?: string } | null)?.reason ?? null, at: dispute.at } : null,
+          decision: decision ? { outcome: decision.type as "tamamlandi" | "iptal", note: (decision.meta as { note?: string } | null)?.note ?? null, at: decision.at } : null,
+        };
+      }),
+      page,
+      hasMore: rows.length > PAGE_SIZE,
+    };
+  }
+
+  /**
+   * Yönetici itirazı çözer. Teslim geçerli → tamamlandı (iki taraf puanlayabilir). Geçersiz → iptal; iptal nakliyecinin
+   * hanesine yazılır (güven skorundaki iptal oranı, BR-30). Gerekçe iki tarafa bildirilir.
+   */
+  async resolveDispute(adminId: string, jobId: string, input: ResolveDisputeInput, now = new Date()) {
+    const [job] = await this.db.select().from(jobs).where(eq(jobs.id, jobId));
+    if (!job) throw new NotFoundException("İş bulunamadı");
+    const set: Partial<typeof jobs.$inferInsert> =
+      input.outcome === "tamamlandi" ? { completedAt: now } : { cancelReason: `Yönetici kararı: ${input.note}`, cancelledBy: job.carrierId };
+    await this.db.transaction((tx) => this.transition(tx, job, input.outcome, adminId, "admin", set, { note: input.note }));
+    await this.trust.refresh(job.shipperId, job.carrierId);
+    if (input.outcome === "tamamlandi") {
+      await this.tell(job, "shipper", `İtirazınız sonuçlandı: teslim geçerli sayıldı, iş tamamlandı. Gerekçe: ${input.note}`);
+      await this.tell(job, "carrier", `İtiraz sonuçlandı: teslim geçerli sayıldı, iş tamamlandı. Yük sahibini puanlayabilirsiniz. Gerekçe: ${input.note}`);
+    } else {
+      await this.tell(job, "shipper", `İtirazınız haklı bulundu: iş iptal edildi. İlanı yeniden yayınlayabilirsiniz. Gerekçe: ${input.note}`);
+      await this.tell(job, "carrier", `İtiraz yük sahibi lehine sonuçlandı: iş iptal edildi ve iptal oranınıza yazıldı. Gerekçe: ${input.note}`);
+    }
+    return { id: job.id, status: input.outcome };
   }
 
   /** Zamanlayıcı (BR-32): teslimden 48 saat sonra itiraz yoksa tamamlandı. */

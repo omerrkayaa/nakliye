@@ -1,4 +1,4 @@
-// Yönetici paneli: ilan moderasyonu (Y4), şikayet kuyruğu (Y3), kullanıcı arama ve askıya alma (Y2).
+// Yönetici paneli: ilan moderasyonu (Y4), şikayet kuyruğu (Y3), kullanıcı arama ve askıya alma (Y2), itirazlar.
 // Hazırlık API ile; tarayıcı yöneticidir. Yönetici olmayan kullanıcı bölümü göremez.
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { api, apiLogin, apiUser, localPhone, phone, psql } from "./helpers";
@@ -11,7 +11,7 @@ let context: BrowserContext;
 let page: Page;
 let S: Awaited<ReturnType<typeof apiUser>>;
 let C1: Awaited<ReturnType<typeof apiUser>>;
-let L1: string, L2: string;
+let L1: string, L2: string, adminAccess: string;
 const dialogs: string[] = [];
 
 const trDay = (offset: number) => new Date(Date.now() + 3 * 3600e3 + offset * 86400e3).toISOString().slice(0, 10);
@@ -50,6 +50,7 @@ test.beforeAll(async ({ browser }) => {
   psql(`insert into user_roles(user_id, role) select id, 'admin' from users where phone='${ap}' on conflict do nothing`);
   const admin = (await api<{ accessToken: string; refreshToken: string }>("POST", "/auth/refresh", undefined, { refreshToken: a.refreshToken })).body;
   await api("PATCH", "/me", admin.accessToken, { name: "Test Yönetici" });
+  adminAccess = admin.accessToken;
 
   S = await apiUser(SP, "shipper", "Moderasyon Deneme");
   C1 = await apiUser(phone(202), "carrier", "Şikayetçi Nakliyat");
@@ -84,7 +85,7 @@ test("yönetici olmayan bölümü göremez, menüde bağlantı yok", async ({ br
 
 test("telefon genişliğinde yönetici sayfaları yatay taşmaz (menüde Yönetim varken)", async () => {
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const path of ["/panel/yonetim/moderasyon", "/panel/yonetim/sikayetler", "/panel/yonetim/kullanicilar"]) {
+  for (const path of ["/panel/yonetim/moderasyon", "/panel/yonetim/sikayetler", "/panel/yonetim/itirazlar", "/panel/yonetim/kullanicilar"]) {
     await page.goto(path);
     await expect(page.getByRole("link", { name: "Yönetim" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Çıkış" })).toBeInViewport();
@@ -174,4 +175,58 @@ test("kullanıcılar: numarayla ara → askıya al (sebep zorunlu) → askıdaki
   await expect(listed).toHaveCount(0);
   expect(dialogs.at(-1)).toContain("Kapanan ilanlar geri açılmaz");
   expect(psql(`select status from users where phone='${SP}'`)).toBe("aktif");
+});
+
+test("itiraz: kuyrukta iki taraf ve sebep; gerekçe zorunlu; 'teslim geçersiz' iptal eder, yük sahibi kararı görür", async ({ browser }) => {
+  // Hazırlık API ile: ilan → teklif → kabul → teslim → itiraz
+  const S2 = await apiUser(phone(203), "shipper", "İtiraz Eden Gıda");
+  const C2 = await apiUser(phone(204), "carrier", "Hasar Nakliyat");
+  const v = (await api("POST", "/vehicles", C2.accessToken, { plate: `48 IT ${SP.slice(-7, -3)}`, vehicleType: "kamyon", bodyType: "tenteli", capacityTon: 10 })).body.id!;
+  const l = await rawLoad(S2.accessToken, 5);
+  if (l.status === "moderasyonda") await api("POST", `/admin/loads/${l.id}/review`, adminAccess, { decision: "onay" });
+  const o = (await api("POST", `/loads/${l.id}/offers`, C2.accessToken, { vehicleId: v, price: 6000 })).body.id!;
+  const acc = (await api<{ job: { id: string }; deliveryCode: string }>("POST", `/offers/${o}/accept`, S2.accessToken)).body;
+  await api("POST", `/jobs/${acc.job.id}/deliver`, C2.accessToken, { code: acc.deliveryCode });
+  expect((await api("POST", `/jobs/${acc.job.id}/dispute`, S2.accessToken, { reason: "Paletlerden biri kırık geldi" })).status).toBe(200);
+
+  // /panel/yonetim akış içinde moderasyona yönlendirir: yönlendirme bitmeden tıklanırsa sonradan geri götürür
+  await page.goto("/panel/yonetim/moderasyon");
+  await expect(page.getByRole("heading", { name: "Onay bekleyen ilanlar" })).toBeVisible();
+  await page.getByRole("link", { name: "İtirazlar" }).click();
+  await expect(page).toHaveURL(/\/panel\/yonetim\/itirazlar$/);
+  // Açık kuyruk eskiden yeniye: önceki çalıştırmaların itirazları öndeyse sayfa sayfa git
+  const row = page.locator(`li[data-dispute-id="${acc.job.id}"]`);
+  for (let n = 1; n <= 100; n++) {
+    if (n > 1) await page.goto(`/panel/yonetim/itirazlar?sayfa=${n}`);
+    await expect(page.locator("li[data-dispute-id]").first()).toBeVisible();
+    if ((await row.count()) > 0 || (await page.getByRole("link", { name: "Sonraki" }).count()) === 0) break;
+  }
+  await expect(row).toContainText("Menteşe, Muğla → Muratpaşa, Antalya");
+  await expect(row).toContainText("Yük sahibinin itirazı: “Paletlerden biri kırık geldi”");
+  await expect(row).toContainText(`Yük sahibi: İtiraz Eden Gıda · ${fmt(phone(203))}`);
+  await expect(row.getByRole("link", { name: fmt(phone(204)) })).toHaveAttribute("href", `tel:${phone(204)}`);
+
+  // Kısa gerekçe: API hatası alanda
+  await row.getByLabel("Karar gerekçesi (iki tarafa gönderilir)").fill("kısa");
+  await row.getByRole("button", { name: "Teslim geçersiz: iptal et" }).click();
+  await expect(row.getByText("Kararın gerekçesini en az 5 karakterle yazın")).toBeVisible();
+  expect(psql(`select status from jobs where id='${acc.job.id}'`)).toBe("itirazli");
+
+  await row.getByLabel("Karar gerekçesi (iki tarafa gönderilir)").fill("Alıcı kırık paleti fotoğrafla belgeledi");
+  await row.getByRole("button", { name: "Teslim geçersiz: iptal et" }).click();
+  await expect(row).toHaveCount(0);
+  expect(dialogs.at(-1)).toContain("nakliyecinin iptal oranına yazılır");
+  expect(psql(`select status from jobs where id='${acc.job.id}'`)).toBe("iptal");
+
+  await page.goto("/panel/yonetim/itirazlar?durum=kapali");
+  await expect(page.locator(`li[data-dispute-id="${acc.job.id}"]`)).toContainText("Teslim geçersiz: taşıma iptal edildi — Alıcı kırık paleti fotoğrafla belgeledi");
+
+  // Yük sahibi taşıma sayfasında kararı ve yeniden yayınlamayı görür
+  const ctx = await cookieContext(browser, S2);
+  const p = await ctx.newPage();
+  await p.goto(`/panel/tasimalar/${acc.job.id}`);
+  await expect(p.getByText("Taşıma iptal edildi: “Yönetici kararı: Alıcı kırık paleti fotoğrafla belgeledi”")).toBeVisible();
+  await expect(p.getByRole("listitem").filter({ hasText: "Taşıma iptal edildi" })).toContainText("yönetici");
+  await expect(p.getByRole("link", { name: "İlanı yeniden yayınla" })).toBeVisible();
+  await ctx.close();
 });

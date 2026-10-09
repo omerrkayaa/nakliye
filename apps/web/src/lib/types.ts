@@ -102,7 +102,7 @@ export interface JobDetail extends Job {
     /** Kör puanlama: karşı taraf puanladıysa ama görünür değilse yalnız { revealed: false } */
     received: ({ revealed: true } & RatingView) | { revealed: false } | null;
   };
-  events: { type: string; at: string; by: "shipper" | "carrier" | "system"; meta: Record<string, unknown> | null }[];
+  events: { type: string; at: string; by: "shipper" | "carrier" | "system" | "admin"; meta: Record<string, unknown> | null }[];
 }
 
 export interface Page<T> {
@@ -158,6 +158,20 @@ export interface AdminReport {
     owner: AdminUser | null;
   };
   openOnTarget: number;
+}
+
+/** Yönetici: itirazlı taşıma (GET /admin/disputes) */
+export interface AdminDispute {
+  id: string;
+  status: JobStatus;
+  agreedPrice: number | null;
+  load: { id: string; loadFrom: string; loadTo: string; cargoType: CargoType; weightTon: number; origin: Place; dest: Place };
+  vehicle: { plate: string };
+  shipper: { id: string; displayName: string | null; phone: string };
+  carrier: { id: string; displayName: string | null; phone: string };
+  deliveredAt: string | null;
+  dispute: { reason: string | null; at: string } | null;
+  decision: { outcome: "tamamlandi" | "iptal"; note: string | null; at: string } | null;
 }
 
 /** Bildirim kutusu (GET /notifications) — mobil lib/types.ts ile aynı */

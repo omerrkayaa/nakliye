@@ -1,9 +1,12 @@
 import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, UseGuards } from "@nestjs/common";
 import {
+  adminDisputeListSchema,
   adminReportListSchema,
+  resolveDisputeSchema,
   resolveReportSchema,
   suspendUserSchema,
   type AdminReportListInput,
+  type ResolveDisputeInput,
   type ResolveReportInput,
   type SuspendUserInput,
 } from "@nakliye/shared";
@@ -11,6 +14,7 @@ import { z } from "zod";
 import { AuthGuard, CurrentUser, Roles } from "../auth/auth.guard.js";
 import type { AccessPayload } from "../auth/auth.service.js";
 import { ZodPipe } from "../common/zod.pipe.js";
+import { JobsService } from "../jobs/jobs.service.js";
 import { AdminService } from "./admin.service.js";
 
 const uuid = new ParseUUIDPipe({ version: "4" });
@@ -32,6 +36,25 @@ export class AdminReportsController {
   @HttpCode(200)
   resolve(@CurrentUser() user: AccessPayload, @Param("id", uuid) id: string, @Body(new ZodPipe(resolveReportSchema)) body: ResolveReportInput) {
     return this.admin.resolveReport(user.sub, id, body);
+  }
+}
+
+/** İtirazlı işler (BR-32 sonrası): kuyruk ve karar */
+@Controller("admin/disputes")
+@UseGuards(AuthGuard)
+@Roles("admin")
+export class AdminDisputesController {
+  constructor(private readonly jobs: JobsService) {}
+
+  @Get()
+  list(@Query(new ZodPipe(adminDisputeListSchema)) q: AdminReportListInput) {
+    return this.jobs.listDisputes(q);
+  }
+
+  @Post(":id/resolve")
+  @HttpCode(200)
+  resolve(@CurrentUser() user: AccessPayload, @Param("id", uuid) id: string, @Body(new ZodPipe(resolveDisputeSchema)) body: ResolveDisputeInput) {
+    return this.jobs.resolveDispute(user.sub, id, body);
   }
 }
 

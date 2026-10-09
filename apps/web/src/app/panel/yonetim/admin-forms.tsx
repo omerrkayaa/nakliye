@@ -3,7 +3,7 @@
 import { startTransition, useActionState, useState, type FormEvent } from "react";
 import { Field, invalid } from "@/components/field";
 import { Button } from "@/components/ui/button";
-import { resolveReportAction, reviewLoadAction, suspendUserAction, unsuspendUserAction, type AdminFormState } from "./actions";
+import { resolveDisputeAction, resolveReportAction, reviewLoadAction, suspendUserAction, unsuspendUserAction, type AdminFormState } from "./actions";
 
 const textareaClass =
   "w-full rounded-lg border border-input bg-background px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
@@ -64,6 +64,32 @@ export function ResolveForm({ id }: { id: string }) {
         </Button>
       </div>
       <ErrorText state={state} />
+    </form>
+  );
+}
+
+/** İtiraz kararı: gerekçe zorunlu (iki tarafa bildirilir); geri alınamaz, onay sorulur */
+export function DisputeForm({ id }: { id: string }) {
+  const [state, dispatch, pending] = useActionState(resolveDisputeAction, {});
+  const noteId = `dispute-note-${id}`;
+  const ask = (b: HTMLButtonElement | null) =>
+    b?.value === "iptal"
+      ? "Teslim geçersiz sayılsın mı? Taşıma iptal olur ve nakliyecinin iptal oranına yazılır. Geri alınamaz."
+      : "Teslim geçerli sayılsın mı? Taşıma tamamlanır. Geri alınamaz.";
+  return (
+    <form onSubmit={submitWithSubmitter(dispatch, ask)} className="space-y-2">
+      <input type="hidden" name="id" value={id} />
+      <Field label="Karar gerekçesi (iki tarafa gönderilir)" htmlFor={noteId} error={state.error}>
+        <textarea id={noteId} name="note" rows={2} maxLength={500} required className={textareaClass} {...invalid(noteId, state.error)} />
+      </Field>
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" name="outcome" value="tamamlandi" disabled={pending} className="h-11">
+          Teslim geçerli: tamamla
+        </Button>
+        <Button type="submit" name="outcome" value="iptal" variant="destructive" disabled={pending} className="h-11">
+          Teslim geçersiz: iptal et
+        </Button>
+      </div>
     </form>
   );
 }
