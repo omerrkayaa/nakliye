@@ -22,6 +22,12 @@ export const JOB_PARAMS = {
 export const ACTIVE_JOB_STATUSES: readonly JobStatus[] = ["anlasildi", "yuklendi", "yolda", "teslim_edildi"];
 
 /**
+ * Aracı meşgul tutan işler (teslimden önce). Böyle bir işin yükleme tarihleriyle çakışan tarihlere araç başka teklif
+ * veremez, kabul edilemez, boş araç ilanı açamaz. Teslimden sonra araç boştur (dönüş yükü bu yüzden alınabilir).
+ */
+export const VEHICLE_BUSY_JOB_STATUSES: readonly JobStatus[] = ["anlasildi", "yuklendi", "yolda"];
+
+/**
  * İzin verilen geçişler ve kimin yapabileceği.
  * - Nakliyeci ileri taşır: anlaşıldı → yüklendi → yolda; teslim yalnız kodla (ara adımlar atlanabilir: şoför güncellemeyebilir).
  * - Yük sahibi elle tamamlayabilir (BR-31: kod girilemediyse) ve teslimden sonra 48 saat içinde itiraz edebilir.

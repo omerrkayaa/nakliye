@@ -8,12 +8,13 @@ import {
   type CreateOfferInput,
   type VehicleType,
 } from "@nakliye/shared";
-import { and, asc, desc, eq, inArray, isNull, ne, notInArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lte, ne, notInArray, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { DB, type Db } from "../db/db.module.js";
 import { capacityPosts, companies, districts, loadPosts, matches, offers, provinces, users, vehicles } from "../db/schema.js";
 import { NotificationsService } from "../notifications/notifications.service.js";
 import { TrustService } from "../ratings/trust.service.js";
+import { vehicleBusy, vehicleBusyMessage } from "./vehicle-busy.js";
 
 const PAGE_SIZE = 20;
 const PG_UNIQUE_VIOLATION = "23505";
@@ -48,6 +49,8 @@ export class OffersService {
       { vehicleType: vehicle.vehicleType as VehicleType, bodyType: vehicle.bodyType as BodyType, capacityTon: vehicle.capacityTon },
     );
     if (misfit) throw new BadRequestException(misfit);
+    const busy = await vehicleBusy(this.db, vehicle.id, load.loadFrom, load.loadTo);
+    if (busy) throw new ConflictException(vehicleBusyMessage(busy));
 
     let offerId: string;
     try {
@@ -164,6 +167,42 @@ export class OffersService {
       throw new ConflictException("Teklif artık beklemede değil");
     }
     return this.one(offerId);
+  }
+
+  /**
+   * Kabulden sonra: aynı aracın tarihleri çakışan ilanlardaki bekleyen teklifleri geri çekilir (araç artık o günlerde
+   * dolu; bırakılsa yük sahibi kabul etmeye çalışıp hata alırdı). Commit'ten sonra çağrılır; kabulün doğruluğu buna
+   * bağlı değil (kabul aracı kilitleyip ayrıca kontrol eder).
+   */
+  async withdrawBusy(vehicleId: string, load: { id: string; loadFrom: string; loadTo: string }): Promise<number> {
+    const rows = await this.db
+      .update(offers)
+      .set({ status: "geri_cekildi" })
+      .where(
+        and(
+          eq(offers.vehicleId, vehicleId),
+          eq(offers.status, "beklemede"),
+          ne(offers.loadPostId, load.id),
+          inArray(
+            offers.loadPostId,
+            this.db
+              .select({ id: loadPosts.id })
+              .from(loadPosts)
+              .where(and(lte(loadPosts.loadFrom, load.loadTo), gte(loadPosts.loadTo, load.loadFrom))),
+          ),
+        ),
+      )
+      .returning({ carrierId: offers.carrierId, loadId: offers.loadPostId, id: offers.id });
+    for (const r of rows) {
+      await this.notifications.notify(r.carrierId, {
+        type: "offer_result",
+        refKey: `offer:${r.id}:sonuc`,
+        title: "Teklifiniz geri çekildi",
+        body: `${await this.route(r.loadId)}: aracınız bu tarihlerde başka bir işe atandı`,
+        data: { type: "offer", loadId: r.loadId, offerId: r.id },
+      });
+    }
+    return rows.length;
   }
 
   /**

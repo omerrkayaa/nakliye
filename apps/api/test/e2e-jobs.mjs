@@ -126,7 +126,8 @@ check("aynı teklif tekrar kabul 409", (await api("POST", `/offers/${O1}/accept`
 check("reddedilen teklif kabul edilemez 409", (await api("POST", `/offers/${O2}/accept`, S)).status === 409);
 
 console.log("\nEşzamanlı kabul");
-const L2 = await load();
+// V1 artık 1–2. günlerde L'nin işinde: bu ilan başka günlerde (yoksa V1 teklif veremez)
+const L2 = await load(S, 4, 5);
 const P1 = (await offer(C1, L2, V1, 3000)).body.id, P2 = (await offer(C2, L2, V2, 3100)).body.id;
 const both = await Promise.all([api("POST", `/offers/${P1}/accept`, S), api("POST", `/offers/${P2}/accept`, S)]);
 check("iki teklif aynı anda kabul: biri 201, biri 409", both.map((x) => x.status).sort().join() === "201,409", both.map((x) => x.status).join());
@@ -206,6 +207,30 @@ await api("POST", `/loads/${L5}/close`, S, { reason: "arac_bulundu" });
 r = await api("POST", "/admin/tick", A);
 check("tur bekleyen teklifi sonuçlandırdı", r.body.offersClosed >= 1 && offerStatus(O5) === "ret", JSON.stringify(r.body));
 check("nakliyeciye 'ilan yayından kalktı'", (await notes(C2, "offer_result")).some((n) => n.body.includes("yayından kalktı")));
+
+console.log("\nÇifte rezervasyon: aynı araç aynı günlerde iki işte olamaz");
+const V4 = await vehicle(C1, `48 PE ${run}`);
+const Lx = await load(S, 7, 8), Ly = await load(S2, 8, 9), Lz = await load(S2, 10, 11);
+const Ox = (await offer(C1, Lx, V4, 2500)).body.id, Oy = (await offer(C1, Ly, V4, 2600)).body.id, Oz = (await offer(C1, Lz, V4, 2700)).body.id;
+check("boş araç aynı günlere birden çok ilana teklif verebilir", [Ox, Oy, Oz].every(Boolean));
+const pair = await Promise.all([api("POST", `/offers/${Ox}/accept`, S), api("POST", `/offers/${Oy}/accept`, S2)]);
+check("iki yük sahibi aynı anda kabul: biri 201, biri 409", pair.map((x) => x.status).sort().join() === "201,409", pair.map((x) => `${x.status} ${x.body.message ?? ""}`).join(" | "));
+check("araca çakışan günlerde tek iş", psql(`select count(*) from jobs where vehicle_id='${V4}' and status='anlasildi'`) === "1");
+const won = pair[0].status === 201 ? Ox : Oy, lost = won === Ox ? Oy : Ox;
+const JV4 = pair.find((x) => x.status === 201).body.job.id;
+check("kaybeden teklif geri çekildi", offerStatus(lost) === "geri_cekildi", offerStatus(lost));
+check("çakışmayan günlerdeki teklif bekliyor", offerStatus(Oz) === "beklemede");
+check("nakliyeciye 'geri çekildi' bildirimi", (await notes(C1, "offer_result")).some((n) => n.title.includes("geri çekildi") && n.body.includes("başka bir işe")));
+const Lw = await load(S2, 8, 8);
+r = await offer(C1, Lw, V4, 2400);
+check("dolu günlere yeni teklif 409", r.status === 409 && r.body.message.includes("başka bir işte"), JSON.stringify(r.body));
+r = await api("POST", "/capacity", C1, { vehicleId: V4, originDistrictId: MENTESE, destDistrictId: null, availableFrom: trDay(8), availableTo: trDay(8) });
+check("dolu günlere boş araç ilanı 409", r.status === 409 && r.body.message.includes("başka bir işte"), JSON.stringify(r.body));
+r = await api("POST", "/capacity", C1, { vehicleId: V4, originDistrictId: MURATPASA, destDistrictId: null, availableFrom: trDay(12), availableTo: trDay(13) });
+check("işten sonraki günlere boş araç ilanı açılır", r.status === 201, JSON.stringify(r.body));
+check("boş araç ilanı dolu günlere kaydırılamaz 409", (await api("PATCH", `/capacity/${r.body.id}`, C1, { availableFrom: trDay(8) })).status === 409);
+await api("POST", `/jobs/${JV4}/cancel`, won === Ox ? S : S2, { reason: "Yük ertelendi" });
+check("iş iptal edilince araç o günlere yine teklif verir", (await offer(C1, Lw, V4, 2400)).status === 201);
 
 cleanup();
 console.log(`\nSonuç: ${pass} geçti, ${fail} kaldı`);

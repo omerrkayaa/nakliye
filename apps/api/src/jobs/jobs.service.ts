@@ -32,6 +32,7 @@ import { NotificationsService } from "../notifications/notifications.service.js"
 import { RatingsService } from "../ratings/ratings.service.js";
 import { TrustService } from "../ratings/trust.service.js";
 import { OffersService } from "./offers.service.js";
+import { vehicleBusy, vehicleBusyMessage } from "./vehicle-busy.js";
 
 const PAGE_SIZE = 20;
 const HOUR = 3_600_000;
@@ -87,11 +88,16 @@ export class JobsService {
       if (!offer) throw new NotFoundException("Teklif bulunamadı");
       if (offer.status !== "beklemede") throw new ConflictException("Teklif artık beklemede değil");
       if (!VISIBLE_LOAD_STATUSES.includes(load.status)) throw new ConflictException("İlan yayında değil; teklif kabul edilemez");
+      // Araç satırı kilitlenir (kilit sırası: ilan → teklif → araç): aynı aracın iki ilandaki teklifi aynı anda
+      // kabul edilirse ikincisi birincinin işini görür ve reddedilir (çifte rezervasyon olmaz)
       const [vehicle] = await tx
         .select({ id: vehicles.id })
         .from(vehicles)
-        .where(and(eq(vehicles.id, offer.vehicleId), eq(vehicles.status, "aktif")));
+        .where(and(eq(vehicles.id, offer.vehicleId), eq(vehicles.status, "aktif")))
+        .for("update");
       if (!vehicle) throw new ConflictException("Teklifteki araç artık kullanılmıyor");
+      const busy = await vehicleBusy(tx, vehicle.id, load.loadFrom, load.loadTo);
+      if (busy) throw new ConflictException(`${vehicleBusyMessage(busy)}; bu teklif kabul edilemez`);
 
       await tx.update(offers).set({ status: "kabul" }).where(eq(offers.id, offer.id));
       const rejected = await tx
@@ -124,12 +130,12 @@ export class JobsService {
             gte(capacityPosts.availableTo, load.loadFrom),
           ),
         );
-      return { carrierId: offer.carrierId, loadId: load.id, rejected };
+      return { carrierId: offer.carrierId, vehicleId: offer.vehicleId, load, rejected };
     });
 
     // Yan etkiler commit'ten sonra (toplam iş sayısı iptal oranının paydası)
     await this.trust.refresh(userId, result.carrierId);
-    const route = await this.offersService.route(result.loadId);
+    const route = await this.offersService.route(result.load.id);
     const [shipper] = await this.db.select({ phone: users.phone }).from(users).where(eq(users.id, userId));
     await this.sms.send(shipper!.phone, deliveryCodeSmsText(code)).catch((e: Error) => this.logger.warn(`Teslim kodu SMS'i gitmedi (${jobId}): ${e.message}`));
     await this.notifications.notify(result.carrierId, {
@@ -144,9 +150,12 @@ export class JobsService {
         refKey: `offer:${r.id}:sonuc`,
         title: "Teklifiniz sonuçlanmadı",
         body: `${route} ilanı için başka bir teklif kabul edildi`,
-        data: { type: "offer", loadId: result.loadId, offerId: r.id },
+        data: { type: "offer", loadId: result.load.id, offerId: r.id },
       });
     }
+    await this.offersService
+      .withdrawBusy(result.vehicleId, result.load)
+      .catch((e: Error) => this.logger.warn(`Aracın diğer teklifleri geri çekilemedi (${jobId}): ${e.message}`));
     return { job: await this.get(userId, jobId), deliveryCode: code };
   }
 

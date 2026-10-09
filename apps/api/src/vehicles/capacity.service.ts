@@ -12,6 +12,7 @@ import { and, desc, eq, gte, inArray, lt, lte, ne, type SQL } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core";
 import { DB, type Db } from "../db/db.module.js";
 import { capacityPosts, districts, provinces, vehicles } from "../db/schema.js";
+import { vehicleBusy, vehicleBusyMessage } from "../jobs/vehicle-busy.js";
 import { MatchingService } from "../matching/matching.service.js";
 
 const PAGE_SIZE = 20;
@@ -130,7 +131,7 @@ export class CapacityService {
     return { origin: origin.geom, dest: dest?.geom ?? null };
   }
 
-  /** Aynı aracın tarihleri çakışan (iki uç dahil) başka aktif ilanı varsa 409. */
+  /** Aynı aracın tarihleri çakışan (iki uç dahil) başka aktif ilanı ya da teslim edilmemiş işi varsa 409. */
   private async assertNoOverlap(tx: Tx, vehicleId: string, from: string, to: string, now: Date, exceptId?: string) {
     const where: SQL[] = [
       eq(capacityPosts.vehicleId, vehicleId),
@@ -148,6 +149,9 @@ export class CapacityService {
     if (clash) {
       throw new ConflictException(`Bu araç için ${clash.from} – ${clash.to} tarihlerinde zaten boş araç ilanı var`);
     }
+    // Araç o günlerde bir işteyse boş değildir (kabul zaten çakışan ilanları kapatıyor; sonradan açılmasın)
+    const busy = await vehicleBusy(tx, vehicleId, from, to);
+    if (busy) throw new ConflictException(vehicleBusyMessage(busy));
   }
 
   private async ownActive(tx: Tx, userId: string, id: string) {
