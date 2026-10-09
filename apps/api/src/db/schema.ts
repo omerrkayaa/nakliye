@@ -465,3 +465,16 @@ export const favoriteCarriers = pgTable(
   },
   (t) => [primaryKey({ columns: [t.shipperId, t.carrierId] }), index("favorite_carriers_carrier_idx").on(t.carrierId)],
 );
+
+// F7: ilçe merkezleri arası karayolu mesafesi önbelleği (OSRM'den bir kez alınır; yön önemli: A→B ile B→A farklı olabilir)
+export const districtRoutes = pgTable(
+  "district_routes",
+  {
+    originDistrictId: integer("origin_district_id").notNull().references(() => districts.id),
+    destDistrictId: integer("dest_district_id").notNull().references(() => districts.id),
+    distanceM: integer("distance_m").notNull(),
+    durationS: integer("duration_s").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.originDistrictId, t.destDistrictId] })],
+);

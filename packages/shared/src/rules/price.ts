@@ -34,8 +34,14 @@ export const DEFAULT_PRICE_PARAMS: PriceParams = {
   },
 };
 
+/** Gerçek karayolu mesafesiyle (OSRM) aralık. Otoyol/köprü ücreti dahil değil. */
+export function roadEstimate(roadKm: number, vehicleType: VehicleType, p: PriceParams = DEFAULT_PRICE_PARAMS): CorridorEstimate {
+  const distanceKm = Math.round(roadKm);
+  return { distanceKm, ...estimatePrice(distanceKm, vehicleType, 0, p) };
+}
+
 /**
- * Kuş uçuşu → karayolu mesafe katsayısı [T]. Yol motoru (OSRM vb.) yok; Türkiye'de şehirlerarası karayolu kuş uçuşunun
+ * Yol motoruna ulaşılamadığında yedek: kuş uçuşu → karayolu mesafe katsayısı [T]. Yol motoru (OSRM vb.) yok; Türkiye'de şehirlerarası karayolu kuş uçuşunun
  * kabaca 1,2–1,4 katı. Gerçek iş fiyatları biriktikçe formülle birlikte düzeltilmeli (docs/04 §7).
  */
 export const ROAD_FACTOR = 1.3;

@@ -27,3 +27,13 @@ services:
       - "9001:9001"
     volumes:
       - ./data/minio:/data
+
+  # F7 karayolu mesafesi (OSRM, OpenStreetMap verisi; ücretsiz, kendi makinemizde). Veri bir kez hazırlanır: osrm.md
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend:latest
+    command: osrm-routed --algorithm mld /data/turkey.osrm
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data/osrm:/data
+    restart: unless-stopped

@@ -4,7 +4,7 @@
 // Kullanım (apps/api içinden): node dist/main.js > api.log 2>&1 &   sonra   node test/e2e-loads.mjs api.log
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { corridorEstimate } from "@nakliye/shared";
+import { corridorEstimate, roadEstimate } from "@nakliye/shared";
 
 const LOG = process.argv[2];
 const B = "http://localhost:3000/api/v1";
@@ -172,8 +172,12 @@ console.log("\nFiyat aralığı (F7)");
 check("girişsiz 401", (await api("GET", `/price-estimate?from=${KONAK}&to=${EFELER}&vehicleType=tir`)).status === 401);
 r = await api("GET", `/price-estimate?from=${KONAK}&to=${EFELER}&vehicleType=tir`, C);
 const straight = Number(psql(`select ST_Distance(o.geom::geography, d.geom::geography) / 1000 from districts o, districts d where o.id=${KONAK} and d.id=${EFELER}`));
-const want = corridorEstimate(straight, "tir");
-check("Konak → Efeler tır: shared formülüyle aynı aralık", r.status === 200 && r.body.distanceKm === want.distanceKm && r.body.min === want.min && r.body.max === want.max && r.body.approximate === true, JSON.stringify([r.body, want]));
+// Kaynak: OSRM çalışıyorsa karayolu (önbelleğe yazılır), yoksa kuş uçuşu × katsayı
+const cached = () => psql(`select distance_m from district_routes where origin_district_id=${KONAK} and dest_district_id=${EFELER}`);
+const want = r.body.source === "karayolu" ? roadEstimate(Number(cached()) / 1000, "tir") : corridorEstimate(straight, "tir");
+check(`Konak → Efeler tır (${r.body.source}): shared formülüyle aynı aralık`, r.status === 200 && ["karayolu", "kus_ucusu"].includes(r.body.source) && r.body.distanceKm === want.distanceKm && r.body.min === want.min && r.body.max === want.max && r.body.approximate === true, JSON.stringify([r.body, want]));
+check("karayolu kaynağında mesafe önbellekte ve kuş uçuşundan uzun", r.body.source !== "karayolu" || (cached() !== "" && r.body.distanceKm > straight), `${r.body.distanceKm} / ${straight}`);
+console.log(`  (kaynak: ${r.body.source}, ${r.body.distanceKm} km)`);
 check("mesafe makul (90–200 km) ve aralık sıralı", r.body.distanceKm > 90 && r.body.distanceKm < 200 && r.body.min < r.body.max, JSON.stringify(r.body));
 check("kamyonet tırdan ucuz", (await api("GET", `/price-estimate?from=${KONAK}&to=${EFELER}&vehicleType=kamyonet`, C)).body.max < r.body.max);
 r = await api("GET", `/price-estimate?from=${KONAK}&to=${EFELER}&vehicleType=ucak`, C);

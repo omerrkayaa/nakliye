@@ -66,7 +66,7 @@ test("yük akışı → filtre → detay → teklif → Tekliflerim", async ({ p
   await expect(web.getByRole("heading", { level: 1 })).toHaveText("Nazilli, Aydın → Esenyurt, İstanbul");
   await web.close();
   // F7: teklif verirken tahmini piyasa aralığı
-  await expect(vis(page, /^Tahmini piyasa aralığı: [\d.]+ ₺ – [\d.]+ ₺ \(yaklaşık \d+ km; otoyol\/köprü hariç\)$/)).toBeVisible();
+  await expect(vis(page, /^Tahmini piyasa aralığı: [\d.]+ ₺ – [\d.]+ ₺ \((karayolu|yaklaşık) \d+ km; otoyol\/köprü hariç\)$/)).toBeVisible();
   const price = page.getByLabel("Fiyat (₺, KDV hariç)").locator("visible=true");
   await expect(price).toHaveValue("24000");
   await price.fill("23500");

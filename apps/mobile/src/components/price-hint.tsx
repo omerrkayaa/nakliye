@@ -22,7 +22,8 @@ export function PriceHint({ from, to, vehicleType }: { from?: number | null; to?
   if (!from || !to || !vehicleType || !estimate) return null;
   return (
     <Muted>
-      Tahmini piyasa aralığı: {tl(estimate.min)} – {tl(estimate.max)} (yaklaşık {estimate.distanceKm} km; otoyol/köprü hariç)
+      Tahmini piyasa aralığı: {tl(estimate.min)} – {tl(estimate.max)} ({estimate.source === "karayolu" ? "karayolu" : "yaklaşık"} {estimate.distanceKm} km;
+      otoyol/köprü hariç)
     </Muted>
   );
 }

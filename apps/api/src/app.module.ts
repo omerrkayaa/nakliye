@@ -7,6 +7,7 @@ import { JobsModule } from "./jobs/jobs.module.js";
 import { LoadsModule } from "./loads/loads.module.js";
 import { LocationsController } from "./locations.controller.js";
 import { PriceController } from "./price.controller.js";
+import { RoutesService } from "./routes.service.js";
 import { MatchingModule } from "./matching/matching.module.js";
 import { NotificationsModule } from "./notifications/notifications.module.js";
 import { ReportsModule } from "./reports/reports.module.js";
@@ -29,5 +30,6 @@ import { VehiclesModule } from "./vehicles/vehicles.module.js";
     AdminModule,
   ],
   controllers: [HealthController, LocationsController, PriceController],
+  providers: [RoutesService],
 })
 export class AppModule {}

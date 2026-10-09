@@ -1,18 +1,22 @@
 import { Controller, Get, Inject, NotFoundException, Query, UseGuards } from "@nestjs/common";
-import { corridorEstimate, priceEstimateSchema, type PriceEstimateInput } from "@nakliye/shared";
+import { corridorEstimate, priceEstimateSchema, roadEstimate, type PriceEstimateInput } from "@nakliye/shared";
 import { sql } from "drizzle-orm";
 import { AuthGuard } from "./auth/auth.guard.js";
 import { ZodPipe } from "./common/zod.pipe.js";
 import { DB, type Db } from "./db/db.module.js";
+import { RoutesService } from "./routes.service.js";
 
 /**
- * F7 koridor fiyat aralığı (FR-25, docs/04 §7): ilçe merkezleri arası mesafe (PostGIS, metre → km) × yol katsayısı,
- * araç tipine göre maliyet ve kâr bandı. Yaklaşıktır: otoyol/köprü ücreti ve gerçek güzergâh yok.
+ * F7 koridor fiyat aralığı (FR-25, docs/04 §7): ilçe merkezleri arası karayolu mesafesi (OSRM, önbellekli) ile araç
+ * tipine göre maliyet ve kâr bandı. OSRM yoksa kuş uçuşu × yol katsayısına düşer (`source`). Otoyol/köprü ücreti yok.
  */
 @Controller("price-estimate")
 @UseGuards(AuthGuard)
 export class PriceController {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly routes: RoutesService,
+  ) {}
 
   @Get()
   async estimate(@Query(new ZodPipe(priceEstimateSchema)) q: PriceEstimateInput) {
@@ -22,6 +26,8 @@ export class PriceController {
     `);
     const row = r.rows[0];
     if (!row) throw new NotFoundException("İlçe bulunamadı");
-    return { ...corridorEstimate(Number(row.km), q.vehicleType), approximate: true };
+    const road = await this.routes.roadKm(q.from, q.to);
+    if (road !== null) return { ...roadEstimate(road, q.vehicleType), source: "karayolu" as const, approximate: true };
+    return { ...corridorEstimate(Number(row.km), q.vehicleType), source: "kus_ucusu" as const, approximate: true };
   }
 }

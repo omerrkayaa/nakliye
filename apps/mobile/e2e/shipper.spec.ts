@@ -59,7 +59,7 @@ test("yük sahibi: giriş → ilan → teyit → teklif kabul → teslim → pua
     await vis(page, "Tır", true).click();
     await vis(page, "Tenteli", true).click();
     // F7: güzergâh + araç seçilince tahmini aralık (Nazilli → Esenyurt ~ 600 km)
-    await expect(vis(page, /^Tahmini piyasa aralığı: [\d.]+ ₺ – [\d.]+ ₺ \(yaklaşık \d+ km/)).toBeVisible();
+    await expect(vis(page, /^Tahmini piyasa aralığı: [\d.]+ ₺ – [\d.]+ ₺ \((karayolu|yaklaşık) \d+ km/)).toBeVisible();
     await vis(page, "Sabit fiyat", true).click();
     await vis(page, "İlanı yayınla").click();
     await expect(vis(page, "Tutarı TL olarak girin")).toBeVisible();

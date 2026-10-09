@@ -165,7 +165,8 @@ export function NewLoadForm({ provinces, today, maxDay, draft }: { provinces: Pr
             </strong>
             <span className="text-muted-foreground">
               {" "}
-              (yaklaşık {shownEstimate.distanceKm} km; yakıt, şoför ve araç gideri üzerinden, otoyol/köprü hariç)
+              ({shownEstimate.source === "karayolu" ? "karayolu" : "yaklaşık"} {shownEstimate.distanceKm} km; yakıt, şoför ve araç gideri üzerinden,
+              otoyol/köprü hariç)
             </span>
           </p>
         )}

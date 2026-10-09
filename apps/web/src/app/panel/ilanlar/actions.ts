@@ -67,6 +67,8 @@ export interface PriceEstimate {
   distanceKm: number;
   min: number;
   max: number;
+  /** karayolu: OSRM; kus_ucusu: yol motoruna ulaşılamadı, kuş uçuşu × katsayı */
+  source: "karayolu" | "kus_ucusu";
 }
 
 /** F7: güzergâh ve araç tipine göre tahmini fiyat aralığı (formdan, seçim değiştikçe). Hata olursa sessizce yok. */
