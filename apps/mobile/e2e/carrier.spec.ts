@@ -224,3 +224,22 @@ test("çevrimdışı: son kayıtlı yük listesi ve uyarı", async ({ page, cont
   await expect(vis(page, /^Teyitli ·/).first()).toBeVisible();
   await expect(vis(page, /^Çevrimdışısınız/)).toHaveCount(0);
 });
+
+test("ilan şikayeti: sebep zorunlu, açıklamayla gönderilir, yönetici kuyruğuna düşer", async ({ page }) => {
+  const errors = collectErrors(page);
+  await demoLogin(page);
+  await btn(page, /Nazilli, Aydın → Esenyurt/).first().click();
+  await expect(vis(page, "Yük sahibi", true)).toBeVisible();
+  const loadId = page.url().split("/").at(-1)!;
+  await btn(page, "Bu ilanı şikayet et").click();
+  await btn(page, "Şikayeti gönder").click();
+  await expect(vis(page, "Şikayet sebebini seçin")).toBeVisible();
+  await vis(page, "Yük yok / gitmiş", true).click();
+  await page.getByLabel("Açıklama (isteğe bağlı)").locator("visible=true").fill("Aradım, yük dün gitmiş");
+  await btn(page, "Şikayeti gönder").click();
+  await expect(vis(page, "Şikayetiniz alındı")).toBeVisible();
+  expect(psql(`select reason || '|' || note || '|' || status from reports where target_id='${loadId}' and reporter_id=(select id from users where phone='+905550102030')`)).toBe(
+    "yuk_yok|Aradım, yük dün gitmiş|acik",
+  );
+  expect(errors).toEqual([]);
+});

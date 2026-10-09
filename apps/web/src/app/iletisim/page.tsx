@@ -18,8 +18,9 @@ export default function ContactPage() {
       <section className="space-y-2">
         <h2>İlan ya da kullanıcı şikayeti</h2>
         <p>
-          Sahte ilan, ulaşılamayan ilan sahibi ya da numaranın kötüye kullanılması gibi durumları yukarıdaki e-posta adresine ilanın
-          bağlantısıyla bildirin; şikayetler yönetici tarafından incelenir. Uygulama içi şikayet düğmesi hazırlanıyor.
+          Sahte ya da gitmiş ilan, ulaşılamayan ilan sahibi gibi durumları uygulamada ilan sayfasındaki &quot;Bu ilanı şikayet et&quot; ile
+          bildirin. Numaranın kötüye kullanılması gibi diğer durumlar için yukarıdaki e-posta adresine yazın. Şikayetler yönetici tarafından
+          incelenir; haklı bulunanlar ilgili kişinin güven skorunu düşürür.
         </p>
       </section>
       <section className="space-y-2">

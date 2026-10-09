@@ -4,6 +4,7 @@ import { useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
 import { ConfirmBadge, loadSpec, priceText, Route, useCall } from "@/components/load-card";
 import { PriceHint } from "@/components/price-hint";
+import { ReportForm } from "@/components/report-form";
 import { Badge, Button, Card, Chip, ErrorText, Field, Muted, Status, s } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -48,6 +49,7 @@ export default function YukDetay() {
         </Card>
 
         {isCarrier ? <OfferForm load={load} /> : <Muted>Teklif vermek için hesabınızda nakliyeci rolü olmalı.</Muted>}
+        <ReportForm loadId={load.id} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
