@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Suspense } from "react";
 import { Truck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
@@ -34,6 +35,17 @@ async function Form({ searchParams }: Pick<PageProps<"/giris">, "searchParams">)
     <>
       {oturum && <p className="mb-4 rounded-md bg-muted p-3 text-sm">Oturumunuz sona erdi; lütfen tekrar giriş yapın.</p>}
       <LoginForm next={typeof sonra === "string" ? sonra : "/panel"} />
+      <p className="mt-4 text-xs text-muted-foreground">
+        Giriş yaparak{" "}
+        <Link href="/kullanim-sartlari" className="underline underline-offset-2">
+          kullanım şartlarını
+        </Link>{" "}
+        kabul etmiş ve{" "}
+        <Link href="/kvkk" className="underline underline-offset-2">
+          KVKK aydınlatma metnini
+        </Link>{" "}
+        okumuş olursunuz.
+      </p>
     </>
   );
 }
