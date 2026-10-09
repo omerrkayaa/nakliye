@@ -28,6 +28,14 @@ export function ago(iso: string | null, now = Date.now()): string {
 }
 
 /** "+905551234567" → "0555 123 45 67" (biçim tanınmazsa olduğu gibi) */
+/** Kartta güven sinyali: "★ 4,8 (12) · 23 iş", puan yoksa "5 iş · henüz puan yok", hiç iş yoksa "Yeni üye" */
+export function reputationText(r: { rating?: number | null; ratingCount?: number; completedJobs?: number }): string | null {
+  if (r.completedJobs === undefined) return null;
+  const jobs = `${r.completedJobs} iş`;
+  if (r.rating !== null && r.rating !== undefined) return `★ ${String(r.rating).replace(".", ",")} (${r.ratingCount ?? 0}) · ${jobs}`;
+  return r.completedJobs > 0 ? `${jobs} · henüz puan yok` : "Yeni üye";
+}
+
 export function phoneText(p: string): string {
   const m = /^\+90(\d{3})(\d{3})(\d{2})(\d{2})$/.exec(p);
   return m ? `0${m[1]} ${m[2]} ${m[3]} ${m[4]}` : p;

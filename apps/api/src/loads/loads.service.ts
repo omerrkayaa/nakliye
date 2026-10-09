@@ -34,6 +34,7 @@ import { randomBytes } from "node:crypto";
 import { DB, type Db, type Tx } from "../db/db.module.js";
 import { callLogs, capacityPosts, companies, districts, loadConfirmations, loadPosts, matches, offers, provinces, users } from "../db/schema.js";
 import { MatchingService } from "../matching/matching.service.js";
+import { TrustService } from "../ratings/trust.service.js";
 
 const PAGE_SIZE = 20;
 const PG_UNIQUE_VIOLATION = "23505";
@@ -53,6 +54,7 @@ export class LoadsService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly matching: MatchingService,
+    private readonly trust: TrustService,
   ) {}
 
   // ── Okuma ──────────────────────────────────────────────────────────
@@ -85,7 +87,9 @@ export class LoadsService {
       .limit(PAGE_SIZE + 1)
       .offset((q.page - 1) * PAGE_SIZE);
 
-    return this.page(rows, q.page, (r) => this.view(r, false));
+    // A6 kart: yük sahibinin puanı ve tamamlanan işi (güven sinyali; docs/02 ilke "her kartta güven sinyali")
+    const rep = await this.trust.reputationMany(rows.slice(0, PAGE_SIZE).map((r) => r.load.shipperId));
+    return this.page(rows, q.page, (r) => this.withReputation(this.view(r, false), rep.get(r.load.shipperId)!));
   }
 
   /** Yük sahibinin kendi ilanları (A18 "İlanlarım"), tüm durumlar. */
@@ -106,7 +110,7 @@ export class LoadsService {
     if (!row || (!owner && !VISIBLE_LOAD_STATUSES.includes(row.load.status))) {
       throw new NotFoundException("İlan bulunamadı");
     }
-    if (!owner) return this.view(row, false);
+    if (!owner) return this.withReputation(this.view(row, false), (await this.trust.reputationMany([row.load.shipperId])).get(row.load.shipperId)!);
     return { ...this.view(row, true), pendingOffers: (await this.pendingOffers([id])).get(id) ?? 0 };
   }
 
@@ -428,6 +432,10 @@ export class LoadsService {
       },
       ...(owner ? { nextReminderAt: l.nextReminderAt, reminderSentAt: l.reminderSentAt, moderation: l.moderation } : {}),
     };
+  }
+
+  private withReputation<V extends ReturnType<LoadsService["view"]>>(v: V, rep: { rating: number | null; ratingCount: number; completedJobs: number }) {
+    return { ...v, shipper: { ...v.shipper, ...rep } };
   }
 
   private page<R, V>(rows: R[], page: number, map: (r: R) => V) {

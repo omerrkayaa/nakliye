@@ -46,7 +46,15 @@ export interface Load {
   note: string | null;
   lastConfirmedAt: string | null;
   distanceKm?: number;
-  shipper: { displayName: string | null; verified: boolean; phoneMasked: string };
+  shipper: {
+    displayName: string | null;
+    verified: boolean;
+    phoneMasked: string;
+    /** Görünür puanların ortalaması (kör puanlama), puan sayısı, tamamlanan iş (A6 güven sinyali) */
+    rating?: number | null;
+    ratingCount?: number;
+    completedJobs?: number;
+  };
 }
 
 export interface Vehicle {

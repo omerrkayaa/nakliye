@@ -73,6 +73,9 @@ check("ilçe kimliği = plaka×100 + sıra (Konak 35xx, Efeler 9xx)", Math.floor
 console.log("\nOluşturma ve doğrulama");
 check("geçmiş tarih 400", (await api("POST", "/loads", S, { ...base, loadFrom: trDay(-3), loadTo: trDay(-2) })).status === 400);
 check("olmayan ilçe 400", (await api("POST", "/loads", S, { ...base, originDistrictId: 99999 })).status === 400);
+const zr = await api("POST", "/loads", S, { ...base, weightTon: "on iki", cargoType: "yok", originDistrictId: undefined });
+const msg = Object.fromEntries((zr.body.errors ?? []).map((e) => [e.path, e.message]));
+check("doğrulama mesajları Türkçe (zod haritası)", zr.status === 400 && msg.weightTon === "Sayı girin" && msg.cargoType === "Listeden bir seçenek seçin" && msg.originDistrictId === "Bu alan zorunlu", JSON.stringify(zr.body));
 check("nakliyeci ilan veremez 403", (await api("POST", "/loads", C, base)).status === 403);
 let r = await api("POST", "/loads", S, base);
 const L1 = r.body.id;

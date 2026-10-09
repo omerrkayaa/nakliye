@@ -76,6 +76,29 @@ export async function confirmLoadAction(_prev: FormState, form: FormData): Promi
   return {};
 }
 
+export interface BulkConfirmState {
+  confirmed?: number;
+  errors?: string[];
+}
+
+/** P4 toplu teyit: seçilenler ya da sayfadaki yayındaki ilanların hepsi; tek tek teyit edilir, biri hata verse diğerleri sürer. */
+export async function bulkConfirmAction(_prev: BulkConfirmState, form: FormData): Promise<BulkConfirmState> {
+  const ids = [...new Set(form.getAll(form.get("mode") === "all" ? "all" : "ids").map(String))].slice(0, 50);
+  let confirmed = 0;
+  const errors: string[] = [];
+  for (const id of ids) {
+    try {
+      await api(`/loads/${encodeURIComponent(id)}/confirm`, { method: "POST", body: { answer: "gecerli" } });
+      confirmed++;
+    } catch (e) {
+      if (e instanceof ApiError) errors.push(e.message);
+      else throw e;
+    }
+  }
+  refresh();
+  return { confirmed, errors };
+}
+
 /** İlanı kapat (FR-15): araç bulundu → kapandı, vazgeçildi → iptal. */
 export async function closeLoadAction(_prev: FormState, form: FormData): Promise<FormState> {
   const id = String(form.get("id") ?? "");

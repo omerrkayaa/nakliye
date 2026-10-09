@@ -43,8 +43,11 @@ test("yük akışı → filtre → detay → teklif → Tekliflerim", async ({ p
   await btn(page, "Aydın", true).click();
   await expect(vis(page, /, Aydın$/).first()).toBeVisible();
 
+  // A6 güven sinyali: kartta ve detayda yük sahibinin puanı / tamamlanan işi
+  await expect(vis(page, /^· (Yeni üye|★ \d,?\d? \(\d+\) · \d+ iş|\d+ iş · henüz puan yok)$/).first()).toBeVisible();
   await btn(page, /Nazilli, Aydın → Esenyurt/).first().click();
   await expect(vis(page, "Yük sahibi", true)).toBeVisible();
+  await expect(vis(page, /^(Yeni üye|★ \d,?\d? \(\d+\) · \d+ iş|\d+ iş · henüz puan yok)$/).first()).toBeVisible();
 
   // F8 paylaş: sistemin paylaşım menüsü (web derlemesinde navigator.share) → metindeki bağlantı web'de aynı ilanı açar
   await page.evaluate(() => {

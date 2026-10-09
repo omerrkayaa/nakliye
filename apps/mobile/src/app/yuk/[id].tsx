@@ -7,7 +7,7 @@ import { Badge, Button, Card, Chip, ErrorText, Field, Muted, Status, s } from "@
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { shareLoad } from "@/lib/share";
-import { dayRange } from "@/lib/format";
+import { dayRange, reputationText } from "@/lib/format";
 import { C } from "@/lib/theme";
 import type { Load, Vehicle } from "@/lib/types";
 import { useApi } from "@/lib/use-api";
@@ -41,6 +41,7 @@ export default function YukDetay() {
             <Text style={s.text}>{load.shipper.displayName ?? "Yük sahibi"}</Text>
             {load.shipper.verified && <Badge tone="ok" icon="shield-checkmark" label="Doğrulanmış" />}
           </View>
+          {reputationText(load.shipper) && <Muted>{reputationText(load.shipper)}</Muted>}
           <Muted>{load.shipper.phoneMasked}</Muted>
           {isCarrier && <Button title="Ara" icon="call" variant="call" busy={busyId === load.id} onPress={() => call(load.id)} />}
         </Card>

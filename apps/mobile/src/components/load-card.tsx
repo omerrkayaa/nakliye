@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Alert, Linking, Platform, Pressable, Text, View } from "react-native";
 import { Badge, Button, Card, Muted } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
-import { ago, dayRange, place, tl } from "@/lib/format";
+import { ago, dayRange, place, reputationText, tl } from "@/lib/format";
 import { C } from "@/lib/theme";
 import type { Load } from "@/lib/types";
 
@@ -70,6 +70,7 @@ export function LoadCard({ load, onPress, onCall, calling }: { load: Load; onPre
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
           {load.shipper.verified && <Badge tone="ok" icon="shield-checkmark" label="Doğrulanmış" />}
           <Muted>{load.shipper.displayName ?? "Yük sahibi"}</Muted>
+          {reputationText(load.shipper) && <Muted>· {reputationText(load.shipper)}</Muted>}
         </View>
         <ConfirmBadge load={load} />
       </Pressable>

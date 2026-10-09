@@ -156,6 +156,28 @@ test("ilan sayfasından iptal: onay sorulur, vazgeçilirse bir şey olmaz", asyn
   expect(psql(`select status from load_posts where id='${other}'`)).toBe("iptal");
 });
 
+test("toplu teyit: seçilenler ya da tümü; seçim yoksa uyarı", async () => {
+  const token = (await cookie("nk_at"))!.value;
+  const b1 = await createLoad(token, admin);
+  const b2 = await createLoad(token, admin);
+  const ids = [loadId, b1, b2].map((x) => `'${x}'`).join(",");
+  psql(`update load_posts set status='teyit_bekliyor', last_confirmed_at = now() - interval '30 hours' where id in (${ids})`);
+  await page.goto("/panel/ilanlar");
+  await page.getByRole("button", { name: "Seçilenleri teyit et" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Teyit edilecek ilan seçmediniz." })).toBeVisible();
+
+  await page.locator(`tr[data-load-id="${b1}"]`).getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Seçilenleri teyit et" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "1 ilan teyit edildi." })).toBeVisible();
+  expect(psql(`select id || ':' || status from load_posts where id in (${ids}) order by status, id`).split("\n").filter((x) => x.endsWith(":teyitli"))).toEqual([`${b1}:teyitli`]);
+  await expect(page.locator(`tr[data-load-id="${b1}"]`)).toContainText("az önce");
+
+  await page.getByRole("button", { name: "Tümünü teyit et (3)" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "3 ilan teyit edildi." })).toBeVisible();
+  expect(psql(`select count(*) from load_posts where id in (${ids}) and status='teyitli' and last_confirmed_at > now() - interval '1 minute'`)).toBe("3");
+  psql(`update load_posts set status='iptal' where id in ('${b1}','${b2}')`);
+});
+
 test("erişim çerezi düşünce refresh ile sessizce yenilenir (refresh de döner)", async () => {
   const oldRefresh = (await cookie("nk_rt"))!.value;
   await context.clearCookies({ name: "nk_at" });

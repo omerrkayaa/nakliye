@@ -131,6 +131,18 @@ check("bilinmeyen kullanıcı 404", (await api("GET", `/users/00000000-0000-4000
 check("girişsiz profil 401", (await api("GET", `/users/${cId}/reputation`)).status === 401);
 
 // ── Süre ve zamanlayıcı ───────────────────────────────────────────
+console.log("\nYük kartında yük sahibinin itibarı (A6)");
+let lr = await api("POST", "/loads", S, {
+  originDistrictId: MENTESE, destDistrictId: MURATPASA, loadFrom: trDay(3), loadTo: trDay(3), cargoType: "genel",
+  weightTon: 2, vehicleType: "panelvan", bodyType: "kapali", priceType: "teklif", price: null,
+});
+if (lr.body.status === "moderasyonda") await api("POST", `/admin/loads/${lr.body.id}/review`, A, { decision: "onay" });
+const feedCard = (await api("GET", `/loads?vehicleType=panelvan&fromProvinceId=48&date=${trDay(3)}`, X)).body.items?.find((l) => l.id === lr.body.id);
+check("akış kartı: yük sahibinin görünür puanı, puan sayısı, tamamlanan işi", feedCard?.shipper.rating === 4 && feedCard.shipper.ratingCount === 1 && feedCard.shipper.completedJobs === 1, JSON.stringify(feedCard?.shipper));
+const detailShipper = (await api("GET", `/loads/${lr.body.id}`, X)).body.shipper;
+check("ilan detayı (başkası): aynı itibar, numara maskeli", detailShipper?.rating === 4 && detailShipper.completedJobs === 1 && !JSON.stringify(detailShipper).includes(phone(1)), JSON.stringify(detailShipper));
+psql(`update load_posts set status='iptal' where id='${lr.body.id}'`);
+
 console.log("\nPuanlama süresi (14 gün) ve zamanlayıcı");
 const J2 = await newJob();
 await api("POST", `/jobs/${J2.id}/complete`, S);

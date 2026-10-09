@@ -57,6 +57,28 @@ export class TrustService {
     });
   }
 
+  /**
+   * Listeler için (yük akışı kartı, A6): kullanıcı başına görünür puan ortalaması, puan sayısı ve tamamlanan iş —
+   * `stats` ile aynı kurallar (kör puanlama: açılmamış puan sayılmaz; iş iki rolde de sayılır), tek sorguda.
+   */
+  async reputationMany(userIds: string[]): Promise<Map<string, { rating: number | null; ratingCount: number; completedJobs: number }>> {
+    const ids = [...new Set(userIds)];
+    const out = new Map(ids.map((id) => [id, { rating: null as number | null, ratingCount: 0, completedJobs: 0 }]));
+    if (ids.length === 0) return out;
+    const rated = await this.db
+      .select({ id: ratings.rateeId, n: count(), avg: sql<number | null>`avg(${ratings.stars})::float` })
+      .from(ratings)
+      .where(and(inArray(ratings.rateeId, ids), isNotNull(ratings.revealedAt)))
+      .groupBy(ratings.rateeId);
+    for (const r of rated) Object.assign(out.get(r.id)!, { rating: r.avg === null ? null : Math.round(r.avg * 10) / 10, ratingCount: r.n });
+    const done = await this.db
+      .select({ shipperId: jobs.shipperId, carrierId: jobs.carrierId })
+      .from(jobs)
+      .where(and(eq(jobs.status, "tamamlandi"), or(inArray(jobs.shipperId, ids), inArray(jobs.carrierId, ids))));
+    for (const j of done) for (const id of new Set([j.shipperId, j.carrierId])) if (out.has(id)) out.get(id)!.completedJobs++;
+    return out;
+  }
+
   async stats(db: Db | Tx, userId: string): Promise<TrustStats> {
     const [r] = await db
       .select({ n: count(), avg: sql<number | null>`avg(${ratings.stars})::float` })

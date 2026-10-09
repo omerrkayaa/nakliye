@@ -10,11 +10,14 @@ import { api } from "@/lib/api";
 import { ago, dayRange, place, tl } from "@/lib/format";
 import type { LoadItem, Me, Page } from "@/lib/types";
 import { BecomeShipper } from "../become-shipper";
+import { BulkConfirm } from "./bulk-confirm";
 import { ConfirmButton } from "./confirm-button";
+
+const BULK_FORM = "toplu-teyit";
 
 export const metadata: Metadata = { title: "İlanlarım" };
 
-/** P4 İlanlarım: durum, son teyit, bekleyen teklif, "hâlâ geçerli". Kapatma ilan sayfasında. (Toplu teyit sonraki dilimde.) */
+/** P4 İlanlarım: durum, son teyit, bekleyen teklif, "hâlâ geçerli" (tek tek ya da toplu). Kapatma ilan sayfasında. */
 export default function LoadsPage({ searchParams }: PageProps<"/panel/ilanlar">) {
   return (
     <div className="space-y-6">
@@ -57,12 +60,19 @@ async function Loads({ searchParams }: Pick<PageProps<"/panel/ilanlar">, "search
     );
   }
 
+  const visibleIds = data.items.filter((l) => VISIBLE_LOAD_STATUSES.includes(l.status)).map((l) => l.id);
   return (
     <div className="space-y-4">
+      {visibleIds.length > 1 && <BulkConfirm formId={BULK_FORM} visibleIds={visibleIds} />}
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
+              {visibleIds.length > 1 && (
+                <TableHead className="w-10">
+                  <span className="sr-only">Seç</span>
+                </TableHead>
+              )}
               <TableHead>Güzergâh</TableHead>
               <TableHead>Yükleme</TableHead>
               <TableHead>Yük</TableHead>
@@ -78,6 +88,20 @@ async function Loads({ searchParams }: Pick<PageProps<"/panel/ilanlar">, "search
           <TableBody>
             {data.items.map((l) => (
               <TableRow key={l.id} data-load-id={l.id}>
+                {visibleIds.length > 1 && (
+                  <TableCell>
+                    {VISIBLE_LOAD_STATUSES.includes(l.status) && (
+                      <input
+                        type="checkbox"
+                        name="ids"
+                        value={l.id}
+                        form={BULK_FORM}
+                        aria-label={`Seç: ${place(l.origin)} → ${place(l.dest)}`}
+                        className="size-5 accent-primary"
+                      />
+                    )}
+                  </TableCell>
+                )}
                 <TableCell className="font-medium">
                   <Link href={`/panel/ilanlar/${l.id}`} className="underline-offset-4 hover:underline">
                     {place(l.origin)} → {place(l.dest)}
