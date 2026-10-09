@@ -16,6 +16,7 @@ import type { AccessPayload } from "../auth/auth.service.js";
 import { ZodPipe } from "../common/zod.pipe.js";
 import { JobsService } from "../jobs/jobs.service.js";
 import { AdminService } from "./admin.service.js";
+import { MetricsService } from "./metrics.service.js";
 
 const uuid = new ParseUUIDPipe({ version: "4" });
 const userSearchSchema = z.object({ q: z.string().max(80).optional(), page: z.coerce.number().int().min(1).default(1) });
@@ -36,6 +37,19 @@ export class AdminReportsController {
   @HttpCode(200)
   resolve(@CurrentUser() user: AccessPayload, @Param("id", uuid) id: string, @Body(new ZodPipe(resolveReportSchema)) body: ResolveReportInput) {
     return this.admin.resolveReport(user.sub, id, body);
+  }
+}
+
+/** Y5 / FR-53 tez metrikleri */
+@Controller("admin/metrics")
+@UseGuards(AuthGuard)
+@Roles("admin")
+export class AdminMetricsController {
+  constructor(private readonly metrics: MetricsService) {}
+
+  @Get()
+  get() {
+    return this.metrics.metrics();
   }
 }
 

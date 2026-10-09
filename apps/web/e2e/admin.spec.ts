@@ -85,7 +85,7 @@ test("yönetici olmayan bölümü göremez, menüde bağlantı yok", async ({ br
 
 test("telefon genişliğinde yönetici sayfaları yatay taşmaz (menüde Yönetim varken)", async () => {
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const path of ["/panel/yonetim/moderasyon", "/panel/yonetim/sikayetler", "/panel/yonetim/itirazlar", "/panel/yonetim/kullanicilar"]) {
+  for (const path of ["/panel/yonetim/moderasyon", "/panel/yonetim/sikayetler", "/panel/yonetim/itirazlar", "/panel/yonetim/kullanicilar", "/panel/yonetim/metrikler"]) {
     await page.goto(path);
     await expect(page.getByRole("link", { name: "Yönetim" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Çıkış" })).toBeInViewport();
@@ -229,4 +229,21 @@ test("itiraz: kuyrukta iki taraf ve sebep; gerekçe zorunlu; 'teslim geçersiz' 
   await expect(p.getByRole("listitem").filter({ hasText: "Taşıma iptal edildi" })).toContainText("yönetici");
   await expect(p.getByRole("link", { name: "İlanı yeniden yayınla" })).toBeVisible();
   await ctx.close();
+});
+
+test("metrikler: bu hafta kapanan yük API ile aynı; haftalık ve günlük grafik + tablo", async () => {
+  const m = (await api<{ weeklyClosed: { week: string; closed: number }[]; dailyLoads: unknown[] }>("GET", "/admin/metrics", adminAccess)).body;
+  await page.goto("/panel/yonetim/metrikler");
+  await expect(page.getByTestId("closed-this-week")).toHaveText(String(m.weeklyClosed.at(-1)!.closed));
+  const weekly = page.getByRole("region", { name: "Haftalık kapanan yük" });
+  await expect(weekly.getByRole("listitem")).toHaveCount(8);
+  await expect(page.getByRole("region", { name: "Günlük yeni ilan" }).getByRole("listitem")).toHaveCount(14);
+  // Değer tabloda da var (ipucu tek yol değil)
+  await weekly.getByText("Tablo olarak göster").click();
+  await expect(weekly.locator("tbody tr")).toHaveCount(8);
+  await expect(weekly.locator("tbody tr").last()).toContainText(`${m.weeklyClosed.at(-1)!.closed} taşıma`);
+  // Sütun odaklanınca ipucu görünür
+  await weekly.getByRole("listitem").last().focus();
+  await expect(weekly.getByRole("tooltip").last()).toBeVisible();
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/metrikler.png`, fullPage: true });
 });

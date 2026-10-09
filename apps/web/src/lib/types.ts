@@ -160,6 +160,15 @@ export interface AdminReport {
   openOnTarget: number;
 }
 
+/** Yönetici: tez metrikleri (GET /admin/metrics, Y5) */
+export interface AdminMetrics {
+  weeklyClosed: { week: string; closed: number }[];
+  dailyLoads: { day: string; loads: number }[];
+  live: { visible: number; fresh: number; freshness: number | null };
+  confirmations: { windowDays: number; asked: number; answered: number; unanswered: number; open: number; answerRate: number | null; medianMinutes: number | null };
+  matches: { windowDays: number; created: number; notified: number; converted: number; hitRate: number | null };
+}
+
 /** Yönetici: itirazlı taşıma (GET /admin/disputes) */
 export interface AdminDispute {
   id: string;

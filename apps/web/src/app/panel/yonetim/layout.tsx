@@ -8,9 +8,10 @@ const TABS = [
   ["/panel/yonetim/sikayetler", "Şikayetler"],
   ["/panel/yonetim/itirazlar", "İtirazlar"],
   ["/panel/yonetim/kullanicilar", "Kullanıcılar"],
+  ["/panel/yonetim/metrikler", "Metrikler"],
 ] as const;
 
-/** Yönetici paneli (Y2–Y4, itirazlar). Yetki API'de (admin rolü); burada yalnız yönetici olmayana sayfa gösterilmez. */
+/** Yönetici paneli (Y2–Y5, itirazlar). Yetki API'de (admin rolü); burada yalnız yönetici olmayana sayfa gösterilmez. */
 export default function AdminLayout({ children }: LayoutProps<"/panel/yonetim">) {
   return (
     <div className="space-y-6">
