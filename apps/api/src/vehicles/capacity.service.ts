@@ -8,7 +8,7 @@ import {
   type CreateCapacityInput,
   type UpdateCapacityInput,
 } from "@nakliye/shared";
-import { and, desc, eq, gte, inArray, lt, lte, ne, type SQL } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, lte, ne, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { DB, type Db } from "../db/db.module.js";
 import { capacityPosts, districts, provinces, vehicles } from "../db/schema.js";
@@ -58,9 +58,14 @@ export class CapacityService {
   }
 
   async mine(userId: string, page: number) {
+    // Dönüş Planı (A10): aktifler üstte, en yakın müsaitlik önce; kapananlar/süresi dolanlar altta, yeniden eskiye
     const rows = await this.select()
       .where(eq(capacityPosts.carrierId, userId))
-      .orderBy(desc(capacityPosts.createdAt))
+      .orderBy(
+        sql`case when ${capacityPosts.status} = 'aktif' then 0 else 1 end`,
+        sql`case when ${capacityPosts.status} = 'aktif' then ${capacityPosts.availableFrom} end asc`,
+        desc(capacityPosts.createdAt),
+      )
       .limit(PAGE_SIZE + 1)
       .offset((page - 1) * PAGE_SIZE);
     return { items: rows.slice(0, PAGE_SIZE).map((r) => this.view(r)), page, hasMore: rows.length > PAGE_SIZE };

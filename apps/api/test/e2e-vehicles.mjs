@@ -99,7 +99,11 @@ check("İlanlarım", (await api("GET", "/capacity", C)).body.items.length === 3)
 r = await api("POST", `/capacity/${P1}/close`, C, { reason: "doldu" });
 check("doldu → kapandı", r.body.status === "kapandi");
 check("kapalı ilan düzenlenemez 409", (await api("PATCH", `/capacity/${P1}`, C, { destDistrictId: EFELER })).status === 409);
-check("kapanan ilanın tarihleri yeniden kullanılabilir", (await post(C, { availableFrom: trDay(1), availableTo: trDay(2) })).status === 201);
+const P3 = (await post(C, { availableFrom: trDay(1), availableTo: trDay(2) })).body.id;
+check("kapanan ilanın tarihleri yeniden kullanılabilir", !!P3);
+r = await api("GET", "/capacity", C);
+const order = r.body.items.map((c) => `${c.status}:${c.availableFrom}`);
+check("liste: aktifler üstte en yakın tarih önce, kapanan altta", order.join() === [`aktif:${trDay(1)}`, `aktif:${trDay(3)}`, `aktif:${trDay(6)}`, `kapandi:${trDay(1)}`].join(), order.join());
 
 console.log("\nSüresi dolma (zamanlayıcı)");
 psql(`update capacity_posts set available_from = current_date - 3, available_to = current_date - 1 where id='${P2}'`);
