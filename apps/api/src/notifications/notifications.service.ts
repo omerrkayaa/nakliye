@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import type { NotificationType } from "@nakliye/shared";
 import { and, count, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
-import { DB, type Db } from "../db/db.module.js";
+import { DB, type Db, type Tx } from "../db/db.module.js";
 import { notifications } from "../db/schema.js";
 import { PushService, type PushMessage } from "./push.service.js";
 
@@ -16,6 +16,12 @@ export interface NotifyInput {
   refKey?: string;
   actions?: PushMessage["actions"];
 }
+
+/**
+ * Bildirimi kullanıcı kilidi altında kurar; null dönerse bildirim gitmez. Gönderip göndermeme kararı aynı kullanıcıya
+ * giden başka bildirimlerle yarışmamalıysa kullanılır (ör. nakliyeci bu yükü başka bir bildirimden öğrendi mi).
+ */
+export type NotifyBuilder = (tx: Tx) => Promise<NotifyInput | null>;
 
 export interface NotifyLimit {
   /** Son 1 saatte bu tiplerden en fazla kaç bildirim (BR-22) */
@@ -37,12 +43,13 @@ export class NotificationsService {
    * @returns bildirim gönderildiyse true; aynı refKey ile daha önce gönderilmişse ya da saatlik sınır dolduysa false.
    * Saatlik sınırda sayma ile ekleme kullanıcı başına kilit (transaction'a bağlı advisory lock) altında: aynı anda
    * gelen eşleşmeler sırayla sayar (kilitsizken art arda 6 ilanda 6. bildirim de gidiyordu; testte görüldü).
-   * Tekilleştirme (refKey) veritabanı indeksiyle kesindir.
+   * Tekilleştirme (refKey) veritabanı indeksiyle kesindir. `input` bir NotifyBuilder ise aynı kilit altında çalışır.
    */
-  async notify(userId: string, n: NotifyInput, limit?: NotifyLimit, now = new Date()): Promise<boolean> {
+  async notify(userId: string, input: NotifyInput | NotifyBuilder, limit?: NotifyLimit, now = new Date()): Promise<boolean> {
+    let n: NotifyInput | null = typeof input === "function" ? null : input;
     const row = await this.db.transaction(async (tx) => {
+      if (limit || !n) await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`notify:${userId}`}))`);
       if (limit) {
-        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`notify:${userId}`}))`);
         const since = new Date(now.getTime() - 3_600_000);
         const [{ sent }] = (await tx
           .select({ sent: count() })
@@ -52,6 +59,8 @@ export class NotificationsService {
         ];
         if (sent >= limit.perHour) return null;
       }
+      if (typeof input === "function") n = await input(tx);
+      if (!n) return null;
       const [inserted] = await tx
         .insert(notifications)
         .values({ userId, type: n.type, title: n.title, body: n.body, data: n.data ?? {}, refKey: n.refKey ?? null, createdAt: now })
@@ -59,7 +68,7 @@ export class NotificationsService {
         .returning({ id: notifications.id });
       return inserted ?? null;
     });
-    if (!row) return false;
+    if (!row || !n) return false;
 
     await this.push
       .sendToUser(userId, { title: n.title, body: n.body, data: { ...n.data, notificationId: row.id }, actions: n.actions })

@@ -72,9 +72,9 @@ const KARS = district("Kars", "Merkez"), SELIM = district("Kars", "Selim"), ARDA
 
 const alert = (t, body) => api("POST", "/alerts", t, body);
 /** Yük ilanı; moderasyondaysa onaylanır ve eşleştirmenin bitmesi beklenir. */
-async function load(t, from, to, vehicleType = "tir", { approve = true } = {}) {
+async function load(t, from, to, vehicleType = "tir", { approve = true, day = 1 } = {}) {
   const r = await api("POST", "/loads", t, {
-    originDistrictId: from, destDistrictId: to, loadFrom: trDay(1), loadTo: trDay(2), cargoType: "genel",
+    originDistrictId: from, destDistrictId: to, loadFrom: trDay(day), loadTo: trDay(day + 1), cargoType: "genel",
     weightTon: 10, vehicleType, bodyType: null, priceType: "teklif", price: null,
   });
   const id = r.body.id;
@@ -170,6 +170,45 @@ console.log("\nSaatlik sınır (BR-22)");
 const got = (await alertNotes(C2)).map((n) => n.data.loadId);
 check("7 uygun yükten ilk 5'i bildirildi, sonrası saatlik sınıra takıldı",
   got.length === 5 && [L1, L3, L4, L6, L7].every((id) => got.includes(id)) && !got.includes(L8) && !got.includes(L9), JSON.stringify(got));
+
+console.log("\nToplu bildirimle tekilleştirme (BR-22)");
+// Boş araç ilanının toplu bildirimi ("uygun yük bulundu") bir yükü kapsadıysa o yük için alarm bildirimi gitmez; alarmla
+// duyurulan yük de toplu bildirime girmez. Yalıtım: yeni nakliyeciler (saatlik sınır boş) ve ileri tarihler (yukarıdaki
+// yükler 1–2. günlerde, tarih toleransı ±1 gün). Zamanlamaya bağlı yarış yerine aynı sıralar düzenlemeyle kurulur.
+const capacity = async (t, plate, day) => {
+  const v = (await api("POST", "/vehicles", t, { plate, vehicleType: "tir", bodyType: "tenteli", capacityTon: 25 })).body.id;
+  const k = (await api("POST", "/capacity", t, { vehicleId: v, originDistrictId: HOPA, destDistrictId: null, availableFrom: trDay(day), availableTo: trDay(day + 1) })).body.id;
+  await until(async () => psql(`select matched_at is not null from capacity_posts where id='${k}'`) === "t");
+  return k;
+};
+/** Boş araç ilanının toplu bildirimi (yük kimliği taşımaz) */
+const batchNotes = async (t, capId) => (await api("GET", "/notifications", t)).body.items.filter((n) => n.data?.capacityId === capId && !n.data.loadId);
+
+const C6 = await user(phone(10), ["carrier"]);
+const L10 = await load(S, FINDIKLI, KARS, "tir", { day: 10 });
+const K6 = await capacity(C6, `08 AM ${run}`, 10);
+r = await batchNotes(C6, K6);
+check("boş araç ilanı önceden açılmış yükü toplu bildirimle duyurur", r.length === 1 && r[0].body.includes("Fındıklı"), JSON.stringify(r));
+check("nakliyeci aynı yüke uyan alarm kurdu", (await alert(C6, { originDistrictId: HOPA })).status === 201);
+await api("PATCH", `/loads/${L10}`, S, { weightTon: 11 }); // düzenleme yeniden eşleştirir: alarm sahipleri yeniden taranır
+await until(async () => psql(`select matched_at is not null from load_posts where id='${L10}'`) === "t");
+r = await notesFor(C6, L10);
+check("toplu bildirimle duyurulan yük için alarm bildirimi gitmez", r.length === 0, JSON.stringify(r.map((n) => n.type)));
+const L13 = await load(S, FINDIKLI, KARS, "tir", { day: 30 });
+check("aynı alarm yeni yükü bildirir (kontrol)", (await notesFor(C6, L13)).some((n) => n.type === "route_alert"));
+
+const C7 = await user(phone(11), ["carrier"]);
+check("kamyon alarmı kuruldu", (await alert(C7, { originDistrictId: HOPA, vehicleType: "kamyon" })).status === 201);
+const L11 = await load(S, FINDIKLI, KARS, "kamyon", { day: 20 });
+check("kamyon isteyen yük alarmla bildirildi", (await notesFor(C7, L11)).some((n) => n.type === "route_alert"));
+const L14 = await load(S, ARHAVI, KARS, "tir", { day: 20 });
+check("tır isteyen yük kamyon alarmına uymaz", (await notesFor(C7, L14)).length === 0);
+const K7 = await capacity(C7, `08 AN ${run}`, 20);
+r = await batchNotes(C7, K7);
+check("toplu bildirim alarmla duyurulan yükü saymaz (yalnız Arhavi yükü)",
+  r.length === 1 && r[0].body.includes("Arhavi") && !r[0].body.includes("Fındıklı") && !r[0].body.includes("2 yük"), JSON.stringify(r));
+r = (await api("GET", `/capacity/${K7}/matches`, C7)).body;
+check("iki yük de boş araç ilanının uygun yükler listesinde", [L11, L14].every((id) => r.items?.some((m) => m.loadId === id)), JSON.stringify(r));
 
 cleanup();
 console.log(`\nSonuç: ${pass} geçti, ${fail} kaldı`);

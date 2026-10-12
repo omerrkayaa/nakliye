@@ -17,12 +17,12 @@ import {
   type MatchResult,
   type VehicleType,
 } from "@nakliye/shared";
-import { and, eq, gte, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { AlertsService } from "../alerts/alerts.service.js";
-import { DB, type Db } from "../db/db.module.js";
-import { capacityPosts, companies, districts, favoriteCarriers, loadPosts, matches, provinces, users, vehicles } from "../db/schema.js";
-import { NotificationsService, type NotifyLimit } from "../notifications/notifications.service.js";
+import { DB, type Db, type Tx } from "../db/db.module.js";
+import { capacityPosts, companies, districts, favoriteCarriers, loadPosts, matches, notifications, provinces, users, vehicles } from "../db/schema.js";
+import { NotificationsService, type NotifyBuilder, type NotifyInput, type NotifyLimit } from "../notifications/notifications.service.js";
 
 const P = DEFAULT_MATCH_PARAMS;
 /**
@@ -48,6 +48,8 @@ const dp = alias(provinces, "dp");
 
 const geog = (pt: Point) => sql`ST_SetSRID(ST_MakePoint(${pt.x}::float8, ${pt.y}::float8), 4326)::geography`;
 const latLng = (pt: Point) => ({ lat: pt.y, lng: pt.x });
+/** Nakliyeciye yük başına bildirimlerin ortak anahtarı (favori, eşleşme, alarm): aynı yük için tek bildirim (BR-22) */
+const loadRef = (loadId: string) => `match:load:${loadId}`;
 const isCandidate = <T extends { m: MatchResult }>(c: T): c is T & { m: Candidate } => c.m.candidate;
 /**
  * Tarih aralıkları ±tolerans ile kesişiyor mu (iki uç dahil; daterange varsayılanı '[)' son günü dışlardı).
@@ -116,26 +118,29 @@ export class MatchingService {
         .from(favoriteCarriers)
         .where(eq(favoriteCarriers.shipperId, load.shipperId));
       for (const f of favorites) {
-        await this.notifications.notify(f.carrierId, {
-          type: "favorite_load",
-          refKey: `match:load:${load.id}`,
-          title: "Çalıştığınız yük sahibinden yeni ilan",
-          body: `${route}, ${dayText(load.loadFrom)} yükleme, ${load.weightTon} ton`,
-          data: { type: "match", loadId: load.id },
-        });
+        await this.notifications.notify(
+          f.carrierId,
+          this.unlessTold(f.carrierId, load.id, {
+            type: "favorite_load",
+            refKey: loadRef(load.id),
+            title: "Çalıştığınız yük sahibinden yeni ilan",
+            body: `${route}, ${dayText(load.loadFrom)} yükleme, ${load.weightTon} ton`,
+            data: { type: "match", loadId: load.id },
+          }),
+        );
       }
       for (const c of await this.candidatesForLoad(load, now)) {
         if (!(await this.newPair(load.id, c.cap.id, c.m.score))) continue;
         fresh++;
         const sent = await this.notifications.notify(
           c.cap.carrierId,
-          {
+          this.unlessTold(c.cap.carrierId, load.id, {
             type: "match_for_carrier",
-            refKey: `match:load:${load.id}`, // nakliyeciye aynı yük için tek bildirim (iki boş araç ilanı da uysa)
+            refKey: loadRef(load.id), // nakliyeciye aynı yük için tek bildirim (iki boş araç ilanı da uysa)
             title: "Rotanıza uygun yeni yük",
             body: `${route}, ${dayText(load.loadFrom)} yükleme, ${load.weightTon} ton`,
             data: { type: "match", loadId: load.id, capacityId: c.cap.id },
-          },
+          }),
           LIMIT,
           now,
         );
@@ -143,17 +148,18 @@ export class MatchingService {
       }
       if (fresh > 0) await this.notifyShipper(load, route, fresh, now);
       // Rota alarmı (FR-22). ref_key eşleşmeyle ortak: boş araç ilanından zaten haber alan nakliyeciye ikinci bildirim
-      // gitmez; ilan düzenlenip yeniden eşleştirilse de tekrar gitmez. Saatlik sınır (BR-22) eşleşmelerle ortak.
+      // gitmez (toplu bildirimle haber aldıysa da); ilan düzenlenip yeniden eşleştirilse de tekrar gitmez. Saatlik
+      // sınır (BR-22) eşleşmelerle ortak.
       for (const a of await this.alerts.ownersForLoad(load.id)) {
         await this.notifications.notify(
           a.userId,
-          {
+          this.unlessTold(a.userId, load.id, {
             type: "route_alert",
-            refKey: `match:load:${load.id}`,
+            refKey: loadRef(load.id),
             title: "Alarmınıza uygun yeni yük",
             body: `${route}, ${dayText(load.loadFrom)} yükleme, ${load.weightTon} ton`,
             data: { type: "alert", loadId: load.id, alertId: a.alertId },
-          },
+          }),
           LIMIT,
           now,
         );
@@ -176,28 +182,38 @@ export class MatchingService {
     let fresh = 0;
     if (cap.status === "aktif" && cap.availableTo >= trDay(now) && vehicle.status === "aktif") {
       const found = await this.candidatesForCapacity(cap, vehicle, ["teyitli"], now);
-      let best: (typeof found)[number] | undefined;
+      const news: typeof found = [];
       for (const c of found) {
         if (!(await this.newPair(c.load.id, cap.id, c.m.score))) continue;
         fresh++;
-        best ??= c; // aday listesi skora göre sıralı
+        news.push(c); // aday listesi skora göre sıralı
         await this.notifyShipper(c.load, `${c.origin.province}/${c.origin.district} → ${c.dest.province}/${c.dest.district}`, 1, now);
       }
-      if (best) {
-        // Bu turda bulunan yeni yükler tek bildirimde (tekilleştirme gerekmez: yeni çiftler bu tura özeldir)
-        const top = `${best.origin.province}/${best.origin.district} → ${best.dest.province}/${best.dest.district}`;
-        const sent = await this.notifications.notify(
+      if (news.length > 0) {
+        // Bu turda bulunan yeni yükler tek bildirimde. Nakliyecinin başka bildirimden (alarm, favori, yükün kendi
+        // eşleştirmesi) haber aldığı yükler sayılmaz (BR-22); kalanların çifti aynı kilit altında bildirildi işaretlenir.
+        await this.notifications.notify(
           cap.carrierId,
-          {
-            type: "match_for_carrier",
-            title: "Boş aracınıza uygun yük bulundu",
-            body: fresh === 1 ? `${top}, ${dayText(best.load.loadFrom)}` : `${fresh} yük; en uygunu ${top}`,
-            data: { type: "match", capacityId: cap.id },
+          async (tx) => {
+            const told = await this.toldAbout(tx, cap.carrierId, news.map((c) => c.load.id));
+            const left = news.filter((c) => !told.has(c.load.id));
+            const best = left[0];
+            if (!best) return null;
+            await tx
+              .update(matches)
+              .set({ notifiedAt: now })
+              .where(and(eq(matches.capacityPostId, cap.id), inArray(matches.loadPostId, left.map((c) => c.load.id))));
+            const top = `${best.origin.province}/${best.origin.district} → ${best.dest.province}/${best.dest.district}`;
+            return {
+              type: "match_for_carrier",
+              title: "Boş aracınıza uygun yük bulundu",
+              body: left.length === 1 ? `${top}, ${dayText(best.load.loadFrom)}` : `${left.length} yük; en uygunu ${top}`,
+              data: { type: "match", capacityId: cap.id },
+            };
           },
           LIMIT,
           now,
         );
-        if (sent) await this.db.update(matches).set({ notifiedAt: now }).where(and(eq(matches.capacityPostId, cap.id), isNull(matches.notifiedAt)));
       }
     }
     await this.db.update(capacityPosts).set({ matchedAt: now }).where(eq(capacityPosts.id, cap.id));
@@ -385,6 +401,31 @@ export class MatchingService {
       .onConflictDoNothing()
       .returning({ id: matches.id });
     return Boolean(m);
+  }
+
+  /**
+   * Nakliyeci bu yüklerden hangilerini bir bildirimle öğrendi: yük başına bildirim (favori, eşleşme, alarm; ortak
+   * ref_key) ya da boş araç ilanının toplu bildirimi (çiftin notified_at'i). NotifyBuilder içinde, kullanıcının bildirim
+   * kilidi altında çağrılır: toplu bildirim notified_at'i aynı kilit altında yazdığı için iki yol birbirini görür
+   * (2026-10-09: toplu bildirim yükü kapsadıktan sonra aynı nakliyeciye rota alarmı da gidiyordu).
+   */
+  private async toldAbout(tx: Tx, carrierId: string, loadIds: string[]): Promise<Set<string>> {
+    const byRef = new Map(loadIds.map((id) => [loadRef(id), id]));
+    const viaLoad = await tx
+      .select({ refKey: notifications.refKey })
+      .from(notifications)
+      .where(and(eq(notifications.userId, carrierId), inArray(notifications.refKey, [...byRef.keys()])));
+    const viaBatch = await tx
+      .select({ loadId: matches.loadPostId })
+      .from(matches)
+      .innerJoin(capacityPosts, eq(capacityPosts.id, matches.capacityPostId))
+      .where(and(eq(capacityPosts.carrierId, carrierId), inArray(matches.loadPostId, loadIds), isNotNull(matches.notifiedAt)));
+    return new Set([...viaLoad.map((r) => byRef.get(r.refKey!)!), ...viaBatch.map((r) => r.loadId)]);
+  }
+
+  /** Yük başına bildirim; nakliyeci yükü başka bir bildirimden öğrendiyse gitmez (bkz. toldAbout). */
+  private unlessTold(carrierId: string, loadId: string, n: NotifyInput): NotifyBuilder {
+    return async (tx) => ((await this.toldAbout(tx, carrierId, [loadId])).size > 0 ? null : n);
   }
 
   /** Yük sahibine ilanı için tek bildirim (BR-22): sonraki araçlar uygulamadaki listede görünür. */

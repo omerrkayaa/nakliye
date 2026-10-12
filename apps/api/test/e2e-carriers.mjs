@@ -36,6 +36,11 @@ async function user(phone, roles) {
   return roles.length ? (await api("POST", "/me/roles", t.accessToken, { roles })).body.accessToken : t.accessToken;
 }
 
+async function until(fn, ms = 5000) {
+  const end = Date.now() + ms;
+  for (;;) { const v = await fn(); if (v || Date.now() > end) return v; await sleep(150); }
+}
+
 const trDay = (offset = 0) => new Date(Date.now() + 3 * 3600e3 + offset * 86400e3).toISOString().slice(0, 10);
 let run;
 do run = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
@@ -121,6 +126,24 @@ await load(S, 6);
 await sleep(800);
 check("çıkarınca yeni ilan bildirilmez", (await favNotes(C1)).length === before + 1);
 
+console.log("\nToplu bildirimle tekilleştirme (BR-22)");
+// Yükü boş araç ilanının toplu bildiriminden öğrenen nakliyeci sonradan favori olsa da o yük için ikinci bildirim almaz
+const L2 = await load(S, 9);
+await sleep(800);
+const K2 = (await api("POST", "/capacity", C2, { vehicleId: V2, originDistrictId: POLATELI, destDistrictId: null, availableFrom: trDay(9), availableTo: trDay(9) })).body.id;
+await until(async () => psql(`select matched_at is not null from capacity_posts where id='${K2}'`) === "t");
+r = (await api("GET", "/notifications", C2)).body.items.filter((n) => n.data?.capacityId === K2);
+check("boş araç ilanı yükü toplu bildirimle duyurur", r.length === 1, JSON.stringify(r));
+await api("PUT", `/me/carriers/${C2id}/favorite`, S);
+await api("PATCH", `/loads/${L2}`, S, { weightTon: 2.5 });
+await until(async () => psql(`select matched_at is not null from load_posts where id='${L2}'`) === "t");
+check("sonradan favori olunca aynı yük için favori bildirimi gitmez", !(await favNotes(C2)).some((n) => n.data.loadId === L2));
+const L3 = await load(S, 12);
+await until(async () => psql(`select matched_at is not null from load_posts where id='${L3}'`) === "t");
+check("favoriye yeni yük bildirilir (kontrol)", (await favNotes(C2)).some((n) => n.data.loadId === L3));
+await api("DELETE", `/me/carriers/${C2id}/favorite`, S);
+
 psql(`update load_posts set status='iptal' where status in ('teyitli','teyit_bekliyor','moderasyonda') and shipper_id in (select id from users where phone like '+90547${run}%')`);
+psql(`update capacity_posts set status='iptal' where status='aktif' and carrier_id in (select id from users where phone like '+90547${run}%')`);
 console.log(`\nSonuç: ${pass} geçti, ${fail} kaldı`);
 process.exitCode = fail ? 1 : 0;
