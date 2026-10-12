@@ -14,7 +14,10 @@ export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export const psql = (q: string) =>
   execFileSync("docker", ["exec", "nakliye-db-1", "psql", "-U", "nakliye", "-d", "nakliye", "-tAc", q]).toString().trim();
 
-const run = Date.now().toString().slice(-4);
+// 4 haneli kimlik eski bir çalıştırmayla (ya da aynı öneki kullanan başka bir takımla) çakışabiliyor: DB'de boş olana kadar yeniden üretilir
+let run: string;
+do run = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
+while (psql(`select count(*) from users where phone like '+90554${run}%'`) !== "0");
 /** Bu çalıştırmaya özel numara (+90554…): diğer test takımlarının numaralarıyla karışmaz */
 export const phone = (n: number) => `+90554${run}${String(n).padStart(3, "0")}`;
 
