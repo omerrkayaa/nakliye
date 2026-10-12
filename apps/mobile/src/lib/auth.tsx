@@ -11,8 +11,12 @@ type Status = "loading" | "signedOut" | "signedIn" | "offline";
 interface AuthState {
   status: Status;
   me: Me | null;
+  /** Oturum neden kapandı (askı, hesap silindi): giriş ekranında bir kez gösterilir */
+  notice: string | null;
   signIn: (t: Tokens) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Sunucuda zaten kapanmış oturumu (ör. hesap silindi) yerelde kapatır ve giriş ekranında not gösterir */
+  endSession: (notice: string) => Promise<void>;
   addRoles: (roles: Role[]) => Promise<void>;
   /** Profil (ad, firma) değişince /me'yi yeniden oku */
   refreshMe: () => Promise<void>;
@@ -25,14 +29,16 @@ const AuthContext = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: PropsWithChildren) {
   const [status, setStatus] = useState<Status>("loading");
   const [me, setMe] = useState<Me | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
 
-  const onTokens = useCallback((t: Tokens | null) => {
+  const onTokens = useCallback((t: Tokens | null, reason?: string) => {
     if (t) void storage.set(REFRESH_KEY, t.refreshToken);
     else {
-      // API oturumu reddetti (yenileme belirteci geçersiz ya da süresi dolmuş)
+      // API oturumu reddetti (yenileme belirteci geçersiz ya da süresi dolmuş, hesap askıya alındı)
       void storage.remove(REFRESH_KEY);
       setMe(null);
+      setNotice(reason ?? null);
       setStatus("signedOut");
     }
   }, []);
@@ -72,10 +78,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
     () => ({
       status,
       me,
+      notice,
       signIn: async (t) => {
         bindSession(t, onTokens);
         onTokens(t);
         setMe(await api<Me>("/me"));
+        setNotice(null);
         setStatus("signedIn");
       },
       signOut: async () => {
@@ -84,6 +92,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
         await storage.remove(REFRESH_KEY);
         bindSession(null, onTokens);
         setMe(null);
+        setStatus("signedOut");
+      },
+      endSession: async (reason) => {
+        await storage.remove(REFRESH_KEY);
+        bindSession(null, onTokens);
+        setMe(null);
+        setNotice(reason);
         setStatus("signedOut");
       },
       addRoles: async (roles) => {
@@ -103,7 +118,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         setAttempt((n) => n + 1);
       },
     }),
-    [status, me, onTokens],
+    [status, me, notice, onTokens],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

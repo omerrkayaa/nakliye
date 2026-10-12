@@ -8,7 +8,7 @@ import {
   trDayStart,
   VISIBLE_LOAD_STATUSES,
 } from "@nakliye/shared";
-import { and, eq, inArray, isNull, lt, lte, or, type SQL } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, lt, lte, or, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { randomToken, sha256 } from "../common/hash.js";
 import { NotificationsService } from "../notifications/notifications.service.js";
@@ -182,6 +182,7 @@ export class ConfirmationService {
           isNull(loadConfirmations.smsSentAt),
           lte(loadConfirmations.askedAt, deadline),
           inArray(loadPosts.status, [...VISIBLE_LOAD_STATUSES]),
+          isNotNull(users.phone), // silinen hesabın numarası yok (ilanları da kapanmıştır)
         ),
       )
       .limit(BATCH);
@@ -192,7 +193,7 @@ export class ConfirmationService {
     let sent = 0;
     for (const r of rows) {
       const route = routes.get(r.loadPostId);
-      if (!route) continue;
+      if (!route || !r.phone) continue;
       const token = randomToken(12);
       // Önce sahiplen (sms_sent_at), sonra gönder: iki tur aynı SMS'i iki kez atmasın
       const [claimed] = await this.db

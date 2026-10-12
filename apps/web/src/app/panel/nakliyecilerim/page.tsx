@@ -54,16 +54,21 @@ async function Carriers() {
               )}
             </p>
             <p className="text-sm">
-              <a href={`tel:${c.phone}`} className="underline-offset-4 hover:underline">
-                {phoneText(c.phone)}
-              </a>
+              {c.phone ? (
+                <a href={`tel:${c.phone}`} className="underline-offset-4 hover:underline">
+                  {phoneText(c.phone)}
+                </a>
+              ) : (
+                <span className="text-muted-foreground">Hesap silindi</span>
+              )}
               <span className="text-muted-foreground"> · {reputation(c.reputation)}</span>
             </p>
             <p className="text-sm text-muted-foreground">
               Sizinle {c.jobsWithYou} taşıma ({c.completedWithYou} tamamlandı) · son {ago(c.lastJobAt)}
             </p>
           </div>
-          <FavoriteButton id={c.id} favorite={c.favorite} name={c.displayName ?? "Nakliyeci"} />
+          {/* Silinen hesaba bildirim gitmez; favori olamaz */}
+          {c.phone && <FavoriteButton id={c.id} favorite={c.favorite} name={c.displayName ?? "Nakliyeci"} />}
         </li>
       ))}
     </ul>

@@ -55,11 +55,14 @@ export class CarriersService {
   async setFavorite(shipperId: string, carrierId: string, favorite: boolean) {
     if (favorite) {
       const [worked] = await this.db
-        .select({ id: jobs.id })
+        .select({ id: jobs.id, status: users.status })
         .from(jobs)
+        .innerJoin(users, eq(users.id, jobs.carrierId))
         .where(and(eq(jobs.shipperId, shipperId), eq(jobs.carrierId, carrierId)))
         .limit(1);
       if (!worked) throw new NotFoundException("Bu nakliyeciyle henüz iş yapmadınız");
+      // Silinen hesaba bildirim gitmez (FR-07); favori satırı da kişisel veri olarak birikmesin
+      if (worked.status === "silindi") throw new NotFoundException("Nakliyecinin hesabı silinmiş");
       await this.db.insert(favoriteCarriers).values({ shipperId, carrierId }).onConflictDoNothing();
     } else {
       await this.db.delete(favoriteCarriers).where(and(eq(favoriteCarriers.shipperId, shipperId), eq(favoriteCarriers.carrierId, carrierId)));

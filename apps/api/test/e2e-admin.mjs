@@ -180,6 +180,8 @@ check("oturum yenilenemez 401", r.status === 401);
 await api("POST", "/auth/otp/request", null, { phone: phone(1) });
 r = await api("POST", "/auth/otp/verify", null, { phone: phone(1), code: await otp(phone(1)) });
 check("giriş yapamaz 403 + mesaj", r.status === 403 && r.body.message === "Hesabınız askıya alındı.", JSON.stringify(r.body));
+r = await api("GET", "/me", S.access);
+check("erişim belirteci de hemen kapanır 403 + mesaj", r.status === 403 && r.body.message === "Hesabınız askıya alındı.", JSON.stringify(r.body));
 
 // Nakliyeci: boş araç ilanı ve bekleyen teklif
 const L3 = await load(S2.access);
@@ -201,6 +203,7 @@ check("q boşken askıdakiler listelenir", r.body.items.some((u) => u.id === c2I
 r = await api("POST", `/admin/users/${sId}/unsuspend`, A);
 check("askı kaldırıldı", r.status === 200 && r.body.user.status === "aktif" && r.body.user.suspendedAt === null);
 check("askıda değilken kaldırma 409", (await api("POST", `/admin/users/${sId}/unsuspend`, A)).status === 409);
+check("askı kalkınca süresi dolmamış erişim belirteci yeniden geçer", (await api("GET", "/me", S.access)).status === 200);
 await sleep(61_000); // OTP yeniden gönderme bekleme süresi (60 sn)
 await api("POST", "/auth/otp/request", null, { phone: phone(1) });
 r = await api("POST", "/auth/otp/verify", null, { phone: phone(1), code: await otp(phone(1)) });

@@ -79,9 +79,13 @@ async function JobView({ params }: Pick<PageProps<"/panel/tasimalar/[id]">, "par
               </span>
             </Item>
             <Item term="Telefon">
-              <a href={`tel:${j.counterpart.phone}`} className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline">
-                <Phone className="size-4" aria-hidden /> 0{j.counterpart.phone.slice(3)}
-              </a>
+              {j.counterpart.phone ? (
+                <a href={`tel:${j.counterpart.phone}`} className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline">
+                  <Phone className="size-4" aria-hidden /> 0{j.counterpart.phone.slice(3)}
+                </a>
+              ) : (
+                "— (hesap silindi)"
+              )}
             </Item>
             <Item term="Araç">
               {j.vehicle.plate} · {VEHICLE_TYPES[j.vehicle.vehicleType]}, {BODY_TYPES[j.vehicle.bodyType].toLocaleLowerCase("tr-TR")}

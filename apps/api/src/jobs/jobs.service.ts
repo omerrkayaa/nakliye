@@ -139,7 +139,7 @@ export class JobsService {
     await this.trust.refresh(userId, result.carrierId);
     const route = await this.offersService.route(result.load.id);
     const [shipper] = await this.db.select({ phone: users.phone }).from(users).where(eq(users.id, userId));
-    await this.sms.send(shipper!.phone, deliveryCodeSmsText(code)).catch((e: Error) => this.logger.warn(`Teslim kodu SMS'i gitmedi (${jobId}): ${e.message}`));
+    if (shipper?.phone) await this.sms.send(shipper.phone, deliveryCodeSmsText(code)).catch((e: Error) => this.logger.warn(`Teslim kodu SMS'i gitmedi (${jobId}): ${e.message}`));
     await this.notifications.notify(result.carrierId, {
       type: "offer_result",
       title: "Teklifiniz kabul edildi",
@@ -238,7 +238,7 @@ export class JobsService {
       .where(and(eq(jobs.id, job.id), eq(jobs.status, job.status)));
     await this.event(this.db, job.id, "yeni_kod", userId, {});
     const [shipper] = await this.db.select({ phone: users.phone }).from(users).where(eq(users.id, userId));
-    await this.sms.send(shipper!.phone, deliveryCodeSmsText(code)).catch((e: Error) => this.logger.warn(`Teslim kodu SMS'i gitmedi (${jobId}): ${e.message}`));
+    if (shipper?.phone) await this.sms.send(shipper.phone, deliveryCodeSmsText(code)).catch((e: Error) => this.logger.warn(`Teslim kodu SMS'i gitmedi (${jobId}): ${e.message}`));
     return { deliveryCode: code };
   }
 

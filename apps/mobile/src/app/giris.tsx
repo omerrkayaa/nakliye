@@ -1,11 +1,13 @@
 import { phoneSchema } from "@nakliye/shared";
+import * as WebBrowser from "expo-web-browser";
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button, ErrorText, Field, Muted, s } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { C } from "@/lib/theme";
+import { WEB_URL } from "@/lib/share";
+import { C, TOUCH } from "@/lib/theme";
 import type { Tokens } from "@/lib/types";
 
 // Demo hesabı: apps/api/.env'deki DEMO_PHONE / DEMO_OTP ile aynı olmalı (yalnız geliştirme derlemesinde görünür).
@@ -13,7 +15,7 @@ const DEMO = { phone: "0555 010 20 30", code: "123456" };
 
 /** A2 — Telefonla giriş: numara → SMS kodu */
 export default function Giris() {
-  const { signIn } = useAuth();
+  const { signIn, notice } = useAuth();
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
@@ -70,6 +72,12 @@ export default function Giris() {
           </View>
 
           <View style={[s.card, { gap: 16 }]}>
+            {/* Oturum neden kapandı: hesap silindi ya da askıya alındı */}
+            {notice && (
+              <Text accessibilityLiveRegion="polite" style={{ backgroundColor: C.warnBg, color: C.warn, padding: 12, borderRadius: 8, fontSize: 15 }}>
+                {notice}
+              </Text>
+            )}
             {step === "phone" ? (
               <>
                 <Field
@@ -114,6 +122,14 @@ export default function Giris() {
             )}
           </View>
 
+          <View style={{ gap: 4 }}>
+            <Text style={{ color: "#D5DEEA", textAlign: "center" }}>Uygulamayı kullanarak kullanım şartlarını kabul etmiş ve KVKK aydınlatma metnini okumuş olursunuz.</Text>
+            <View style={{ flexDirection: "row", justifyContent: "center", flexWrap: "wrap" }}>
+              <LegalLink title="Kullanım şartları" path="/kullanim-sartlari" />
+              <LegalLink title="KVKK aydınlatma metni" path="/kvkk" />
+            </View>
+          </View>
+
           {__DEV__ && (
             <View style={{ gap: 8 }}>
               <Button title="Demo hesabıyla gir" variant="accent" icon="flash" onPress={demo} busy={busy} />
@@ -125,5 +141,18 @@ export default function Giris() {
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+/** Yasal metinler webde (W4); uygulama içi tarayıcıda açılır */
+function LegalLink({ title, path }: { title: string; path: string }) {
+  return (
+    <Pressable
+      accessibilityRole="link"
+      onPress={() => void WebBrowser.openBrowserAsync(WEB_URL + path)}
+      style={{ minHeight: TOUCH, justifyContent: "center", paddingHorizontal: 12 }}
+    >
+      <Text style={{ color: C.primaryText, textDecorationLine: "underline", fontSize: 15 }}>{title}</Text>
+    </Pressable>
   );
 }

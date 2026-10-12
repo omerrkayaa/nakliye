@@ -12,7 +12,14 @@ const OTP_MAX_ATTEMPTS = 5;
 const OTP_RESEND_MS = 60_000;
 const REFRESH_TTL_MS = 30 * 24 * 3_600_000;
 // Destek kanalı (W4 iletişim) gelince mesaja eklenmeli
-const SUSPENDED_MESSAGE = "Hesabınız askıya alındı.";
+export const SUSPENDED_MESSAGE = "Hesabınız askıya alındı.";
+/** Silme başladı ama anonimleştirme bitmedi (zamanlayıcı tamamlar); numara o ana kadar yeni hesaba açılamaz */
+const DELETING_MESSAGE = "Hesap silme işlemi sürüyor. Birkaç dakika sonra tekrar deneyin.";
+const OTP_SMS = {
+  giris: (code: string) => `Nakliye giriş kodunuz: ${code}. Kimseyle paylaşmayın.`,
+  // Türkçe karakterli SMS 70 karakterle sınırlı (UCS-2); bu metin 58 karakter
+  silme: (code: string) => `Nakliye hesap silme kodunuz: ${code}. Kimseyle paylaşmayın.`,
+};
 
 /**
  * Demo hesabı (mobil uygulamayı telefonda denemek için): DEMO_PHONE'a her zaman DEMO_OTP gider.
@@ -41,7 +48,7 @@ export class AuthService {
     return sha256(`${phone}:${code}:${process.env.OTP_PEPPER ?? ""}`);
   }
 
-  async requestOtp(phone: string): Promise<void> {
+  async requestOtp(phone: string, purpose: keyof typeof OTP_SMS = "giris"): Promise<void> {
     const [existing] = await this.db.select().from(otpCodes).where(eq(otpCodes.phone, phone));
     if (existing && existing.expiresAt.getTime() - OTP_TTL_MS + OTP_RESEND_MS > Date.now()) {
       throw new HttpException("Yeni kod için biraz bekleyin", HttpStatus.TOO_MANY_REQUESTS);
@@ -50,10 +57,11 @@ export class AuthService {
     const code = demoCode(phone) ?? sixDigitCode();
     const row = { phone, codeHash: this.otpHash(phone, code), expiresAt: new Date(Date.now() + OTP_TTL_MS), attempts: 0 };
     await this.db.insert(otpCodes).values(row).onConflictDoUpdate({ target: otpCodes.phone, set: row });
-    await this.sms.send(phone, `Nakliye giriş kodunuz: ${code}. Kimseyle paylaşmayın.`);
+    await this.sms.send(phone, OTP_SMS[purpose](code));
   }
 
-  async verifyOtp(phone: string, code: string) {
+  /** Kodu doğrular ve harcar (tek kullanımlık); yanlış kod deneme hakkından düşer. Giriş ve hesap silme kullanır. */
+  async consumeOtp(phone: string, code: string): Promise<void> {
     const [otp] = await this.db.select().from(otpCodes).where(eq(otpCodes.phone, phone));
     if (!otp || otp.expiresAt < new Date() || otp.attempts >= OTP_MAX_ATTEMPTS) {
       throw new UnauthorizedException("Kodun süresi doldu, yeni kod isteyin");
@@ -63,12 +71,17 @@ export class AuthService {
       throw new UnauthorizedException("Kod hatalı");
     }
     await this.db.delete(otpCodes).where(eq(otpCodes.phone, phone));
+  }
 
-    // BR-12: bir telefon numarası = tek hesap
+  async verifyOtp(phone: string, code: string) {
+    await this.consumeOtp(phone, code);
+
+    // BR-12: bir telefon numarası = tek hesap (silinen hesabın numarası boşaltıldığı için yeni hesap açılır)
     let [user] = await this.db.select().from(users).where(eq(users.phone, phone));
     const isNew = !user;
     if (!user) [user] = await this.db.insert(users).values({ phone }).returning();
     if (user!.status === "askida") throw new ForbiddenException(SUSPENDED_MESSAGE);
+    if (user!.status === "silindi") throw new ForbiddenException(DELETING_MESSAGE);
 
     return { isNew, ...(await this.issueTokens(user!.id)) };
   }
@@ -88,6 +101,7 @@ export class AuthService {
     // Askıya alınan hesabın belirteçleri askıya alırken iptal edilir; bu ikinci kilit (yarışta açık kalanlar için)
     const [owner] = await this.db.select({ status: users.status }).from(users).where(eq(users.id, row.userId));
     if (owner?.status === "askida") throw new UnauthorizedException(SUSPENDED_MESSAGE);
+    if (!owner || owner.status === "silindi") throw new UnauthorizedException("Oturum süresi doldu");
     // Yenileme belirteci tek kullanımlıktır (rotation).
     await this.db.update(refreshTokens).set({ revokedAt: new Date() }).where(eq(refreshTokens.id, row.id));
     return this.issueTokens(row.userId);

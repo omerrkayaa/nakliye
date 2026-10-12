@@ -23,8 +23,9 @@ export function ago(iso: string | null, now = Date.now()): string {
   return `${Math.round(h / 24)} gün önce`;
 }
 
-/** "+905551234567" → "0555 123 45 67" (biçim tanınmazsa olduğu gibi) — mobil lib/format.ts ile aynı */
-export function phoneText(p: string): string {
+/** "+905551234567" → "0555 123 45 67" (biçim tanınmazsa olduğu gibi; silinen hesapta "—") — mobil lib/format.ts ile aynı */
+export function phoneText(p: string | null): string {
+  if (!p) return "—";
   const m = /^\+90(\d{3})(\d{3})(\d{2})(\d{2})$/.exec(p);
   return m ? `0${m[1]} ${m[2]} ${m[3]} ${m[4]}` : p;
 }

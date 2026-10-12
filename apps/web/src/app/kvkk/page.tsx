@@ -57,8 +57,9 @@ export default function KvkkPage() {
       <section className="space-y-2">
         <h2>6. Saklama süresi</h2>
         <p>
-          Hesabınız açık kaldığı sürece ve ilgili mevzuattaki zamanaşımı süreleri boyunca saklanır [kesin süreler]. Hesap silindiğinde kişisel
-          alanlar anonimleştirilir; tamamlanmış taşımalar yalnız anonim istatistik olarak kalır.
+          Hesabınız açık kaldığı sürece ve ilgili mevzuattaki zamanaşımı süreleri boyunca saklanır [kesin süreler]. Hesap silindiğinde adınız,
+          numaranız, firma bilgileriniz, plakalarınız, bildirimleriniz ve yazdığınız notlar silinir; tamamlanmış taşımalar ve verdiğiniz puanlar,
+          karşı tarafın geçmişi ve istatistik için “Silinmiş kullanıcı” adıyla kalır.
         </p>
       </section>
       <section className="space-y-2">
@@ -66,7 +67,8 @@ export default function KvkkPage() {
         <p>
           Kişisel verilerinizin işlenip işlenmediğini öğrenme, bilgi talep etme, amacına uygun kullanılıp kullanılmadığını öğrenme, aktarıldığı
           üçüncü kişileri bilme, eksik ya da yanlış işlenmişse düzeltilmesini, silinmesini ya da yok edilmesini isteme, itiraz etme ve zarara
-          uğradıysanız giderilmesini talep etme haklarına sahipsiniz. Başvurularınızı{" "}
+          uğradıysanız giderilmesini talep etme haklarına sahipsiniz. Verilerinizi panelde Hesap sayfasından (mobil uygulamada Profil’den)
+          indirebilir, hesabınızı silebilirsiniz. Diğer başvurularınızı{" "}
           <a href="/iletisim" className="text-primary underline-offset-4 hover:underline">
             iletişim sayfasındaki
           </a>{" "}

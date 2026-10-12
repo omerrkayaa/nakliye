@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { AccountService } from "../account/account.service.js";
 import { JobsService } from "../jobs/jobs.service.js";
 import { OffersService } from "../jobs/offers.service.js";
 import { ConfirmationService } from "../loads/confirmation.service.js";
@@ -23,6 +24,8 @@ export interface TickStats {
   jobsCompleted: number;
   /** Puanlama süresi bittiği için görünür olan (kör) puanlar */
   ratingsRevealed: number;
+  /** Silme isteği yarıda kalıp tamamlanan hesaplar (FR-07) */
+  deletionsFinished: number;
 }
 
 /** Periyodik görevlerin tek turu. Her adım tekrar çalıştırılabilir (idempotent). */
@@ -35,6 +38,7 @@ export class SchedulerService {
     private readonly offers: OffersService,
     private readonly jobs: JobsService,
     private readonly ratings: RatingsService,
+    private readonly account: AccountService,
   ) {}
 
   async tick(now = new Date()): Promise<TickStats> {
@@ -45,6 +49,7 @@ export class SchedulerService {
     const offersClosed = await this.offers.rejectStale();
     const jobsCompleted = await this.jobs.autoComplete(now);
     const ratingsRevealed = await this.ratings.revealExpired(now);
-    return { ...confirmation, capacityExpired, matchSwept, offersClosed, jobsCompleted, ratingsRevealed };
+    const deletionsFinished = await this.account.finishPendingDeletions(now);
+    return { ...confirmation, capacityExpired, matchSwept, offersClosed, jobsCompleted, ratingsRevealed, deletionsFinished };
   }
 }

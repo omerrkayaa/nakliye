@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { ACCESS_COOKIE, API_URL } from "./session";
 
 const INVALID_SESSION = "/giris?oturum=gecersiz";
+/** API AuthGuard askıdaki hesabın her isteğini bu mesajla 403'ler (FR-51); panelde hata sayfası yerine girişe */
+const SUSPENDED = "Hesabınız askıya alındı.";
 
 /** API'nin döndürdüğü hata (mesaj kullanıcıya gösterilebilir Türkçe metindir). */
 export class ApiError extends Error {
@@ -44,6 +46,7 @@ export async function api<T>(path: string, { method = "GET", body, auth = true }
   if (res.status === 401 && auth) redirect(INVALID_SESSION);
   if (res.status === 204) return undefined as T;
   const json: unknown = await res.json().catch(() => null);
+  if (res.status === 403 && auth && messageOf(json, res.status) === SUSPENDED) redirect("/giris?oturum=askida");
   if (!res.ok) throw new ApiError(res.status, messageOf(json, res.status), fieldsOf(json));
   return json as T;
 }

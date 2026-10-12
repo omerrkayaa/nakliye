@@ -21,6 +21,9 @@ export const JOB_PARAMS = {
 /** Aktif (sürmekte olan) işler: araç bu işteyken silinemez. */
 export const ACTIVE_JOB_STATUSES: readonly JobStatus[] = ["anlasildi", "yuklendi", "yolda", "teslim_edildi"];
 
+/** Sonuçlanmamış işler (aktif + itirazlı): bunlardan biri varken hesap silinemez (FR-07; karşı tarafın işi yarım kalmasın). */
+export const OPEN_JOB_STATUSES: readonly JobStatus[] = [...ACTIVE_JOB_STATUSES, "itirazli"];
+
 /**
  * Aracı meşgul tutan işler (teslimden önce). Böyle bir işin yükleme tarihleriyle çakışan tarihlere araç başka teklif
  * veremez, kabul edilemez, boş araç ilanı açamaz. Teslimden sonra araç boştur (dönüş yükü bu yüzden alınabilir).

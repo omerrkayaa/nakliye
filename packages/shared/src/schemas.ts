@@ -34,6 +34,8 @@ export const isoDaySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tarih YYYY-
 
 export const otpRequestSchema = z.object({ phone: phoneSchema });
 export const otpVerifySchema = z.object({ phone: phoneSchema, code: z.string().regex(/^\d{6}$/) });
+/** Hesap silme (FR-07): geri dönüşü olmadığı için hesabın numarasına giden kodla yeniden doğrulanır. */
+export const deleteAccountSchema = z.object({ code: z.string().regex(/^\d{6}$/, "6 haneli kodu girin") });
 
 // ── Kullanıcı ve firma (FR-02, FR-03) ────────────────────────────────
 
@@ -303,6 +305,7 @@ export const priceEstimateSchema = z.object({
 export const suspendUserSchema = z.object({ reason: z.string().trim().min(5, "Sebebi en az 5 karakterle yazın").max(500) });
 
 export type UpdateMeInput = z.infer<typeof updateMeSchema>;
+export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;
 export type AddRolesInput = z.infer<typeof addRolesSchema>;
 export type CreateCompanyInput = z.infer<typeof createCompanySchema>;
 export type UpdateCompanyInput = z.infer<typeof updateCompanySchema>;

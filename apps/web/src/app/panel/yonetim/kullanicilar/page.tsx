@@ -53,7 +53,7 @@ async function Users({ searchParams }: Pick<PageProps<"/panel/yonetim/kullanicil
                   </p>
                   {u.suspendReason && <p className="text-muted-foreground">Sebep: {u.suspendReason}</p>}
                 </div>
-                {u.status === "askida" ? <UnsuspendButton id={u.id} who={who} /> : <SuspendForm id={u.id} who={who} />}
+                {u.status === "askida" ? <UnsuspendButton id={u.id} who={who} /> : u.status === "aktif" ? <SuspendForm id={u.id} who={who} /> : null}
               </li>
             );
           })}

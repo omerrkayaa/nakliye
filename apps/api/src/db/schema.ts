@@ -89,7 +89,8 @@ export const districts = pgTable(
 // ── Kullanıcı ───────────────────────────────────────────────────────
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
-  phone: varchar("phone", { length: 16 }).notNull().unique(),
+  // Silinen hesapta (FR-07) boşaltılır: numara yeni bir hesapla yeniden kullanılabilir
+  phone: varchar("phone", { length: 16 }).unique(),
   name: varchar("name", { length: 80 }),
   verificationLevel: smallint("verification_level").notNull().default(0),
   trustScore: real("trust_score").notNull().default(0.25),

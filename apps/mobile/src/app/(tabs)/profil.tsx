@@ -35,6 +35,8 @@ export default function Profil() {
 
       {isCarrier && <Vehicles />}
 
+      <Button title="Hesap ve veriler" variant="outline" icon="person-circle-outline" onPress={() => router.push("/hesap")} />
+
       <Button
         title="Çıkış yap"
         variant="outline"

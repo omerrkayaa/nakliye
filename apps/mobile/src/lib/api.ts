@@ -20,11 +20,14 @@ export class ApiError extends Error {
 
 // Oturum: erişim belirteci yalnız bellekte; yenileme belirteci AuthProvider'ın güvenli deposunda.
 let tokens: Tokens | null = null;
-let onTokens: (t: Tokens | null) => void = () => {};
+/** notice: oturum neden kapandı (giriş ekranında gösterilir), ör. hesap askıya alındı */
+let onTokens: (t: Tokens | null, notice?: string) => void = () => {};
+/** API AuthGuard askıdaki hesabın her isteğini bu mesajla 403'ler (FR-51) */
+const SUSPENDED = "Hesabınız askıya alındı.";
 let refreshing: Promise<boolean> | null = null;
 
 /** AuthProvider bağlar: belirteç yenilenince ya da oturum düşünce haber verilir. */
-export function bindSession(initial: Tokens | null, listener: (t: Tokens | null) => void) {
+export function bindSession(initial: Tokens | null, listener: (t: Tokens | null, notice?: string) => void) {
   tokens = initial;
   onTokens = listener;
 }
@@ -43,11 +46,12 @@ export async function api<T>(path: string, opts: Options = {}): Promise<T> {
   if (res.status === 204) return undefined as T;
   const json: unknown = await res.json().catch(() => null);
   if (!res.ok) {
-    if (res.status === 401 && opts.auth !== false) {
+    const message = messageOf(json, res.status);
+    if (opts.auth !== false && (res.status === 401 || (res.status === 403 && message === SUSPENDED))) {
       tokens = null;
-      onTokens(null);
+      onTokens(null, res.status === 403 ? message : undefined);
     }
-    throw new ApiError(res.status, messageOf(json, res.status));
+    throw new ApiError(res.status, message);
   }
   return json as T;
 }

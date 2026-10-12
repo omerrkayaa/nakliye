@@ -6,6 +6,9 @@ describe("maskPhone (BR-40)", () => {
   it("numaranın ortasını gizler", () => {
     expect(maskPhone("+905321234567")).toBe("0532 *** ** 67");
   });
+  it("silinen hesabın numarası yok", () => {
+    expect(maskPhone(null)).toBe("—");
+  });
 });
 
 describe("BR-05 şikayetçi", () => {

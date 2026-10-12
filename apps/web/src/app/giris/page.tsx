@@ -30,10 +30,22 @@ export default function LoginPage({ searchParams }: PageProps<"/giris">) {
 }
 
 async function Form({ searchParams }: Pick<PageProps<"/giris">, "searchParams">) {
-  const { sonra, oturum } = await searchParams;
+  const { sonra, oturum, hesap } = await searchParams;
+  const notice =
+    hesap === "silindi"
+      ? "Hesabınız silindi; kişisel verileriniz anonimleştirildi. Aynı numarayla giriş yaparsanız yeni, boş bir hesap açılır."
+      : oturum === "askida"
+        ? "Hesabınız askıya alındı."
+        : oturum
+          ? "Oturumunuz sona erdi; lütfen tekrar giriş yapın."
+          : null;
   return (
     <>
-      {oturum && <p className="mb-4 rounded-md bg-muted p-3 text-sm">Oturumunuz sona erdi; lütfen tekrar giriş yapın.</p>}
+      {notice && (
+        <p role="status" className="mb-4 rounded-md bg-muted p-3 text-sm">
+          {notice}
+        </p>
+      )}
       <LoginForm next={typeof sonra === "string" ? sonra : "/panel"} />
       <p className="mt-4 text-xs text-muted-foreground">
         Giriş yaparak{" "}

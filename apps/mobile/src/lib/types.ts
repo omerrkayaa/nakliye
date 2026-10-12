@@ -104,8 +104,8 @@ export interface Job {
   agreedPrice: number | null;
   load: { id: string; loadFrom: string; loadTo: string; cargoType: CargoType; weightTon: number; note: string | null; origin: Place; dest: Place };
   vehicle: { plate: string; vehicleType: VehicleType; bodyType: BodyType; capacityTon: number };
-  /** Kabulden sonra numaralar karşılıklı açık (FR-32) */
-  counterpart: { displayName: string | null; phone: string; verified: boolean };
+  /** Kabulden sonra numaralar karşılıklı açık (FR-32); silinen hesapta (FR-07) numara yok */
+  counterpart: { displayName: string | null; phone: string | null; verified: boolean };
   deliveryCodeAttemptsLeft: number;
   createdAt: string;
   deliveredAt: string | null;

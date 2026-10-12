@@ -116,12 +116,18 @@ export const REPORT_STATUS_LABELS = {
 } as const;
 export type ReportStatus = keyof typeof REPORT_STATUS_LABELS;
 
-/** Hesap durumu: askıdaki kullanıcı giriş yapamaz, ilanları yayından kalkar (FR-51). */
+/**
+ * Hesap durumu: askıdaki kullanıcı giriş yapamaz, ilanları yayından kalkar (FR-51). Silinen hesabın (FR-07) kişisel
+ * verileri anonimleştirilir; kayıt, karşı tarafların iş ve puan geçmişi için kalır.
+ */
 export const USER_STATUS_LABELS = {
   aktif: "Aktif",
   askida: "Askıda",
+  silindi: "Silindi",
 } as const;
 export type UserStatus = keyof typeof USER_STATUS_LABELS;
+/** Silinen hesabın her yerde görünen adı (FR-07; telefonu ve firması silinir). */
+export const DELETED_USER_NAME = "Silinmiş kullanıcı";
 
 export const DOCUMENT_TYPES = {
   ruhsat: "Araç ruhsatı",

@@ -2,9 +2,10 @@
 
 /**
  * BR-40: teklif kabulünden önce numara listede maskeli görünür ("Ara" ile açılır ve loglanır).
- * "+905321234567" → "0532 *** ** 67"
+ * "+905321234567" → "0532 *** ** 67". Silinen hesabın numarası yoktur (FR-07): "—".
  */
-export function maskPhone(e164: string): string {
+export function maskPhone(e164: string | null): string {
+  if (!e164) return "—";
   const d = e164.replace(/^\+90/, "");
   return `0${d.slice(0, 3)} *** ** ${d.slice(8)}`;
 }

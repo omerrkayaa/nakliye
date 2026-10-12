@@ -2,6 +2,7 @@ import { ConflictException, Inject, Injectable, NotFoundException } from "@nestj
 import { VISIBLE_LOAD_STATUSES, type AdminReportListInput, type ResolveReportInput } from "@nakliye/shared";
 import { and, count, desc, eq, ilike, inArray, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { AccountService } from "../account/account.service.js";
 import { DB, type Db } from "../db/db.module.js";
 import { capacityPosts, districts, loadPosts, offers, provinces, refreshTokens, reports, userRoles, users } from "../db/schema.js";
 import { OffersService } from "../jobs/offers.service.js";
@@ -19,17 +20,15 @@ const dp = alias(provinces, "dp");
 /** Askıya alınca kapanan ilanlar: yayındakiler ve moderasyonda bekleyenler */
 const CLOSABLE_LOADS = [...VISIBLE_LOAD_STATUSES, "moderasyonda" as const];
 
-type UserRow = { id: string; name: string | null; phone: string; status: string; trustScore: number; suspendedAt: Date | null; suspendReason: string | null };
+type UserRow = { id: string; name: string | null; phone: string | null; status: string; trustScore: number; suspendedAt: Date | null; suspendReason: string | null };
 
 /** Yönetici işleri (FR-51): şikayet kuyruğu (Y3), kullanıcı arama ve askıya alma (Y2). */
 @Injectable()
 export class AdminService {
   constructor(
     @Inject(DB) private readonly db: Db,
-    private readonly loads: LoadsService,
-    private readonly capacity: CapacityService,
-    private readonly offersService: OffersService,
     private readonly trust: TrustService,
+    private readonly account: AccountService,
   ) {}
 
   // ── Şikayetler (Y3) ───────────────────────────────────────────────
@@ -146,8 +145,8 @@ export class AdminService {
   }
 
   /**
-   * Askıya al (FR-51): giriş ve belirteç yenileme kapanır, oturumlar düşer (erişim belirteci en çok 15 dk daha
-   * geçerli kalır), yayındaki/moderasyondaki ilanlar ve aktif boş araç ilanları iptal edilir, bekleyen teklifleri
+   * Askıya al (FR-51): giriş, belirteç yenileme ve erişim belirteci hemen kapanır (AuthGuard her istekte
+   * hesap durumuna bakar), yayındaki/moderasyondaki ilanlar ve aktif boş araç ilanları iptal edilir, bekleyen teklifleri
    * geri çekilir. Süren işlere dokunulmaz: karşı tarafın taşıması yarım kalmasın.
    */
   async suspend(adminId: string, userId: string, reason: string, now = new Date()) {
@@ -161,25 +160,14 @@ export class AdminService {
       .where(and(eq(users.id, userId), eq(users.status, "aktif")))
       .returning({ id: users.id });
     if (!row) {
-      await this.user(userId); // yoksa 404
-      throw new ConflictException("Hesap zaten askıda");
+      const u = await this.user(userId); // yoksa 404
+      throw new ConflictException(u.status === "silindi" ? "Hesap silinmiş" : "Hesap zaten askıda");
     }
     await this.db.update(refreshTokens).set({ revokedAt: now }).where(and(eq(refreshTokens.userId, userId), sql`${refreshTokens.revokedAt} is null`));
 
-    // İlan kapatma mevcut akıştan geçer (açık teyit sorusu cevaplanır, durum makinesi denetlenir)
-    const openLoads = await this.db.select({ id: loadPosts.id }).from(loadPosts).where(and(eq(loadPosts.shipperId, userId), inArray(loadPosts.status, CLOSABLE_LOADS)));
-    for (const l of openLoads) await this.loads.close(userId, l.id, "iptal", now);
-    const openCaps = await this.db.select({ id: capacityPosts.id }).from(capacityPosts).where(and(eq(capacityPosts.carrierId, userId), eq(capacityPosts.status, "aktif")));
-    for (const c of openCaps) await this.capacity.close(userId, c.id, "iptal");
-    const withdrawn = await this.db
-      .update(offers)
-      .set({ status: "geri_cekildi" })
-      .where(and(eq(offers.carrierId, userId), eq(offers.status, "beklemede")))
-      .returning({ id: offers.id });
-    // Kapanan ilanlara gelmiş bekleyen teklifler sonuçlanmadı sayılır (nakliyecilere bildirim)
-    await this.offersService.rejectStale();
-
-    return { user: this.userView(await this.user(userId)), closedLoads: openLoads.length, closedCapacity: openCaps.length, withdrawnOffers: withdrawn.length };
+    // İlanlar ve boş araç ilanları iptal, bekleyen teklifler geri çekilir; kapanan ilanlara gelen teklifler sonuçlanmadı
+    const closed = await this.account.closeOpenActivity(userId, now);
+    return { user: this.userView(await this.user(userId)), ...closed };
   }
 
   /** Askıyı kaldır. Kapanan ilanlar geri açılmaz (yayın tarihi ve teyit bilgisi eskidi). */

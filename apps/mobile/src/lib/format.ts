@@ -36,7 +36,9 @@ export function reputationText(r: { rating?: number | null; ratingCount?: number
   return r.completedJobs > 0 ? `${jobs} · henüz puan yok` : "Yeni üye";
 }
 
-export function phoneText(p: string): string {
+/** "+905551234567" → "0555 123 45 67"; silinen hesabın numarası yok: "—" (web lib/format.ts ile aynı) */
+export function phoneText(p: string | null): string {
+  if (!p) return "—";
   const m = /^\+90(\d{3})(\d{3})(\d{2})(\d{2})$/.exec(p);
   return m ? `0${m[1]} ${m[2]} ${m[3]} ${m[4]}` : p;
 }

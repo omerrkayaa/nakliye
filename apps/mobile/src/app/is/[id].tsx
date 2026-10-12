@@ -93,7 +93,11 @@ export default function IsDetay() {
             <Text style={s.text}>{job.counterpart.displayName ?? "—"}</Text>
             {job.counterpart.verified && <Badge tone="ok" icon="shield-checkmark" label="Doğrulanmış" />}
           </View>
-          <Button title={`Ara · ${phoneText(job.counterpart.phone)}`} icon="call" variant="call" onPress={() => Linking.openURL(`tel:${job.counterpart.phone}`)} />
+          {job.counterpart.phone ? (
+            <Button title={`Ara · ${phoneText(job.counterpart.phone)}`} icon="call" variant="call" onPress={() => Linking.openURL(`tel:${job.counterpart.phone}`)} />
+          ) : (
+            <Muted>Hesap silindi; numara yok.</Muted>
+          )}
         </Card>
 
         {actionError && <ErrorText>{actionError}</ErrorText>}

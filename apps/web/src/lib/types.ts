@@ -78,7 +78,8 @@ export interface Job {
   load: { id: string; loadFrom: string; loadTo: string; cargoType: CargoType; weightTon: number; note: string | null; origin: Place; dest: Place };
   vehicle: { plate: string; vehicleType: VehicleType; bodyType: BodyType; capacityTon: number };
   /** Kabulden sonra numaralar karşılıklı açık (FR-32) */
-  counterpart: { displayName: string | null; phone: string; verified: boolean };
+  /** Silinen hesapta (FR-07) numara yok, ad "Silinmiş kullanıcı" */
+  counterpart: { displayName: string | null; phone: string | null; verified: boolean };
   deliveryCodeAttemptsLeft: number;
   createdAt: string;
   deliveredAt: string | null;
@@ -134,7 +135,8 @@ export interface AdminLoad extends LoadDetail {
 export interface AdminUser {
   id: string;
   name: string | null;
-  phone: string;
+  /** Silinen hesapta null */
+  phone: string | null;
   status: UserStatus;
   trustScore: number;
   suspendedAt: string | null;
@@ -150,7 +152,7 @@ export interface AdminReport {
   resolution: string | null;
   createdAt: string;
   resolvedAt: string | null;
-  reporter: { id: string; name: string | null; phone: string };
+  reporter: { id: string; name: string | null; phone: string | null };
   target: {
     type: "load_post" | "user";
     id: string;
@@ -164,7 +166,8 @@ export interface AdminReport {
 export interface CarrierRelation {
   id: string;
   displayName: string | null;
-  phone: string;
+  /** Silinen hesapta null */
+  phone: string | null;
   verified: boolean;
   favorite: boolean;
   jobsWithYou: number;

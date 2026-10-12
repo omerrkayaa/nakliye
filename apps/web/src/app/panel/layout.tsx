@@ -33,6 +33,9 @@ export default function PanelLayout({ children }: LayoutProps<"/panel">) {
             <Link href="/panel/firma" className="underline-offset-4 hover:underline">
               Firma
             </Link>
+            <Link href="/panel/hesap" className="underline-offset-4 hover:underline">
+              Hesap
+            </Link>
             <Suspense>
               <AdminLink />
             </Suspense>
