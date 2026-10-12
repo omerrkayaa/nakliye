@@ -35,7 +35,11 @@ export default async function RouteLandingPage({ params }: PageProps<"/nakliye/[
   const r = routePage((await params).route);
   if (!r) notFound();
   const reverse = routePage(`${r.to.slug}-${r.from.slug}`);
-  const others = [...(reverse ? [reverse] : []), ...ROUTE_PAGES.filter((x) => x !== r && x !== reverse)];
+  // Hepsi (71) çok uzun: ters yön, aynı ilden çıkanlar ve aynı ile varanlar
+  const groups = [
+    { title: `${r.from.name} çıkışlı`, routes: ROUTE_PAGES.filter((x) => x !== r && x.from === r.from) },
+    { title: `${r.to.name} varışlı`, routes: ROUTE_PAGES.filter((x) => x !== r && x.to === r.to) },
+  ];
   return (
     <>
       <SiteHeader />
@@ -74,15 +78,30 @@ export default async function RouteLandingPage({ params }: PageProps<"/nakliye/[
           <h2 id="diger" className="text-lg font-semibold">
             Diğer güzergâhlar
           </h2>
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {others.map((x) => (
-              <li key={x.slug}>
-                <Link href={x.path} className="text-primary underline-offset-4 hover:underline">
-                  {x.from.name} – {x.to.name} nakliye
-                </Link>
-              </li>
+          {reverse && (
+            <p>
+              Ters yön:{" "}
+              <Link href={reverse.path} className="text-primary underline-offset-4 hover:underline">
+                {reverse.from.name} – {reverse.to.name} nakliye
+              </Link>
+            </p>
+          )}
+          <div className="grid gap-6 sm:grid-cols-2">
+            {groups.map((g) => (
+              <div key={g.title} className="space-y-2">
+                <h3 className="font-semibold">{g.title}</h3>
+                <ul className="space-y-1">
+                  {g.routes.map((x) => (
+                    <li key={x.slug}>
+                      <Link href={x.path} className="text-primary underline-offset-4 hover:underline">
+                        {x.from.name} – {x.to.name} nakliye
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
+          </div>
         </nav>
       </main>
       <SiteFooter />

@@ -31,10 +31,20 @@ test("güzergâh sayfası: başlık, önizleme etiketleri, ilan sayısı ve fiya
   for (const [i, e] of s.estimates.entries()) await expect(rows.nth(i)).toContainText(`${money.format(e.min)} ₺ – ${money.format(e.max)} ₺`);
   await expect(page.getByText(`${s.source === "karayolu" ? "Karayolu" : "Yaklaşık"} ${s.distanceKm} km (il merkezleri arası)`)).toBeVisible();
 
-  // Diğer güzergâhlar: önce ters yön, toplam 11
+  // Diğer güzergâhlar: önce ters yön, sonra Aydın çıkışlı 7 ve İstanbul varışlı 7 (hepsi değil)
   const others = page.getByRole("navigation", { name: "Diğer güzergâhlar" }).getByRole("link");
-  await expect(others).toHaveCount(11);
+  await expect(others).toHaveCount(15);
   await expect(others.first()).toHaveText("İstanbul – Aydın nakliye");
+  await expect(page.getByRole("navigation", { name: "Diğer güzergâhlar" }).getByRole("heading", { level: 3 })).toHaveText([
+    "Aydın çıkışlı",
+    "İstanbul varışlı",
+  ]);
+  const names = await others.allTextContents();
+  expect(new Set(names).size).toBe(15);
+  expect(names.slice(1, 8).every((n) => n.startsWith("Aydın – "))).toBe(true);
+  expect(names.slice(8).every((n) => n.endsWith(" – İstanbul nakliye"))).toBe(true);
+  expect(names).toContain("Aydın – Ankara nakliye");
+  expect(names).toContain("Mersin – İstanbul nakliye");
   // Girişsiz "Yük ilanı ver" → giriş, sonra ilan formuna döner
   await page.getByRole("link", { name: "Yük ilanı ver" }).click();
   await expect(page).toHaveURL(/\/giris\?sonra=%2Fpanel%2Filanlar%2Fyeni$/);
@@ -65,7 +75,7 @@ test("ilan sayısı istek anında: yayına çıkan ilan sayfada görünür, kapa
 });
 
 test("listede olmayan güzergâh 404", async ({ page }) => {
-  for (const path of ["/nakliye/aydin-ankara", "/nakliye/aydin-aydin", "/nakliye/aydin"]) {
+  for (const path of ["/nakliye/aydin-antalya", "/nakliye/aydin-aydin", "/nakliye/aydin"]) {
     const res = await page.goto(path);
     expect(res?.status(), path).toBe(404);
   }
@@ -74,16 +84,28 @@ test("listede olmayan güzergâh 404", async ({ page }) => {
 test("tanıtımdan güzergâhlara; site haritası ve robots", async ({ page, request }) => {
   await page.goto("/");
   const links = page.getByRole("navigation", { name: "Güzergâhlar" }).getByRole("link");
-  await expect(links).toHaveCount(12);
+  await expect(links).toHaveCount(72); // 9 il, her çift iki yön
+  await expect(page.getByRole("navigation", { name: "Güzergâhlar" }).getByRole("heading", { level: 3 })).toHaveCount(9);
   await links.filter({ hasText: "Manisa – İzmir nakliye" }).click();
   await expect(page).toHaveURL(/\/nakliye\/manisa-izmir$/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Manisa – İzmir nakliye");
 
   const sitemap = await (await request.get("/sitemap.xml")).text();
-  expect(sitemap.match(/<loc>http:\/\/localhost:3001\/nakliye\/[a-z]+-[a-z]+<\/loc>/g)).toHaveLength(12);
+  expect(sitemap.match(/<loc>http:\/\/localhost:3001\/nakliye\/[a-z]+-[a-z]+<\/loc>/g)).toHaveLength(72);
   expect(sitemap).toContain("<loc>http://localhost:3001/</loc>");
   expect(sitemap).not.toContain("/panel");
   expect(await (await request.get("/robots.txt")).text()).toContain("Sitemap: http://localhost:3001/sitemap.xml");
+});
+
+test("yeni iller: Ankara – Mersin sayfası API'deki karayolu mesafesi ve fiyatlarla açılır", async ({ page }) => {
+  const s = (await api<RouteSummary>("GET", "/public/routes/6/33")).body;
+  expect(s.source).toBe("karayolu"); // OSRM tüm Türkiye
+  const res = await page.goto("/nakliye/ankara-mersin");
+  expect(res?.status()).toBe(200);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Ankara – Mersin nakliye");
+  await expect(page.getByText(`Karayolu ${s.distanceKm} km (il merkezleri arası)`)).toBeVisible();
+  const rows = page.getByTestId("price-table").locator("tbody tr");
+  for (const [i, e] of s.estimates.entries()) await expect(rows.nth(i)).toContainText(`${money.format(e.min)} ₺ – ${money.format(e.max)} ₺`);
 });
 
 test("telefon genişliğinde (390 px) güzergâh sayfası yatay taşmaz", async ({ page }) => {
