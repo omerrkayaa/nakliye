@@ -3,6 +3,7 @@ import { ArrowRight, BadgeCheck, BellRing, FileSpreadsheet, KeyRound, RefreshCcw
 import type { LucideIcon } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { buttonVariants } from "@/components/ui/button";
+import { ROUTE_PAGES } from "@/lib/route-pages";
 
 const FEATURES: [LucideIcon, string, string][] = [
   [RefreshCcw, "Canlı ilan teyidi", "İlan sahibine düzenli olarak “hâlâ geçerli mi?” diye sorulur. Cevapsız ilan listeden düşer; bayat ilanla vakit kaybetmezsiniz."],
@@ -86,6 +87,21 @@ export default function Home() {
             </dl>
           </div>
         </section>
+
+        <nav aria-labelledby="guzergahlar" className="mx-auto max-w-5xl space-y-4 px-4 py-14">
+          <h2 id="guzergahlar" className="text-2xl font-bold">
+            Güzergâhlar
+          </h2>
+          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {ROUTE_PAGES.map((r) => (
+              <li key={r.slug}>
+                <Link href={r.path} className="text-primary underline-offset-4 hover:underline">
+                  {r.from.name} – {r.to.name} nakliye
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
       </main>
       <SiteFooter />
     </>

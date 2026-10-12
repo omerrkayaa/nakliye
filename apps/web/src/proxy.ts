@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { routePage } from "@/lib/route-pages";
 import { ACCESS_COOKIE, REFRESH_COOKIE, accessCookie, refreshCookie, refreshTokens } from "@/lib/session";
 
 /**
@@ -11,6 +12,12 @@ import { ACCESS_COOKIE, REFRESH_COOKIE, accessCookie, refreshCookie, refreshToke
  * çerezi görürse panele geri gönderir; refresh gerçekten geçersizse yeni girişte üzerine yazılır.
  */
 export async function proxy(req: NextRequest) {
+  // W2: listede olmayan güzergâh, sayfa render edilmeden 404. Sayfadaki notFound() ilk ziyarette kabuk akmaya
+  // başladığı için 200 (+ noindex) döndürür ve her rastgele adresi önbelleğe yazar; olmayan bir yola yeniden
+  // yazınca Next'in 404 sayfası 404 durumuyla gelir.
+  if (req.nextUrl.pathname.startsWith("/nakliye/")) {
+    return routePage(req.nextUrl.pathname.slice("/nakliye/".length)) ? NextResponse.next() : NextResponse.rewrite(new URL("/404", req.url));
+  }
   const access = req.cookies.get(ACCESS_COOKIE)?.value;
   const refresh = req.cookies.get(REFRESH_COOKIE)?.value;
 
@@ -38,4 +45,4 @@ function toLogin(req: NextRequest) {
   return NextResponse.redirect(url, 303);
 }
 
-export const config = { matcher: ["/panel/:path*", "/giris"] };
+export const config = { matcher: ["/panel/:path*", "/giris", "/nakliye/:path*"] };

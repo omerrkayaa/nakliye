@@ -235,3 +235,14 @@ export type SharedLoad =
       shipper: { displayName: string | null; verified: boolean };
     }
   | { shareId: string; status: Exclude<LoadStatus, "teyitli" | "teyit_bekliyor">; origin: Place; dest: Place };
+
+/** W2 güzergâh özeti (GET /public/routes/:from/:to, girişsiz). activeLoads = yük akışında görünen ilanlar. */
+export interface RouteSummary {
+  from: { id: number; name: string };
+  to: { id: number; name: string };
+  activeLoads: number;
+  distanceKm: number;
+  source: "karayolu" | "kus_ucusu";
+  /** Büyükten küçüğe araç tipi */
+  estimates: { vehicleType: VehicleType; min: number; max: number }[];
+}
