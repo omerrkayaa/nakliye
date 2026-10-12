@@ -46,7 +46,10 @@ const cleanup = () => {
 cleanup();
 
 const trDay = (offset = 0) => new Date(Date.now() + 3 * 3600e3 + offset * 86400e3).toISOString().slice(0, 10);
-const run = Date.now().toString().slice(-4);
+// 4 haneli kimlik eski bir çalıştırmayla çakışabiliyor (aynı numaralar/plakalar): DB'de boş olana kadar yeniden üretilir
+let run;
+do run = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
+while (psql(`select count(*) from users where phone like '+90556${run}%'`) !== "0");
 const phone = (n) => `+90556${run}${String(n).padStart(3, "0")}`;
 
 const S = await user(phone(1), ["shipper"]);

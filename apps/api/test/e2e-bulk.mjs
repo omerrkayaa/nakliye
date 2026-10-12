@@ -31,7 +31,10 @@ async function login(phone) {
 }
 const role = async (phone, roles) => (await api("POST", "/me/roles", (await login(phone)).accessToken, { roles })).body.accessToken;
 
-const run = Date.now().toString().slice(-4);
+// 4 haneli kimlik eski bir çalıştırmayla çakışabiliyor (aynı numaralar/plakalar): DB'de boş olana kadar yeniden üretilir
+let run;
+do run = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
+while (psql(`select count(*) from users where phone like '+90544${run}%'`) !== "0");
 const phone = (n) => `+90544${run}${String(n).padStart(3, "0")}`;
 const trDay = (o) => new Date(Date.now() + 3 * 3600e3 + o * 86400e3).toISOString().slice(0, 10);
 
