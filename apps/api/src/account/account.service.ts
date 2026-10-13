@@ -1,8 +1,9 @@
 import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException, UnauthorizedException } from "@nestjs/common";
-import { DELETED_USER_NAME, OPEN_JOB_STATUSES, VISIBLE_LOAD_STATUSES } from "@nakliye/shared";
+import { ACCOUNT_DELETION, DELETED_USER_NAME, isQualifiedReporter, OPEN_JOB_STATUSES, trDay, VISIBLE_LOAD_STATUSES } from "@nakliye/shared";
 import { and, asc, count, eq, inArray, isNotNull, lt, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { AuthService, SUSPENDED_MESSAGE } from "../auth/auth.service.js";
+import { deletedPhoneHmac } from "../common/hash.js";
 import { DB, type Db, type Tx } from "../db/db.module.js";
 import {
   callLogs,
@@ -36,6 +37,7 @@ import { CapacityService } from "../vehicles/capacity.service.js";
 const CLOSABLE_LOADS = [...VISIBLE_LOAD_STATUSES, "moderasyonda" as const];
 /** Silme isteği yarıda kalırsa (çökme) zamanlayıcı bu kadar sonra tamamlar; süren isteğin adımlarıyla çakışmasın */
 const PENDING_DELETION_GRACE_MS = 5 * 60_000;
+const DAY_MS = 24 * 3_600_000;
 
 const od = alias(districts, "od");
 const op = alias(provinces, "op");
@@ -43,6 +45,11 @@ const dd = alias(districts, "dd");
 const dp = alias(provinces, "dp");
 const otherU = alias(users, "other_u");
 const otherC = alias(companies, "other_c");
+const reporterU = alias(users, "reporter_u");
+
+/** Erteleme bitiş anı, Türkiye saatiyle "27.10.2026 18:25" */
+const trDateTime = (d: Date) =>
+  `${trDay(d).split("-").reverse().join(".")} ${d.toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit" })}`;
 
 /**
  * Hesap ve kişisel veriler (FR-07, NFR-05, docs/04 §8): veri dökümü, hesap silme (anonimleştirme) ve askıya alma ile
@@ -83,11 +90,10 @@ export class AccountService {
   // ── Hesap silme ────────────────────────────────────────────────────
 
   /**
-   * Silmeyi engelleyen durum: yönetici hesabı, sonuçlanmamış taşıma (karşı tarafın işi yarım kalmasın) ya da hesap veya
-   * ilanları hakkında açık şikayet (silip aynı numarayla yeniden kaydolarak incelemeden kaçılmasın). Şikayetin kimden ve
-   * ne olduğu söylenmez.
+   * Silmeyi engelleyen durum: yönetici hesabı, sonuçlanmamış taşıma (karşı tarafın işi yarım kalmasın) ya da süresi
+   * dolmamış şikayet ertelemesi (`reportHold`). `startHold`: ilk ertelenen istekte erteleme başlangıcı yazılır.
    */
-  private async deletionBlocker(userId: string, db: Db | Tx = this.db): Promise<string | null> {
+  private async deletionBlocker(userId: string, now: Date, db: Db | Tx = this.db, startHold = false): Promise<string | null> {
     const [admin] = await db.select({ n: count() }).from(userRoles).where(and(eq(userRoles.userId, userId), eq(userRoles.role, "admin")));
     if (admin && admin.n > 0) return "Yönetici hesabı silinemez.";
     const [open] = await db
@@ -95,18 +101,46 @@ export class AccountService {
       .from(jobs)
       .where(and(or(eq(jobs.shipperId, userId), eq(jobs.carrierId, userId)), inArray(jobs.status, [...OPEN_JOB_STATUSES])));
     if (open && open.n > 0) return `Sonuçlanmamış ${open.n} taşımanız var. Hesabınızı silmeden önce tamamlanmalı ya da iptal edilmeli.`;
+    return this.reportHold(userId, now, db, startHold);
+  }
+
+  /**
+   * Hesap ya da ilanları hakkında nitelikli açık şikayet silmeyi erteler: silip aynı numarayla dönerek incelemeden
+   * kaçılmasın. Nitelikli şikayetçi BR-05'teki gibi (shared isQualifiedReporter): doğrulanmış ya da hedefle gerçek teması
+   * olan — ilan şikayetinde o ilanı aramış; kullanıcı şikayetinde onun bir ilanını aramış ya da onunla taşıma yapmış.
+   * Erteleme ilk ertelenen istekten en çok ACCOUNT_DELETION.reportHoldDays sürer; sonra şikayet açık olsa da silinir
+   * (kayıt kalır, karar yöneticinin): herkesin açabildiği şikayetle silme süresiz engellenemez. Şikayetin kimden ve ne
+   * olduğu söylenmez.
+   */
+  private async reportHold(userId: string, now: Date, db: Db | Tx, start: boolean): Promise<string | null> {
     const ownLoads = db.select({ id: loadPosts.id }).from(loadPosts).where(eq(loadPosts.shipperId, userId));
-    const [rep] = await db
-      .select({ n: count() })
+    const contact = sql<boolean>`case when ${reports.targetType} = 'load_post'
+      then exists (select 1 from ${callLogs} c where c.caller_id = ${reports.reporterId} and c.load_post_id = ${reports.targetId})
+      else exists (select 1 from ${callLogs} c join ${loadPosts} l on l.id = c.load_post_id where c.caller_id = ${reports.reporterId} and l.shipper_id = ${reports.targetId})
+        or exists (select 1 from ${jobs} j where (j.shipper_id = ${reports.reporterId} and j.carrier_id = ${reports.targetId}) or (j.carrier_id = ${reports.reporterId} and j.shipper_id = ${reports.targetId}))
+      end`;
+    const open = await db
+      .select({ level: reporterU.verificationLevel, contact })
       .from(reports)
+      .innerJoin(reporterU, eq(reporterU.id, reports.reporterId))
       .where(
         and(
           eq(reports.status, "acik"),
           or(and(eq(reports.targetType, "user"), eq(reports.targetId, userId)), and(eq(reports.targetType, "load_post"), inArray(reports.targetId, ownLoads))),
         ),
       );
-    if (rep && rep.n > 0) return "Hesabınızla ilgili sonuçlanmamış bir inceleme var. İnceleme sonuçlanınca hesabınızı silebilirsiniz.";
-    return null;
+    if (!open.some((r) => isQualifiedReporter({ verificationLevel: r.level, calledThisLoad: r.contact }))) return null;
+
+    // Eski istek (ör. aylar önce, başka bir şikayet için) yeni başvuruyu ertelemesiz yapmasın
+    const [u] = await db.select({ since: users.deletionRequestedAt }).from(users).where(eq(users.id, userId));
+    let since = u?.since && now.getTime() - u.since.getTime() < ACCOUNT_DELETION.holdRequestValidDays * DAY_MS ? u.since : null;
+    if (!since) {
+      since = now;
+      if (start) await db.update(users).set({ deletionRequestedAt: now }).where(eq(users.id, userId));
+    }
+    const until = new Date(since.getTime() + ACCOUNT_DELETION.reportHoldDays * DAY_MS);
+    if (now >= until) return null;
+    return `Hesabınızla ilgili sonuçlanmamış bir inceleme var. İnceleme sonuçlanınca ya da en geç ${trDateTime(until)} itibarıyla hesabınızı silebilirsiniz.`;
   }
 
   private async phoneOf(userId: string): Promise<string> {
@@ -116,20 +150,21 @@ export class AccountService {
   }
 
   /** Silme onay kodu hesabın kendi numarasına gider (giriş kodu gibi; tekrar istemek için 60 sn beklenir). */
-  async requestDeletionCode(userId: string): Promise<void> {
-    const blocker = await this.deletionBlocker(userId);
+  async requestDeletionCode(userId: string, now = new Date()): Promise<void> {
+    const blocker = await this.deletionBlocker(userId, now, this.db, true);
     if (blocker) throw new ConflictException(blocker);
     await this.auth.requestOtp(await this.phoneOf(userId), "silme");
   }
 
   /**
-   * Hesabı siler (FR-07). Geri alınamaz; kodla yeniden doğrulanır. Kişisel alanlar anonimleştirilir, kayıt karşı
-   * tarafların iş ve puan geçmişi için "Silinmiş kullanıcı" olarak kalır (docs/04 §8). Numara boşalır: aynı numarayla
-   * yeniden girilirse yeni, boş bir hesap açılır.
+   * Hesabı siler (FR-07); kodla yeniden doğrulanır. Kişisel alanlar anonimleştirilir, kayıt karşı tarafların iş ve puan
+   * geçmişi için "Silinmiş kullanıcı" olarak kalır (docs/04 §8). Numara boşalır; anahtarlı özeti ACCOUNT_DELETION.restoreDays
+   * saklanır: bu sürede aynı numarayla giriş hesabı puanları ve geçmişiyle geri açar (AuthService.verifyOtp), sonra yeni,
+   * boş hesap açılır. Böylece kötü puanlar silip yeniden kaydolarak sıfırlanamaz.
    */
   async deleteAccount(userId: string, code: string, now = new Date()) {
     const phone = await this.phoneOf(userId);
-    const blocker = await this.deletionBlocker(userId);
+    const blocker = await this.deletionBlocker(userId, now, this.db, true);
     if (blocker) throw new ConflictException(blocker);
     // Yanlış/süresi dolmuş onay kodu oturum hatası değildir: 401 dönseydi istemciler oturumu düşmüş sayıp girişe atardı
     await this.auth.consumeOtp(phone, code, "silme").catch((e: unknown) => {
@@ -143,10 +178,13 @@ export class AccountService {
       // Bekleyen teklifler önce geri çekilir: aynı anda kabul edilen teklifte (kabul teklif satırını kilitler) ya kabul
       // önce biter ve iş aşağıdaki kontrolde görülür (silme 409, bu transaction geri alınır) ya da teklif artık beklemede değildir.
       await tx.update(offers).set({ status: "geri_cekildi" }).where(and(eq(offers.carrierId, userId), eq(offers.status, "beklemede")));
-      const late = await this.deletionBlocker(userId, tx);
+      const late = await this.deletionBlocker(userId, now, tx);
       if (late) throw new ConflictException(late);
+      // Aynı numaranın daha eski (süresi dolmuş, henüz temizlenmemiş) bağı düşer: numara başına tek geri açılacak hesap
+      const hmac = deletedPhoneHmac(phone);
+      await tx.update(users).set({ phoneHmac: null }).where(and(eq(users.phoneHmac, hmac), ne(users.id, userId)));
       // Bu andan sonra giriş, belirteç yenileme ve erişim belirteci kapanır (AuthGuard durum kontrolü)
-      await tx.update(users).set({ status: "silindi", deletedAt: now }).where(eq(users.id, userId));
+      await tx.update(users).set({ status: "silindi", deletedAt: now, phoneHmac: hmac, deletionRequestedAt: null }).where(eq(users.id, userId));
       await tx.delete(refreshTokens).where(eq(refreshTokens.userId, userId));
     });
     // Hesap artık silinmiş sayılır (giriş kapalı): anonimleştirme burada yarıda kalırsa (ör. ilanın iyimser kilidi)
@@ -192,6 +230,16 @@ export class AccountService {
         .set({ meta: sql`${jobEvents.meta} - 'reason'` })
         .where(and(eq(jobEvents.actorId, userId), sql`${jobEvents.meta} ->> 'reason' is not null`));
     });
+  }
+
+  /** Zamanlayıcı: geri açma süresi (ACCOUNT_DELETION.restoreDays) dolan silinmiş numara özetlerini siler. */
+  async expireDeletedPhoneLinks(now = new Date()): Promise<number> {
+    const rows = await this.db
+      .update(users)
+      .set({ phoneHmac: null })
+      .where(and(isNotNull(users.phoneHmac), lt(users.deletedAt, new Date(now.getTime() - ACCOUNT_DELETION.restoreDays * DAY_MS))))
+      .returning({ id: users.id });
+    return rows.length;
   }
 
   /** Zamanlayıcı: silme isteği yarıda kalan (çöken) hesapları tamamlar. */

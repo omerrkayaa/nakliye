@@ -26,6 +26,8 @@ export interface TickStats {
   ratingsRevealed: number;
   /** Silme isteği yarıda kalıp tamamlanan hesaplar (FR-07) */
   deletionsFinished: number;
+  /** Geri açma süresi dolup özeti silinen numaralar (FR-07) */
+  deletedLinksExpired: number;
 }
 
 /** Periyodik görevlerin tek turu. Her adım tekrar çalıştırılabilir (idempotent). */
@@ -50,6 +52,7 @@ export class SchedulerService {
     const jobsCompleted = await this.jobs.autoComplete(now);
     const ratingsRevealed = await this.ratings.revealExpired(now);
     const deletionsFinished = await this.account.finishPendingDeletions(now);
-    return { ...confirmation, capacityExpired, matchSwept, offersClosed, jobsCompleted, ratingsRevealed, deletionsFinished };
+    const deletedLinksExpired = await this.account.expireDeletedPhoneLinks(now);
+    return { ...confirmation, capacityExpired, matchSwept, offersClosed, jobsCompleted, ratingsRevealed, deletionsFinished, deletedLinksExpired };
   }
 }

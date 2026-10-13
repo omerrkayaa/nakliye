@@ -1,3 +1,4 @@
+import { ACCOUNT_DELETION } from "@nakliye/shared";
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/site-chrome";
 
@@ -59,7 +60,10 @@ export default function KvkkPage() {
         <p>
           Hesabınız açık kaldığı sürece ve ilgili mevzuattaki zamanaşımı süreleri boyunca saklanır [kesin süreler]. Hesap silindiğinde adınız,
           numaranız, firma bilgileriniz, plakalarınız, bildirimleriniz ve yazdığınız notlar silinir; tamamlanmış taşımalar ve verdiğiniz puanlar,
-          karşı tarafın geçmişi ve istatistik için “Silinmiş kullanıcı” adıyla kalır.
+          karşı tarafın geçmişi ve istatistik için “Silinmiş kullanıcı” adıyla kalır. Silip yeniden kaydolarak puanların sıfırlanmasını önlemek
+          için numaranızdan üretilen bir özet (numaranın kendisi değil) {ACCOUNT_DELETION.restoreDays} gün saklanır; bu sürede aynı numarayla giriş
+          yaparsanız hesabınız puanları ve iş geçmişiyle yeniden açılır, süre dolunca özet silinir. Hesabınızla ilgili sonuçlanmamış bir şikayet
+          varsa silme, inceleme sonuçlanana kadar ve en çok {ACCOUNT_DELETION.reportHoldDays} gün ertelenir.
         </p>
       </section>
       <section className="space-y-2">

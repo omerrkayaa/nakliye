@@ -1,3 +1,4 @@
+import { ACCOUNT_DELETION } from "@nakliye/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -33,7 +34,7 @@ async function Form({ searchParams }: Pick<PageProps<"/giris">, "searchParams">)
   const { sonra, oturum, hesap } = await searchParams;
   const notice =
     hesap === "silindi"
-      ? "Hesabınız silindi; kişisel verileriniz anonimleştirildi. Aynı numarayla giriş yaparsanız yeni, boş bir hesap açılır."
+      ? `Hesabınız silindi; kişisel verileriniz anonimleştirildi. ${ACCOUNT_DELETION.restoreDays} gün içinde aynı numarayla giriş yaparsanız hesabınız puanları ve geçmişiyle yeniden açılır.`
       : oturum === "askida"
         ? "Hesabınız askıya alındı."
         : oturum

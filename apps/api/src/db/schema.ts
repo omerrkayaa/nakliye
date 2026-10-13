@@ -100,6 +100,10 @@ export const users = pgTable("users", {
   suspendReason: varchar("suspend_reason", { length: 500 }),
   createdAt: createdAt(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  // FR-07: silinen numaranın anahtarlı özeti; ACCOUNT_DELETION.restoreDays içinde aynı numarayla giriş hesabı geri açar
+  phoneHmac: varchar("phone_hmac", { length: 64 }).unique(),
+  // FR-07: açık şikayet yüzünden ertelenen silme isteğinin başladığı an (erteleme en çok ACCOUNT_DELETION.reportHoldDays)
+  deletionRequestedAt: timestamp("deletion_requested_at", { withTimezone: true }),
 });
 
 export const userRoles = pgTable(

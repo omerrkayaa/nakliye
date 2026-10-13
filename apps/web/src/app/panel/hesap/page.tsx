@@ -1,3 +1,4 @@
+import { ACCOUNT_DELETION } from "@nakliye/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -46,9 +47,15 @@ export default function AccountPage() {
           <li>Telefon numaranız, adınız, firma bilgileriniz, araç plakalarınız, bildirimleriniz ve rota alarmlarınız silinir.</li>
           <li>Yayındaki ilanlarınız ve boş araç ilanlarınız kapanır; bekleyen teklifleriniz geri çekilir.</li>
           <li>Tamamlanmış taşımalar ve verdiğiniz puanlar karşı tarafın geçmişi için “Silinmiş kullanıcı” adıyla kalır; yazdığınız notlar ve yorumlar silinir.</li>
-          <li>Süren bir taşımanız ya da hesabınızla ilgili sonuçlanmamış bir inceleme varken hesabınız silinemez.</li>
           <li>
-            <strong>Bu işlem geri alınamaz.</strong> Aynı numarayla yeniden giriş yaparsanız yeni, boş bir hesap açılır.
+            Süren bir taşımanız varken hesabınız silinemez. Hesabınızla ilgili sonuçlanmamış bir inceleme varsa silme, inceleme sonuçlanana kadar ve en
+            çok {ACCOUNT_DELETION.reportHoldDays} gün ertelenir.
+          </li>
+          <li>
+            <strong>Kişisel bilgileriniz geri getirilemez.</strong> Silip yeniden kaydolarak puanların sıfırlanmasını önlemek için numaranızdan üretilen
+            bir özet (numaranın kendisi değil) {ACCOUNT_DELETION.restoreDays} gün saklanır: bu sürede aynı numarayla giriş yaparsanız hesabınız aldığınız
+            puanlar ve iş geçmişinizle yeniden açılır; ad, firma ve araç bilgilerini yeniden girersiniz. {ACCOUNT_DELETION.restoreDays} günden sonra aynı
+            numarayla yeni, boş bir hesap açılır.
           </li>
         </ul>
         <Suspense fallback={null}>

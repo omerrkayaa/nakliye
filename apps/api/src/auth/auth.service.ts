@@ -1,7 +1,8 @@
 import { ForbiddenException, HttpException, HttpStatus, Inject, Injectable, UnauthorizedException } from "@nestjs/common";
+import { ACCOUNT_DELETION } from "@nakliye/shared";
 import { JwtService } from "@nestjs/jwt";
 import { and, eq, gt, isNull, lt, sql } from "drizzle-orm";
-import { randomToken, sha256, sixDigitCode } from "../common/hash.js";
+import { deletedPhoneHmac, randomToken, sha256, sixDigitCode } from "../common/hash.js";
 import { SmsService } from "../common/sms.service.js";
 import { DB, type Db } from "../db/db.module.js";
 import { otpCodes, refreshTokens, userRoles, users } from "../db/schema.js";
@@ -87,14 +88,36 @@ export class AuthService {
   async verifyOtp(phone: string, code: string) {
     await this.consumeOtp(phone, code);
 
-    // BR-12: bir telefon numarası = tek hesap (silinen hesabın numarası boşaltıldığı için yeni hesap açılır)
+    // BR-12: bir telefon numarası = tek hesap. Silinen hesabın numarası boşaltılır; süresi içinde dönülürse eski hesap
+    // geri açılır, yoksa yeni hesap
     let [user] = await this.db.select().from(users).where(eq(users.phone, phone));
+    if (!user) [user] = await this.restoreDeleted(phone);
     const isNew = !user;
     if (!user) [user] = await this.db.insert(users).values({ phone }).returning();
     if (user!.status === "askida") throw new ForbiddenException(SUSPENDED_MESSAGE);
     if (user!.status === "silindi") throw new ForbiddenException(DELETING_MESSAGE);
 
     return { isNew, ...(await this.issueTokens(user!.id)) };
+  }
+
+  /**
+   * FR-07: ACCOUNT_DELETION.restoreDays içinde silinen hesap aynı numarayla geri açılır — aldığı puanlar, güven skoru,
+   * iş geçmişi ve hakkındaki açık şikayetler geri gelir; ad, firma, rol ve araçlar silinmişti, yeniden girilir. Yalnız
+   * anonimleştirmesi bitmiş (numarası boşalmış) hesap; bitmemişse giriş "silme sürüyor" der.
+   */
+  private restoreDeleted(phone: string, now = new Date()) {
+    return this.db
+      .update(users)
+      .set({ phone, phoneHmac: null, status: "aktif", deletedAt: null, name: null })
+      .where(
+        and(
+          eq(users.phoneHmac, deletedPhoneHmac(phone)),
+          eq(users.status, "silindi"),
+          isNull(users.phone),
+          gt(users.deletedAt, new Date(now.getTime() - ACCOUNT_DELETION.restoreDays * 24 * 3_600_000)),
+        ),
+      )
+      .returning();
   }
 
   async refresh(refreshToken: string) {

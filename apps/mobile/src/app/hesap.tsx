@@ -1,4 +1,4 @@
-import { trDay } from "@nakliye/shared";
+import { ACCOUNT_DELETION, trDay } from "@nakliye/shared";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { useEffect, useState } from "react";
@@ -117,7 +117,9 @@ function Delete() {
     try {
       await api("/me", { method: "DELETE", body: { code } });
       removeOldExports();
-      await endSession("Hesabınız silindi; kişisel verileriniz anonimleştirildi. Aynı numarayla giriş yaparsanız yeni, boş bir hesap açılır.");
+      await endSession(
+        `Hesabınız silindi; kişisel verileriniz anonimleştirildi. ${ACCOUNT_DELETION.restoreDays} gün içinde aynı numarayla giriş yaparsanız hesabınız puanları ve geçmişiyle yeniden açılır.`,
+      );
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Hesap silinemedi");
       setBusy(false);
@@ -132,8 +134,15 @@ function Delete() {
       <Muted>• Numaranız, adınız, firma bilgileriniz, araç plakalarınız, bildirimleriniz ve rota alarmlarınız silinir.</Muted>
       <Muted>• Yayındaki ilanlarınız ve boş araç ilanlarınız kapanır; bekleyen teklifleriniz geri çekilir.</Muted>
       <Muted>• Tamamlanmış taşımalar ve verdiğiniz puanlar karşı tarafın geçmişi için “Silinmiş kullanıcı” adıyla kalır; notlarınız ve yorumlarınız silinir.</Muted>
-      <Muted>• Süren bir taşımanız ya da hesabınızla ilgili sonuçlanmamış bir inceleme varken hesabınız silinemez.</Muted>
-      <Text style={s.text}>Bu işlem geri alınamaz. Aynı numarayla yeniden giriş yaparsanız yeni, boş bir hesap açılır.</Text>
+      <Muted>
+        • Süren bir taşımanız varken hesabınız silinemez. Hesabınızla ilgili sonuçlanmamış bir inceleme varsa silme, inceleme sonuçlanana kadar ve en çok{" "}
+        {ACCOUNT_DELETION.reportHoldDays} gün ertelenir.
+      </Muted>
+      <Text style={s.text}>
+        Kişisel bilgileriniz geri getirilemez. Silip yeniden kaydolarak puanların sıfırlanmasını önlemek için numaranızdan üretilen bir özet{" "}
+        {ACCOUNT_DELETION.restoreDays} gün saklanır: bu sürede aynı numarayla giriş yaparsanız hesabınız puanlarınız ve iş geçmişinizle yeniden açılır.{" "}
+        {ACCOUNT_DELETION.restoreDays} günden sonra yeni, boş bir hesap açılır.
+      </Text>
       {sent && (
         <>
           <Muted>{phoneText(me.phone)} numarasına 6 haneli kod gönderildi.</Muted>
