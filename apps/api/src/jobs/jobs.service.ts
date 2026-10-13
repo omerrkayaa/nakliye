@@ -205,15 +205,17 @@ export class JobsService {
     if (!canJobTransition(job.status, "teslim_edildi", "carrier")) throw this.statusConflict(job.status);
     if (job.deliveryCodeAttempts >= JOB_PARAMS.deliveryCodeMaxAttempts) throw this.codeLocked();
 
-    if (codeHash(job.id, code) !== job.deliveryCodeHash) {
-      // Sayaç atomik artar: aynı anda gelen denemeler sınırı aşamaz
-      const [r] = await this.db
-        .update(jobs)
-        .set({ deliveryCodeAttempts: sql`${jobs.deliveryCodeAttempts} + 1` })
-        .where(and(eq(jobs.id, job.id), lt(jobs.deliveryCodeAttempts, JOB_PARAMS.deliveryCodeMaxAttempts)))
-        .returning({ attempts: jobs.deliveryCodeAttempts });
+    // Deneme hakkı karşılaştırmadan önce atomik ayrılır (OTP ile aynı): aynı anda gelen denemelerden (doğrusu dahil) en
+    // çok sınır kadarı karşılaştırılır. Önce karşılaştırıp sonra artırmak paralel tahminlerin hepsini değerlendirirdi.
+    // Karşılaştırma güncel koda: bu arada yük sahibi yeni kod ürettiyse o geçerlidir.
+    const [r] = await this.db
+      .update(jobs)
+      .set({ deliveryCodeAttempts: sql`${jobs.deliveryCodeAttempts} + 1` })
+      .where(and(eq(jobs.id, job.id), lt(jobs.deliveryCodeAttempts, JOB_PARAMS.deliveryCodeMaxAttempts)))
+      .returning({ attempts: jobs.deliveryCodeAttempts, hash: jobs.deliveryCodeHash });
+    if (!r) throw this.codeLocked();
+    if (codeHash(job.id, code) !== r.hash) {
       await this.event(this.db, job.id, "hatali_kod", userId, {});
-      if (!r) throw this.codeLocked();
       const left = JOB_PARAMS.deliveryCodeMaxAttempts - r.attempts;
       if (left === 0) {
         await this.tell(job, "shipper", "Teslim kodu çok kez yanlış girildi; uygulamadan yeni kod oluşturun");

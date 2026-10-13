@@ -216,6 +216,19 @@ check("nakliyeci iptal etti (sebep kayıtlı)", r.body.status === "iptal" && r.b
 check("yük sahibine iptal bildirimi", (await notes(S, "job_update")).some((n) => n.body.includes("Araç arızalandı")));
 check("iptal edilen işe teslim 409", (await api("POST", `/jobs/${J4}/deliver`, C2, { code: "123456" })).status === 409);
 
+console.log("\nTeslim kodu: paralel tahmin");
+const V5 = await vehicle(C1, `48 PF ${run}`);
+const otherCode = (c, i) => String((Number(c) + 1 + i) % 1e6).padStart(6, "0"); // i < 999999 için c'den farklı
+const wrongTries = (j) => psql(`select count(*) from job_events where job_id='${j}' and type='hatali_kod'`);
+const Jp = (await api("POST", `/offers/${(await offer(C1, await load(S, 3, 3), V5, 2000)).body.id}/accept`, S)).body;
+let burst = await Promise.all(Array.from({ length: 50 }, (_, i) => api("POST", `/jobs/${Jp.job.id}/deliver`, C1, { code: otherCode(Jp.deliveryCode, i) })));
+check("50 paralel yanlış koddan tam 5'i karşılaştırıldı (4 × 400, gerisi 429)", wrongTries(Jp.job.id) === "5" && burst.filter((x) => x.status === 400).length === 4 && burst.filter((x) => x.status === 429).length === 46, `karşılaştırılan ${wrongTries(Jp.job.id)}`);
+check("hak bitince doğru kod da 429", (await api("POST", `/jobs/${Jp.job.id}/deliver`, C1, { code: Jp.deliveryCode })).status === 429);
+const Jq = (await api("POST", `/offers/${(await offer(C1, await load(S, 5, 5), V5, 2000)).body.id}/accept`, S)).body;
+burst = await Promise.all(Array.from({ length: 50 }, (_, i) => api("POST", `/jobs/${Jq.job.id}/deliver`, C1, { code: i === 25 ? Jq.deliveryCode : otherCode(Jq.deliveryCode, i) })));
+const delivered = burst.filter((x) => x.body?.status === "teslim_edildi").length;
+check("doğru kod araya karışınca da en çok 5 deneme karşılaştırılır", Number(wrongTries(Jq.job.id)) + delivered <= 5 && delivered <= 1, `yanlış ${wrongTries(Jq.job.id)}, teslim ${delivered}`);
+
 console.log("\nYayından kalkan ilanın bekleyen teklifleri");
 const L5 = await load();
 const O5 = (await offer(C2, L5, V2, 1500)).body.id;
