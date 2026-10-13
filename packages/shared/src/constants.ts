@@ -117,12 +117,14 @@ export const REPORT_STATUS_LABELS = {
 export type ReportStatus = keyof typeof REPORT_STATUS_LABELS;
 
 /**
- * Hesap durumu: askıdaki kullanıcı giriş yapamaz, ilanları yayından kalkar (FR-51). Silinen hesabın (FR-07) kişisel
- * verileri anonimleştirilir; kayıt, karşı tarafların iş ve puan geçmişi için kalır.
+ * Hesap durumu: askıdaki kullanıcı giriş yapamaz, ilanları yayından kalkar (FR-51). Kullanıcı hesabını dondurabilir
+ * (FR-08): ilanları kapanır, bildirim almaz, veriler kalır; girişle açılır. Silinen hesabın (FR-07) kişisel verileri
+ * anonimleştirilir; kayıt, karşı tarafların iş ve puan geçmişi için kalır.
  */
 export const USER_STATUS_LABELS = {
   aktif: "Aktif",
   askida: "Askıda",
+  donduruldu: "Donduruldu",
   silindi: "Silindi",
 } as const;
 export type UserStatus = keyof typeof USER_STATUS_LABELS;
@@ -132,9 +134,11 @@ export const DELETED_USER_NAME = "Silinmiş kullanıcı";
  * Hesap silme süreleri (FR-07, 2026-10-13 karar). Nitelikli açık şikayet silmeyi en çok
  * `reportHoldDays` erteler (ilk ertelenen istekten; KVKK başvuruyu en geç 30 günde sonuçlandırmayı ister).
  * `holdRequestValidDays`'ten eski istek yeni başvuru sayılır. Silinen numaranın anahtarlı özeti `restoreDays`
- * saklanır: bu sürede aynı numarayla giriş eski hesabı (puanlar, geçmiş) geri açar.
+ * saklanır: bu sürede aynı numarayla giriş eski hesabı (puanlar, geçmiş) geri açar; ama silmeden sonraki
+ * `reopenAfterDays` gün giriş kapalıdır (silme ciddi bir işlem olsun, sil-aç döngüsü karşı tarafa gürültü üretmesin; ara
+ * vermek isteyen hesabını dondurur, FR-08).
  */
-export const ACCOUNT_DELETION = { reportHoldDays: 14, holdRequestValidDays: 30, restoreDays: 60 } as const;
+export const ACCOUNT_DELETION = { reportHoldDays: 14, holdRequestValidDays: 30, reopenAfterDays: 7, restoreDays: 60 } as const;
 
 export const DOCUMENT_TYPES = {
   ruhsat: "Araç ruhsatı",

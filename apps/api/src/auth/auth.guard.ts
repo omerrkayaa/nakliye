@@ -44,6 +44,8 @@ export class AuthGuard implements CanActivate {
     // Belirteç 15 dk geçerli; askıya alınan ya da silinen hesap o süreyi beklemeden durur (her istekte birincil anahtarla tek sorgu)
     const [u] = await this.db.select({ status: users.status }).from(users).where(eq(users.id, req.user.sub));
     if (!u || u.status === "silindi") throw new UnauthorizedException("Hesap bulunamadı");
+    // FR-08: dondurulan hesap girişle açılır; 401 istemcileri giriş ekranına götürür
+    if (u.status === "donduruldu") throw new UnauthorizedException("Hesabınız donduruldu; giriş yaparak açabilirsiniz.");
     if (u.status === "askida") throw new ForbiddenException(SUSPENDED_MESSAGE);
 
     const required = this.reflector.getAllAndOverride<Role[] | undefined>(ROLES_KEY, [ctx.getHandler(), ctx.getClass()]);

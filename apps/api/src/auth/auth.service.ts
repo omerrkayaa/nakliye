@@ -2,6 +2,7 @@ import { ForbiddenException, HttpException, HttpStatus, Inject, Injectable, Unau
 import { ACCOUNT_DELETION } from "@nakliye/shared";
 import { JwtService } from "@nestjs/jwt";
 import { and, eq, gt, isNull, lt, sql } from "drizzle-orm";
+import { trDateTime } from "../common/format.js";
 import { deletedPhoneHmac, randomToken, sha256, sixDigitCode } from "../common/hash.js";
 import { SmsService } from "../common/sms.service.js";
 import { DB, type Db } from "../db/db.module.js";
@@ -12,6 +13,7 @@ const OTP_TTL_MS = 3 * 60_000;
 const OTP_MAX_ATTEMPTS = 5;
 const OTP_RESEND_MS = 60_000;
 const REFRESH_TTL_MS = 30 * 24 * 3_600_000;
+const DAY_MS = 24 * 3_600_000;
 // Destek kanalı (W4 iletişim) gelince mesaja eklenmeli
 export const SUSPENDED_MESSAGE = "Hesabınız askıya alındı.";
 /** Silme başladı ama anonimleştirme bitmedi (zamanlayıcı tamamlar); numara o ana kadar yeni hesaba açılamaz */
@@ -91,32 +93,52 @@ export class AuthService {
     // BR-12: bir telefon numarası = tek hesap. Silinen hesabın numarası boşaltılır; süresi içinde dönülürse eski hesap
     // geri açılır, yoksa yeni hesap
     let [user] = await this.db.select().from(users).where(eq(users.phone, phone));
-    if (!user) [user] = await this.restoreDeleted(phone);
+    /** İstemci notu: dondurulan hesap girişle açıldı ya da silinen hesap süresi içinde geri açıldı */
+    let reopened: "dondurma" | "silme" | null = null;
+    if (!user) {
+      [user] = await this.restoreDeleted(phone);
+      if (user) reopened = "silme";
+    }
     const isNew = !user;
     if (!user) [user] = await this.db.insert(users).values({ phone }).returning();
+    if (user!.status === "donduruldu") {
+      // FR-08: SMS koduyla kimliğini doğrulayan sahibi hesabı açar
+      const [opened] = await this.db.update(users).set({ status: "aktif" }).where(and(eq(users.id, user!.id), eq(users.status, "donduruldu"))).returning();
+      if (opened) reopened = "dondurma";
+      else [user] = await this.db.select().from(users).where(eq(users.id, user!.id)); // bu arada askıya alındı
+    }
     if (user!.status === "askida") throw new ForbiddenException(SUSPENDED_MESSAGE);
     if (user!.status === "silindi") throw new ForbiddenException(DELETING_MESSAGE);
 
-    return { isNew, ...(await this.issueTokens(user!.id)) };
+    return { isNew, ...(reopened ? { reopened } : {}), ...(await this.issueTokens(user!.id)) };
   }
 
   /**
    * FR-07: ACCOUNT_DELETION.restoreDays içinde silinen hesap aynı numarayla geri açılır — aldığı puanlar, güven skoru,
-   * iş geçmişi ve hakkındaki açık şikayetler geri gelir; ad, firma, rol ve araçlar silinmişti, yeniden girilir. Yalnız
+   * iş geçmişi ve hakkındaki açık şikayetler geri gelir; ad, firma, rol ve araçlar silinmişti, yeniden girilir. Silmeden
+   * sonraki ACCOUNT_DELETION.reopenAfterDays gün giriş kapalı (403, açılış anıyla). Engel kod doğrulandıktan sonra:
+   * kod istenirken söylenseydi numarayı yazan herkes "yakın zamanda silinmiş" bilgisini öğrenirdi. Yalnız
    * anonimleştirmesi bitmiş (numarası boşalmış) hesap; bitmemişse giriş "silme sürüyor" der.
    */
-  private restoreDeleted(phone: string, now = new Date()) {
-    return this.db
-      .update(users)
-      .set({ phone, phoneHmac: null, status: "aktif", deletedAt: null, name: null })
+  private async restoreDeleted(phone: string, now = new Date()) {
+    const [old] = await this.db
+      .select({ id: users.id, deletedAt: users.deletedAt })
+      .from(users)
       .where(
         and(
           eq(users.phoneHmac, deletedPhoneHmac(phone)),
           eq(users.status, "silindi"),
           isNull(users.phone),
-          gt(users.deletedAt, new Date(now.getTime() - ACCOUNT_DELETION.restoreDays * 24 * 3_600_000)),
+          gt(users.deletedAt, new Date(now.getTime() - ACCOUNT_DELETION.restoreDays * DAY_MS)),
         ),
-      )
+      );
+    if (!old) return [];
+    const opensAt = new Date(old.deletedAt!.getTime() + ACCOUNT_DELETION.reopenAfterDays * DAY_MS);
+    if (opensAt > now) throw new ForbiddenException(`Hesabınız yakın zamanda silindi. Aynı numarayla ${trDateTime(opensAt)} itibarıyla yeniden giriş yapabilirsiniz.`);
+    return this.db
+      .update(users)
+      .set({ phone, phoneHmac: null, status: "aktif", deletedAt: null, name: null })
+      .where(and(eq(users.id, old.id), eq(users.status, "silindi"), isNull(users.phone)))
       .returning();
   }
 
@@ -135,7 +157,7 @@ export class AuthService {
     // Askıya alınan hesabın belirteçleri askıya alırken iptal edilir; bu ikinci kilit (yarışta açık kalanlar için)
     const [owner] = await this.db.select({ status: users.status }).from(users).where(eq(users.id, row.userId));
     if (owner?.status === "askida") throw new UnauthorizedException(SUSPENDED_MESSAGE);
-    if (!owner || owner.status === "silindi") throw new UnauthorizedException("Oturum süresi doldu");
+    if (!owner || owner.status === "silindi" || owner.status === "donduruldu") throw new UnauthorizedException("Oturum süresi doldu");
     // Yenileme belirteci tek kullanımlıktır (rotation).
     await this.db.update(refreshTokens).set({ revokedAt: new Date() }).where(eq(refreshTokens.id, row.id));
     return this.issueTokens(row.userId);

@@ -37,6 +37,7 @@ Bir kullanıcı hem nakliyeci hem yük sahibi rolüne sahip olabilir (ör. komis
 | FR-05 | Nakliyeci belge yükler: ruhsat, K belgesi, SRC, sigorta. Yönetici onaylar ya da reddeder. | MVP |
 | FR-06 | Doğrulama seviyesi hesaplanır ve rozet olarak gösterilir (bkz. BR-10). | MVP |
 | FR-07 | Kullanıcı hesabını silebilir ve verilerini indirebilir (KVKK). | MVP |
+| FR-08 | Kullanıcı hesabını dondurabilir (ara vermek için): ilanları kapanır, bildirim almaz, verileri silinmez; SMS koduyla giriş hesabı açar. Süren taşıması varken dondurulamaz. (2026-10-13 eklendi) | MVP |
 
 ### 3.2 İlanlar
 | Kod | Gereksinim | Öncelik |
@@ -152,6 +153,7 @@ Bir kullanıcı hem nakliyeci hem yük sahibi rolüne sahip olabilir (ör. komis
 | UC-13 | İlanı şikayet et | Herkes | Sebep seç → gönder → (BR-05) |
 | UC-14 | Belge onayla | Yönetici | Kuyruk → görüntüle → onay / ret + sebep |
 | UC-15 | Şikayet çöz | Yönetici | Kuyruk → incele → uyar / askıya al / kapat |
+| UC-16 | Hesabı dondur / sil | Herkes | Hesap ve veriler → dondur (girişle açılır) ya da kodla sil |
 
 ### Örnek ayrıntılı senaryo — UC-04 İlanı teyit et
 - **Ön koşul:** İlan "Teyitli" ve son teyitten 24 saat geçmiş.

@@ -6,6 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Button, ErrorText, Field, Muted, s } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { inform } from "@/lib/confirm";
 import { WEB_URL } from "@/lib/share";
 import { C, TOUCH } from "@/lib/theme";
 import type { Tokens } from "@/lib/types";
@@ -44,6 +45,14 @@ export default function Giris() {
     try {
       const t = await api<Tokens>("/auth/otp/verify", { method: "POST", body: { phone: p, code: c }, auth: false });
       await signIn(t);
+      if (t.reopened) {
+        inform(
+          "Hesabınız yeniden açıldı",
+          t.reopened === "dondurma"
+            ? "Dondururken kapanan ilanlarınızı “Benzerini yayınla” ile yeniden açabilirsiniz."
+            : "Puanlarınız ve geçmişiniz duruyor. Adınızı, firma ve araç bilgilerinizi yeniden girin.",
+        );
+      }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Bir sorun oluştu");
       setBusy(false);

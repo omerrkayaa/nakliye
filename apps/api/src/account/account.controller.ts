@@ -5,7 +5,7 @@ import type { AccessPayload } from "../auth/auth.service.js";
 import { ZodPipe } from "../common/zod.pipe.js";
 import { AccountService } from "./account.service.js";
 
-/** KVKK (FR-07, docs/04 §6): `GET /me/export`, `POST /me/deletion-code`, `DELETE /me`. Rol gerekmez. */
+/** KVKK (FR-07, docs/04 §6): `GET /me/export`, `POST /me/deletion-code`, `DELETE /me`; FR-08 `POST /me/freeze`. Rol gerekmez. */
 @Controller("me")
 @UseGuards(AuthGuard)
 export class AccountController {
@@ -21,6 +21,13 @@ export class AccountController {
   @HttpCode(204)
   async deletionCode(@CurrentUser() user: AccessPayload) {
     await this.account.requestDeletionCode(user.sub);
+  }
+
+  /** FR-08: hesabı dondur; SMS koduyla giriş açar. Süren taşıma ya da yönetici rolü varsa 409. */
+  @Post("freeze")
+  @HttpCode(200)
+  freeze(@CurrentUser() user: AccessPayload) {
+    return this.account.freezeAccount(user.sub);
   }
 
   @Delete()

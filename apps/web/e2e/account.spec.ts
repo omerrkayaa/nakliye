@@ -1,8 +1,8 @@
 // FR-07 (KVKK): Hesap sayfası — verileri indir, hesabı kodla sil; silinen nakliyecinin yük sahibi tarafında görünüşü;
-// askıya alınan kullanıcının panelden girişe yönlenmesi. Hazırlık API ile; tarayıcı yük sahibidir.
+// askıya alınan kullanıcının panelden girişe yönlenmesi; FR-08 dondurma. Hazırlık API ile; tarayıcı yük sahibidir.
 import { readFileSync } from "node:fs";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
-import { adminToken, api, apiUser, createLoad, phone, psql, smsCode } from "./helpers";
+import { adminToken, api, apiUser, createLoad, localPhone, otpFor, phone, psql, smsCode } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 
@@ -151,6 +151,59 @@ test("askıya alınan kullanıcı panelde hata sayfası yerine girişe yönlenir
   await expect(p).toHaveURL(/\/giris\?oturum=askida$/);
   await expect(p.getByRole("status")).toHaveText("Hesabınız askıya alındı.");
   await api("POST", `/admin/users/${S3.id}/unsuspend`, admin);
+  await ctx.close();
+});
+
+test("hesabı dondur (FR-08): vazgeçilirse bir şey olmaz → onayla dondurulur, ilan kapanır → kodla giriş açar, göstergede not", async ({ browser }) => {
+  const F = await apiUser(phone(808), "shipper", "Dondurulan Deneme");
+  const loadId = await createLoad(F.accessToken, admin);
+  const ctx = await browserAs(browser, F);
+  const p = await ctx.newPage();
+  await p.goto("/panel/hesap");
+  p.once("dialog", (d) => d.dismiss());
+  await p.getByRole("button", { name: "Hesabımı dondur" }).click();
+  await expect(p).toHaveURL(/\/panel\/hesap$/);
+  expect(psql(`select status from users where id='${F.id}'`)).toBe("aktif");
+
+  p.once("dialog", (d) => d.accept());
+  await p.getByRole("button", { name: "Hesabımı dondur" }).click();
+  await expect(p).toHaveURL(/\/giris\?hesap=donduruldu$/);
+  await expect(p.getByRole("status")).toHaveText("Hesabınız donduruldu. Yeniden giriş yaptığınızda açılır.");
+  expect((await ctx.cookies()).some((c) => c.name === "nk_at" || c.name === "nk_rt")).toBe(false);
+  expect(psql(`select status from users where id='${F.id}'`)).toBe("donduruldu");
+  expect(psql(`select status from load_posts where id='${loadId}'`)).toBe("iptal");
+
+  psql(`delete from otp_codes where phone='${phone(808)}'`); // hazırlıktaki API girişinin 60 sn yeniden gönderme sınırı
+  await p.getByLabel("Cep telefonu").fill(localPhone(phone(808)));
+  await p.getByRole("button", { name: "SMS kodu gönder" }).click();
+  const codeInput = p.getByLabel(/numarasına gelen kod/);
+  await expect(codeInput).toBeVisible(); // yeni kod gönderildi (günlükte hazırlıktaki girişin eski kodu da var)
+  await codeInput.fill(await otpFor(phone(808)));
+  await p.getByRole("button", { name: "Giriş yap" }).click();
+  await expect(p).toHaveURL(/\/panel\?acildi=dondurma$/);
+  await expect(p.getByRole("status").filter({ hasText: "yeniden açıldı" })).toHaveText(
+    "Hesabınız yeniden açıldı. Dondururken kapanan ilanlarınızı “Benzerini yayınla” ile yeniden açabilirsiniz.",
+  );
+  expect(psql(`select status from users where id='${F.id}'`)).toBe("aktif");
+  expect(psql(`select status from load_posts where id='${loadId}'`)).toBe("iptal");
+  await ctx.close();
+});
+
+test("dondurulmuş nakliyeci: yük sahibinin listesinde işaretli, numara ve favori düğmesi duruyor", async ({ browser }) => {
+  const S5 = await apiUser(phone(809), "shipper", "Listeli Yük Sahibi");
+  const C5 = await apiUser(phone(810), "carrier", "Mola Nakliyat");
+  const acc = await acceptedJob(S5, C5, await vehicleOf(C5, 812)); // 812 % 8 = 4: diğer testlerin plakalarıyla çakışmaz
+  await api("POST", `/jobs/${acc.job.id}/deliver`, C5.accessToken, { code: acc.deliveryCode });
+  await api("POST", `/jobs/${acc.job.id}/complete`, S5.accessToken);
+  expect((await api("POST", "/me/freeze", C5.accessToken)).status).toBe(200);
+  const ctx = await browserAs(browser, S5);
+  const p = await ctx.newPage();
+  await p.goto("/panel/nakliyecilerim");
+  const row = p.locator(`[data-carrier-id="${C5.id}"]`);
+  await expect(row).toContainText("Mola Nakliyat");
+  await expect(row).toContainText("Hesabı dondurulmuş");
+  await expect(row.locator('a[href^="tel:"]')).toHaveCount(1);
+  await expect(row.getByRole("button")).toHaveCount(1);
   await ctx.close();
 });
 

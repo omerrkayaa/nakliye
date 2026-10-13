@@ -10,11 +10,12 @@ import { confirm } from "@/lib/confirm";
 import { phoneText } from "@/lib/format";
 import { C } from "@/lib/theme";
 
-/** FR-07 (KVKK md. 11): verilerimi indir ve hesabımı sil. Kurallar web panelindeki Hesap sayfasıyla aynı. */
+/** FR-07 (KVKK md. 11): verilerimi indir ve hesabımı sil; FR-08 hesabımı dondur. Kurallar web panelindeki Hesap sayfasıyla aynı. */
 export default function Hesap() {
   return (
     <ScrollView contentContainerStyle={{ padding: 12, gap: 12 }} keyboardShouldPersistTaps="handled">
       <Export />
+      <Freeze />
       <Delete />
     </ScrollView>
   );
@@ -88,6 +89,40 @@ function Export() {
   );
 }
 
+/** FR-08: kod istenmez (geri alınabilir); onaydan sonra oturum kapanır, giriş ekranı notla açılır. */
+function Freeze() {
+  const { endSession } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function freeze() {
+    if (!(await confirm("Hesabınız dondurulsun mu?", "İlanlarınız kapanır, bildirim almazsınız. Yeniden giriş yaptığınızda hesabınız açılır.", "Dondur"))) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api("/me/freeze", { method: "POST" });
+      await endSession("Hesabınız donduruldu. Yeniden giriş yaptığınızda açılır.");
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Hesap dondurulamadı");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card style={{ gap: 12 }}>
+      <Text accessibilityRole="header" style={s.title}>
+        Hesabımı dondur
+      </Text>
+      <Muted>Ara vermek istiyorsanız hesabınızı silmek yerine dondurabilirsiniz; verileriniz silinmez.</Muted>
+      <Muted>• Yayındaki ilanlarınız ve boş araç ilanlarınız kapanır; bekleyen teklifleriniz geri çekilir.</Muted>
+      <Muted>• Bildirim, rota alarmı ve eşleşme almazsınız; puanlarınız ve geçmişiniz kalır.</Muted>
+      <Muted>• SMS koduyla yeniden giriş yaptığınızda hesabınız hemen açılır. Süren bir taşımanız varken dondurulamaz.</Muted>
+      {error && <ErrorText>{error}</ErrorText>}
+      <Button title="Hesabımı dondur" icon="snow-outline" variant="outline" busy={busy} onPress={freeze} />
+    </Card>
+  );
+}
+
 function Delete() {
   const { me, endSession } = useAuth();
   const [sent, setSent] = useState(false);
@@ -118,7 +153,7 @@ function Delete() {
       await api("/me", { method: "DELETE", body: { code } });
       removeOldExports();
       await endSession(
-        `Hesabınız silindi; kişisel verileriniz anonimleştirildi. ${ACCOUNT_DELETION.restoreDays} gün içinde aynı numarayla giriş yaparsanız hesabınız puanları ve geçmişiyle yeniden açılır.`,
+        `Hesabınız silindi; kişisel verileriniz anonimleştirildi. ${ACCOUNT_DELETION.reopenAfterDays} gün sonra, ${ACCOUNT_DELETION.restoreDays}. güne kadar aynı numarayla giriş yaparsanız hesabınız puanları ve geçmişiyle yeniden açılır.`,
       );
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Hesap silinemedi");
@@ -139,9 +174,11 @@ function Delete() {
         {ACCOUNT_DELETION.reportHoldDays} gün ertelenir.
       </Muted>
       <Text style={s.text}>
-        Kişisel bilgileriniz geri getirilemez. Silip yeniden kaydolarak puanların sıfırlanmasını önlemek için numaranızdan üretilen bir özet{" "}
-        {ACCOUNT_DELETION.restoreDays} gün saklanır: bu sürede aynı numarayla giriş yaparsanız hesabınız puanlarınız ve iş geçmişinizle yeniden açılır.{" "}
-        {ACCOUNT_DELETION.restoreDays} günden sonra yeni, boş bir hesap açılır.
+        Kişisel bilgileriniz geri getirilemez. Silindikten sonra {ACCOUNT_DELETION.reopenAfterDays} gün aynı numarayla giriş yapılamaz. Silip yeniden
+        kaydolarak puanların sıfırlanmasını önlemek için numaranızdan üretilen bir özet {ACCOUNT_DELETION.restoreDays} gün saklanır:{" "}
+        {ACCOUNT_DELETION.reopenAfterDays}. günden {ACCOUNT_DELETION.restoreDays}. güne kadar aynı numarayla giriş yaparsanız hesabınız puanlarınız ve iş
+        geçmişinizle yeniden açılır. {ACCOUNT_DELETION.restoreDays} günden sonra yeni, boş bir hesap açılır. Yalnız ara vermek istiyorsanız yukarıdan
+        hesabınızı dondurun.
       </Text>
       {sent && (
         <>

@@ -170,6 +170,8 @@ export interface CarrierRelation {
   phone: string | null;
   verified: boolean;
   favorite: boolean;
+  /** FR-08: hesabını dondurmuş (bildirim almaz) */
+  frozen: boolean;
   jobsWithYou: number;
   completedWithYou: number;
   lastJobAt: string;

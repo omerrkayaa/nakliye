@@ -34,8 +34,10 @@ async function Form({ searchParams }: Pick<PageProps<"/giris">, "searchParams">)
   const { sonra, oturum, hesap } = await searchParams;
   const notice =
     hesap === "silindi"
-      ? `Hesabınız silindi; kişisel verileriniz anonimleştirildi. ${ACCOUNT_DELETION.restoreDays} gün içinde aynı numarayla giriş yaparsanız hesabınız puanları ve geçmişiyle yeniden açılır.`
-      : oturum === "askida"
+      ? `Hesabınız silindi; kişisel verileriniz anonimleştirildi. ${ACCOUNT_DELETION.reopenAfterDays} gün sonra, ${ACCOUNT_DELETION.restoreDays}. güne kadar aynı numarayla giriş yaparsanız hesabınız puanları ve geçmişiyle yeniden açılır.`
+      : hesap === "donduruldu"
+        ? "Hesabınız donduruldu. Yeniden giriş yaptığınızda açılır."
+        : oturum === "askida"
         ? "Hesabınız askıya alındı."
         : oturum
           ? "Oturumunuz sona erdi; lütfen tekrar giriş yapın."

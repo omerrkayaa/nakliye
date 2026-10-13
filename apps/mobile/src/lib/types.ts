@@ -19,6 +19,8 @@ export interface Me {
 export interface Tokens {
   accessToken: string;
   refreshToken: string;
+  /** Yalnız girişte: dondurulan hesap açıldı ya da silinen hesap süresi içinde geri açıldı */
+  reopened?: "dondurma" | "silme";
 }
 
 export interface Province {

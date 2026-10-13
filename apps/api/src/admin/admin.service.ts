@@ -155,7 +155,8 @@ export class AdminService {
     const [row] = await this.db
       .update(users)
       .set({ status: "askida", suspendedAt: now, suspendReason: reason })
-      .where(and(eq(users.id, userId), eq(users.status, "aktif")))
+      // Dondurulmuş hesap da askıya alınır: dondurma askıdan kaçış olmasın (girişle açılırdı, FR-08)
+      .where(and(eq(users.id, userId), inArray(users.status, ["aktif", "donduruldu"])))
       .returning({ id: users.id });
     if (!row) {
       const u = await this.user(userId); // yoksa 404

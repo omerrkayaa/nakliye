@@ -48,9 +48,10 @@ export class NotificationsService {
   async notify(userId: string, input: NotifyInput | NotifyBuilder, limit?: NotifyLimit, now = new Date()): Promise<boolean> {
     let n: NotifyInput | null = typeof input === "function" ? null : input;
     const row = await this.db.transaction(async (tx) => {
-      // Silinen hesaba bildirim yazılmaz (FR-07; karşı taraf eski bir işte işlem yapsa da kişisel veri birikmesin)
+      // Silinen hesaba bildirim yazılmaz (FR-07; karşı taraf eski bir işte işlem yapsa da kişisel veri birikmesin);
+      // dondurulan hesaba da (FR-08: ara veren kullanıcıya rota alarmı, favori ilanı vb. gitmesin)
       const [u] = await tx.select({ status: users.status }).from(users).where(eq(users.id, userId));
-      if (!u || u.status === "silindi") return null;
+      if (!u || u.status === "silindi" || u.status === "donduruldu") return null;
       if (limit || !n) await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`notify:${userId}`}))`);
       if (limit) {
         const since = new Date(now.getTime() - 3_600_000);

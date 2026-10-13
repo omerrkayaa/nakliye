@@ -13,9 +13,12 @@ import { ConfirmButton } from "./ilanlar/confirm-button";
 export const metadata: Metadata = { title: "Gösterge" };
 
 /** P2 gösterge paneli (docs/02): yayındaki ilanlar, teyit bekleyenler, gelen teklifler, bu ayki taşımalar. */
-export default function Dashboard() {
+export default function Dashboard({ searchParams }: PageProps<"/panel">) {
   return (
     <div className="space-y-6">
+      <Suspense fallback={null}>
+        <Reopened searchParams={searchParams} />
+      </Suspense>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <h1 className="text-2xl font-bold">Gösterge</h1>
         <div className="flex flex-wrap gap-2">
@@ -31,6 +34,24 @@ export default function Dashboard() {
         <Summary />
       </Suspense>
     </div>
+  );
+}
+
+/** Girişte hesap yeniden açıldıysa not (FR-08 dondurma, FR-07 silinen hesabın süresi içinde dönüşü) */
+async function Reopened({ searchParams }: Pick<PageProps<"/panel">, "searchParams">) {
+  const { acildi } = await searchParams;
+  const text =
+    acildi === "dondurma"
+      ? "Hesabınız yeniden açıldı. Dondururken kapanan ilanlarınızı “Benzerini yayınla” ile yeniden açabilirsiniz."
+      : acildi === "silme"
+        ? "Hesabınız puanları ve geçmişiyle yeniden açıldı. Adınızı, firma ve araç bilgilerinizi yeniden girin."
+        : null;
+  return (
+    text && (
+      <p role="status" className="rounded-md bg-muted p-3 text-sm">
+        {text}
+      </p>
+    )
   );
 }
 

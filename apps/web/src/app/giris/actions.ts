@@ -44,5 +44,6 @@ export async function loginAction(_prev: LoginState, form: FormData): Promise<Lo
   const jar = await cookies();
   jar.set(accessCookie(tokens.accessToken));
   jar.set(refreshCookie(tokens.refreshToken));
-  redirect(safeNext(form.get("sonra")));
+  // Hesap girişle yeniden açıldıysa (FR-08 dondurma, FR-07 süresi içinde dönüş) gösterge bir kez not gösterir
+  redirect(tokens.reopened ? `/panel?acildi=${tokens.reopened}` : safeNext(form.get("sonra")));
 }

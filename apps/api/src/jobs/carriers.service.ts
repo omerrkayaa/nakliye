@@ -22,6 +22,7 @@ export class CarriersService {
         id: jobs.carrierId,
         name: users.name,
         phone: users.phone,
+        status: users.status,
         level: users.verificationLevel,
         company: companies.title,
         jobs: sql<number>`count(*)::int`,
@@ -33,7 +34,7 @@ export class CarriersService {
       .innerJoin(users, eq(users.id, jobs.carrierId))
       .leftJoin(companies, eq(companies.ownerUserId, jobs.carrierId))
       .where(eq(jobs.shipperId, shipperId))
-      .groupBy(jobs.carrierId, users.name, users.phone, users.verificationLevel, companies.title)
+      .groupBy(jobs.carrierId, users.name, users.phone, users.status, users.verificationLevel, companies.title)
       .orderBy(desc(sql`exists (select 1 from ${favoriteCarriers} f where f.shipper_id = ${shipperId} and f.carrier_id = ${jobs.carrierId})`), desc(sql`max(${jobs.createdAt})`));
     const rep = await this.trust.reputationMany(rows.map((r) => r.id));
     return {
@@ -43,6 +44,8 @@ export class CarriersService {
         phone: r.phone,
         verified: isVerifiedBadge(r.level),
         favorite: r.favorite,
+        // FR-08: ara vermiş; numara ve favori kalır (birlikte iş yapılmış), bildirim gitmez
+        frozen: r.status === "donduruldu",
         jobsWithYou: r.jobs,
         completedWithYou: r.completed,
         lastJobAt: new Date(r.lastJobAt).toISOString(),

@@ -1,4 +1,4 @@
-// FR-07 (KVKK): Profil → Hesap ve veriler — verileri indir, hesabı kodla sil; askı ve silinmiş karşı taraf; giriş ekranında
+// FR-07 (KVKK): Profil → Hesap ve veriler — verileri indir, hesabı kodla sil, FR-08 dondur; askı ve silinmiş karşı taraf; giriş ekranında
 // yasal metin bağlantıları. Expo web derlemesinde (390 px).
 import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
@@ -68,6 +68,27 @@ test("hesap ve veriler: verileri indir, yanlış kod hatası, kodla sil → giri
   await page.reload();
   await expect(page.getByLabel("Cep telefonu").locator("visible=true")).toBeVisible({ timeout: 20_000 });
   expect(errors.filter((e) => !/status of 400/.test(e))).toEqual([]);
+});
+
+test("hesabı dondur (FR-08): onay → giriş ekranında not → kodla giriş hesabı açar, açıldı notu", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = collectErrors(page);
+  const dialogs = acceptDialogs(page);
+  const me = phone(55);
+  await uiLogin(page, me, true);
+  await page.getByRole("tab", { name: /Profil/ }).click();
+  await vis(page, "Hesap ve veriler").click();
+  await btn(page, "Hesabımı dondur").click();
+  await expect(vis(page, "Hesabınız donduruldu. Yeniden giriş yaptığınızda açılır.")).toBeVisible({ timeout: 20_000 });
+  expect(dialogs.some((m) => m.startsWith("Hesabınız dondurulsun mu?"))).toBe(true);
+  expect(psql(`select status from users where phone='${me}'`)).toBe("donduruldu");
+  await shot(page, "hesap-donduruldu");
+
+  psql(`delete from otp_codes where phone='${me}'`); // ilk girişin 60 sn yeniden gönderme sınırı
+  await uiLogin(page, me, false);
+  await expect.poll(() => dialogs.some((m) => m.startsWith("Hesabınız yeniden açıldı"))).toBe(true);
+  expect(psql(`select status from users where phone='${me}'`)).toBe("aktif");
+  expect(errors).toEqual([]);
 });
 
 test("askıya alınan kullanıcı ilk istekte oturumdan çıkar, giriş ekranında not", async ({ page }) => {

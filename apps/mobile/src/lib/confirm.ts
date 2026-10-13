@@ -10,3 +10,9 @@ export function confirm(title: string, message: string, ok = "Evet"): Promise<bo
     ], { cancelable: true, onDismiss: () => resolve(false) }),
   );
 }
+
+/** Bilgi notu (Android: yerel diyalog; web derlemesi: tarayıcı uyarısı). */
+export function inform(title: string, message: string) {
+  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
+  else Alert.alert(title, message);
+}

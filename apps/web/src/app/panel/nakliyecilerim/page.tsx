@@ -52,6 +52,7 @@ async function Carriers() {
                   <BadgeCheck className="size-4" aria-hidden /> Doğrulanmış
                 </span>
               )}
+              {c.frozen && <span className="text-xs font-medium text-muted-foreground">Hesabı dondurulmuş</span>}
             </p>
             <p className="text-sm">
               {c.phone ? (

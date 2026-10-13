@@ -164,8 +164,13 @@ r = await api("GET", `/users/${Cid}/reputation`, C2.access);
 check("karşı tarafın itibarı korunur (S'nin 2 puanı)", r.body.rating?.count === 2, JSON.stringify(r.body.rating));
 
 check("numara yok, anahtarlı özeti saklandı", psql(`select (phone is null)||'|'||(length(phone_hmac) = 64) from users where id='${Sid}'`) === "true|true");
+const early = await login(phone(1));
+const opensAt = psql(`select to_char((deleted_at + interval '7 days') at time zone 'Europe/Istanbul', 'DD.MM.YYYY HH24:MI') from users where id='${Sid}'`);
+check("silmeden sonraki 7 gün giriş kapalı: mesajda açılış anı", !early.accessToken && typeof early.message === "string" && early.message.includes(`${opensAt} itibarıyla yeniden giriş`), JSON.stringify(early));
+check("bekleme sırasında yeni hesap da açılmadı", psql(`select count(*) from users where phone='${phone(1)}'`) === "0");
+psql(`update users set deleted_at = deleted_at - interval '8 days' where id='${Sid}'`);
 const again = await login(phone(1));
-check("60 gün içinde aynı numarayla giriş: eski hesap geri açıldı", again.isNew === false && idOf(phone(1)) === Sid, JSON.stringify({ isNew: again.isNew }));
+check("7 gün geçince, 60 gün dolmadan: eski hesap geri açıldı", again.isNew === false && again.reopened === "silme" && idOf(phone(1)) === Sid, JSON.stringify({ isNew: again.isNew, reopened: again.reopened }));
 const back = (await api("GET", "/me/export", again.accessToken)).body;
 check("geçmiş geri geldi (4 ilan, 3 iş, 2 görünür puan); ad, firma, rol boş", back.loads?.length === 4 && back.jobs?.length === 3 && back.ratingsReceived?.length === 2 && back.account?.name === null && back.company === null && back.account?.roles?.length === 0, JSON.stringify({ a: back.account, l: back.loads?.length, j: back.jobs?.length, r: back.ratingsReceived?.length }));
 check("durum aktif, özet silindi", psql(`select status||'|'||coalesce(phone_hmac,'-') from users where id='${Sid}'`) === "aktif|-");
@@ -390,6 +395,74 @@ try {
 }
 r = await api("POST", "/admin/tick", A);
 check("engel kalkınca sonraki tur F'yi tamamladı", psql(`select coalesce(phone,'-')||'|'||name from users where id='${Fid}'`) === "-|Silinmiş kullanıcı" && psql(`select status from load_posts where id='${LF}'`) === "iptal", JSON.stringify(r.body));
+
+console.log("\nHesap dondurma (FR-08)");
+const freeze = (t) => api("POST", "/me/freeze", t);
+r = await freeze(C.access);
+check("süren taşıması olan dondurulamaz 409", r.status === 409 && r.body.message === "Sonuçlanmamış 1 taşımanız var. Hesabınızı dondurmadan önce tamamlanmalı ya da iptal edilmeli.", JSON.stringify(r.body));
+r = await freeze(A);
+check("yönetici hesabı dondurulamaz 409", r.status === 409 && r.body.message === "Yönetici hesabı dondurulamaz.", JSON.stringify(r.body));
+check("girişsiz 401", (await freeze(null)).status === 401);
+
+const Z = await user(phone(40), ["shipper"]);
+const Zid = idOf(phone(40));
+await api("PATCH", "/me", Z.access, { name: "Dondurulan Zeki" });
+const LZ = await load(Z.access, 18);
+const Q = await user(phone(41), ["carrier"]);
+const Qid = idOf(phone(41));
+const VQ = await vehicle(Q.access, `62 AF ${run}`);
+const JQ = await doneJob(S2.access, Q.access, VQ, 19); // S2'nin "Nakliyecilerim" listesinde Q
+const OQ = await offer(Q.access, LZ, VQ, 7000);
+check("Q, Z'nin ilanına teklif verdi", !!OQ);
+
+r = await freeze(Z.access);
+check("Z dondurdu 200", r.status === 200 && r.body.frozen === true, JSON.stringify(r.body));
+check("durum donduruldu; ad ve iş geçmişi duruyor", psql(`select status||'|'||name from users where id='${Zid}'`) === "donduruldu|Dondurulan Zeki");
+check("açık ilanı kapandı (iptal)", psql(`select status from load_posts where id='${LZ}'`) === "iptal");
+check("Q'nun teklifi sonuçlanmadı, Q'ya bildirim", psql(`select status from offers where id='${OQ}'`) === "ret" && (await api("GET", "/notifications", Q.access)).body.items.some((n) => n.type === "offer_result" && n.data?.loadId === LZ));
+r = await api("GET", "/me", Z.access);
+check("erişim belirteci hemen kapandı 401", r.status === 401 && /donduruldu/.test(r.body.message), JSON.stringify(r.body));
+check("oturum yenilenemez 401", (await api("POST", "/auth/refresh", null, { refreshToken: Z.refresh })).status === 401);
+r = await api("POST", "/me/freeze", Z.access);
+check("dondurulmuş hesap yeniden dondurulamaz (401)", r.status === 401);
+
+// Rota alarmı: dondurulan nakliyeciye bildirim gitmez; aynı alarmı kuran aktif nakliyeci karşılaştırma
+const Q2 = await user(phone(42), ["carrier"]);
+const Q2id = idOf(phone(42));
+const Q3 = await user(phone(43), ["carrier"]);
+const Q3id = idOf(phone(43));
+for (const t of [Q2.access, Q3.access]) await api("POST", "/alerts", t, { originDistrictId: OVACIK, destDistrictId: KARLIOVA });
+check("Q2 dondurdu", (await freeze(Q2.access)).status === 200);
+const LA = await load(S2.access, 20);
+const alertNote = (id) => psql(`select count(*) from notifications where user_id='${id}' and type='route_alert' and data->>'loadId'='${LA}'`);
+for (let i = 0; i < 40 && alertNote(Q3id) === "0"; i++) await sleep(150);
+check("aktif nakliyeciye rota alarmı bildirimi geldi (karşılaştırma)", alertNote(Q3id) === "1");
+check("dondurulan nakliyeciye gelmedi", alertNote(Q2id) === "0");
+
+r = await freeze(Q.access);
+check("Q (iş geçmişi var, süren işi yok) dondurdu", r.status === 200, JSON.stringify(r.body));
+r = await api("GET", "/me/carriers", S2.access);
+const qRow = r.body.items?.find((c) => c.id === Qid);
+check("Nakliyecilerim: dondurulmuş işaretli, numara ve favori duruyor", qRow?.frozen === true && qRow?.phone === phone(41) && !!JQ, JSON.stringify(qRow));
+check("dondurulmuş nakliyeci favoriye eklenebilir (bildirim gitmez)", (await api("PUT", `/me/carriers/${Qid}/favorite`, S2.access)).status === 200);
+
+const zBack = await login(phone(40));
+check("SMS koduyla giriş hesabı açtı", !!zBack.accessToken && zBack.reopened === "dondurma" && zBack.isNew === false && psql(`select status from users where id='${Zid}'`) === "aktif", JSON.stringify({ reopened: zBack.reopened, isNew: zBack.isNew }));
+check("kapanan ilan kapalı kaldı, ad duruyor", psql(`select status from load_posts where id='${LZ}'`) === "iptal" && (await api("GET", "/me", zBack.accessToken)).body.name === "Dondurulan Zeki");
+const zAgain = await api("POST", "/auth/refresh", null, { refreshToken: zBack.refreshToken });
+check("açılan hesabın oturumu yenilenir", zAgain.status === 201 && !!zAgain.body.accessToken);
+
+r = await api("POST", `/admin/users/${Q2id}/suspend`, A, { reason: "dondurulmuşken askı denemesi" });
+check("dondurulmuş hesap askıya alınabilir (dondurma askıdan kaçış olmasın)", r.status === 200 && psql(`select status from users where id='${Q2id}'`) === "askida", JSON.stringify(r.body));
+r = await login(phone(42));
+check("askıdaki (önce dondurulmuş) hesap girişle açılmaz 403", !r.accessToken && r.message === "Hesabınız askıya alındı.", JSON.stringify(r));
+check("askı kalkınca aktif", (await api("POST", `/admin/users/${Q2id}/unsuspend`, A)).status === 200 && psql(`select status from users where id='${Q2id}'`) === "aktif");
+
+// Yarıda kalan kapatma: dondurulmuş hesapta açık ilan kalmışsa tur kapatır
+const Zl = await load(zBack.accessToken, 21);
+psql(`update users set status='donduruldu' where id='${Zid}'`);
+r = await api("POST", "/admin/tick", A);
+check("tur dondurulmuş hesapta kalan ilanı kapattı", r.body.frozenClosed >= 1 && psql(`select status from load_posts where id='${Zl}'`) === "iptal", JSON.stringify(r.body));
 
 console.log("\nAskıya alma ile silme aynı anda");
 let both = 0, lost = 0;

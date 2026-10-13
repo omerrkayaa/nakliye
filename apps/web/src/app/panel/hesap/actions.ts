@@ -37,3 +37,21 @@ export async function deleteAccountAction(_prev: DeletionState, form: FormData):
   jar.delete(REFRESH_COOKIE);
   redirect("/giris?hesap=silindi");
 }
+
+export interface FreezeState {
+  error?: string;
+}
+
+/** Hesabı dondurur (FR-08); başarıda oturum çerezleri silinir ve giriş sayfası bilgi notuyla açılır. Süren taşımada 409 mesajı. */
+export async function freezeAccountAction(): Promise<FreezeState> {
+  try {
+    await api("/me/freeze", { method: "POST" });
+  } catch (e) {
+    if (e instanceof ApiError) return { error: e.message };
+    throw e;
+  }
+  const jar = await cookies();
+  jar.delete(ACCESS_COOKIE);
+  jar.delete(REFRESH_COOKIE);
+  redirect("/giris?hesap=donduruldu");
+}

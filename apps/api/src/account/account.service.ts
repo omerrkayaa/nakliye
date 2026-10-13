@@ -1,8 +1,9 @@
 import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException, UnauthorizedException } from "@nestjs/common";
-import { ACCOUNT_DELETION, DELETED_USER_NAME, isQualifiedReporter, OPEN_JOB_STATUSES, trDay, VISIBLE_LOAD_STATUSES } from "@nakliye/shared";
-import { and, asc, count, eq, inArray, isNotNull, lt, ne, or, sql } from "drizzle-orm";
+import { ACCOUNT_DELETION, DELETED_USER_NAME, isQualifiedReporter, OPEN_JOB_STATUSES, VISIBLE_LOAD_STATUSES } from "@nakliye/shared";
+import { and, asc, count, eq, exists, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { AuthService, SUSPENDED_MESSAGE } from "../auth/auth.service.js";
+import { trDateTime } from "../common/format.js";
 import { deletedPhoneHmac } from "../common/hash.js";
 import { DB, type Db, type Tx } from "../db/db.module.js";
 import {
@@ -47,13 +48,9 @@ const otherU = alias(users, "other_u");
 const otherC = alias(companies, "other_c");
 const reporterU = alias(users, "reporter_u");
 
-/** Erteleme bitiş anı, Türkiye saatiyle "27.10.2026 18:25" */
-const trDateTime = (d: Date) =>
-  `${trDay(d).split("-").reverse().join(".")} ${d.toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit" })}`;
-
 /**
- * Hesap ve kişisel veriler (FR-07, NFR-05, docs/04 §8): veri dökümü, hesap silme (anonimleştirme) ve askıya alma ile
- * ortak "açık işleri kapat" adımı.
+ * Hesap ve kişisel veriler (FR-07, NFR-05, docs/04 §8): veri dökümü, hesap silme (anonimleştirme), hesap dondurma (FR-08)
+ * ve askıya alma ile ortak "açık işleri kapat" adımı.
  */
 @Injectable()
 export class AccountService {
@@ -89,19 +86,26 @@ export class AccountService {
 
   // ── Hesap silme ────────────────────────────────────────────────────
 
-  /**
-   * Silmeyi engelleyen durum: yönetici hesabı, sonuçlanmamış taşıma (karşı tarafın işi yarım kalmasın) ya da süresi
-   * dolmamış şikayet ertelemesi (`reportHold`). `startHold`: ilk ertelenen istekte erteleme başlangıcı yazılır.
-   */
-  private async deletionBlocker(userId: string, now: Date, db: Db | Tx = this.db, startHold = false): Promise<string | null> {
+  /** Yönetici hesabı ya da sonuçlanmamış taşıması olan hesap silinemez/dondurulamaz (karşı tarafın işi yarım kalmasın). */
+  private async activityBlocker(userId: string, db: Db | Tx, action: "sil" | "dondur"): Promise<string | null> {
     const [admin] = await db.select({ n: count() }).from(userRoles).where(and(eq(userRoles.userId, userId), eq(userRoles.role, "admin")));
-    if (admin && admin.n > 0) return "Yönetici hesabı silinemez.";
+    if (admin && admin.n > 0) return action === "sil" ? "Yönetici hesabı silinemez." : "Yönetici hesabı dondurulamaz.";
     const [open] = await db
       .select({ n: count() })
       .from(jobs)
       .where(and(or(eq(jobs.shipperId, userId), eq(jobs.carrierId, userId)), inArray(jobs.status, [...OPEN_JOB_STATUSES])));
-    if (open && open.n > 0) return `Sonuçlanmamış ${open.n} taşımanız var. Hesabınızı silmeden önce tamamlanmalı ya da iptal edilmeli.`;
-    return this.reportHold(userId, now, db, startHold);
+    if (open && open.n > 0) {
+      return `Sonuçlanmamış ${open.n} taşımanız var. Hesabınızı ${action === "sil" ? "silmeden" : "dondurmadan"} önce tamamlanmalı ya da iptal edilmeli.`;
+    }
+    return null;
+  }
+
+  /**
+   * Silmeyi engelleyen durum: `activityBlocker` ya da süresi dolmamış şikayet ertelemesi (`reportHold`). `startHold`: ilk
+   * ertelenen istekte erteleme başlangıcı yazılır.
+   */
+  private async deletionBlocker(userId: string, now: Date, db: Db | Tx = this.db, startHold = false): Promise<string | null> {
+    return (await this.activityBlocker(userId, db, "sil")) ?? this.reportHold(userId, now, db, startHold);
   }
 
   /**
@@ -256,6 +260,67 @@ export class AccountService {
         done++;
       } catch (e) {
         this.logger.error(`Hesap ${r.id} anonimleştirmesi tamamlanamadı`, e instanceof Error ? e.stack : String(e));
+      }
+    }
+    return done;
+  }
+
+  // ── Hesap dondurma (FR-08) ─────────────────────────────────────────
+
+  /**
+   * Hesabı dondurur (FR-08, 2026-10-13 kullanıcı isteği: Instagram'daki gibi ara vermek isteyen, sistemi meşgul etmek
+   * istemeyen kullanıcı için). Veri silinmez: puanlar, geçmiş ve şikayetler kalır. Oturumlar kapanır; açık ilanlar ve boş
+   * araç ilanları kapanır, bekleyen teklifler geri çekilir (askıya almayla ortak adım); bildirim yazılmaz. SMS koduyla giriş
+   * hesabı açar (AuthService.verifyOtp); kapanan ilanlar açılmaz ("Benzerini yayınla"). Kod istenmez: işlem geri alınabilir
+   * ve SMS ücreti doğmasın. Yönetici dondurulmuş hesabı da askıya alabilir (dondurma askıdan kaçış olmasın).
+   */
+  async freezeAccount(userId: string, now = new Date()) {
+    const blocker = await this.activityBlocker(userId, this.db, "dondur");
+    if (blocker) throw new ConflictException(blocker);
+    await this.db.transaction(async (tx) => {
+      const [locked] = await tx.select({ status: users.status }).from(users).where(eq(users.id, userId)).for("update");
+      if (locked?.status !== "aktif") throw new ConflictException(locked?.status === "askida" ? SUSPENDED_MESSAGE : "Hesap zaten dondurulmuş");
+      // Silmedeki sıra: teklif kabulüyle yarışta ya iş önce oluşur (dondurma 409) ya da teklif artık beklemede değildir
+      await tx.update(offers).set({ status: "geri_cekildi" }).where(and(eq(offers.carrierId, userId), eq(offers.status, "beklemede")));
+      const late = await this.activityBlocker(userId, tx, "dondur");
+      if (late) throw new ConflictException(late);
+      // Bu andan sonra belirteç yenileme ve erişim belirteci kapanır (AuthGuard durum kontrolü)
+      await tx.update(users).set({ status: "donduruldu" }).where(eq(users.id, userId));
+      await tx.update(refreshTokens).set({ revokedAt: now }).where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
+    });
+    // Hesap dondurulmuş sayılır; ilan kapatma yarıda kalırsa zamanlayıcı tamamlar (closeFrozenLeftovers)
+    try {
+      await this.closeOpenActivity(userId, now);
+    } catch (e) {
+      this.logger.error(`Dondurulan hesap ${userId} için ilanlar kapatılamadı; zamanlayıcı tamamlayacak`, e instanceof Error ? e.stack : String(e));
+    }
+    return { frozen: true };
+  }
+
+  /** Zamanlayıcı: dondurulmuş hesapta kapanamamış (yarıda kalan) ilan, boş araç ilanı ya da bekleyen teklif kalmasın. */
+  async closeFrozenLeftovers(now = new Date()): Promise<number> {
+    const db = this.db;
+    const rows = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(
+        and(
+          eq(users.status, "donduruldu"),
+          or(
+            exists(db.select({ x: sql`1` }).from(loadPosts).where(and(eq(loadPosts.shipperId, users.id), inArray(loadPosts.status, CLOSABLE_LOADS)))),
+            exists(db.select({ x: sql`1` }).from(capacityPosts).where(and(eq(capacityPosts.carrierId, users.id), eq(capacityPosts.status, "aktif")))),
+            exists(db.select({ x: sql`1` }).from(offers).where(and(eq(offers.carrierId, users.id), eq(offers.status, "beklemede")))),
+          ),
+        ),
+      )
+      .limit(100);
+    let done = 0;
+    for (const r of rows) {
+      try {
+        await this.closeOpenActivity(r.id, now);
+        done++;
+      } catch (e) {
+        this.logger.error(`Dondurulan hesap ${r.id} için ilanlar kapatılamadı`, e instanceof Error ? e.stack : String(e));
       }
     }
     return done;

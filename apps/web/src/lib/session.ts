@@ -16,6 +16,8 @@ const base = { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV ===
 export interface Tokens {
   accessToken: string;
   refreshToken: string;
+  /** Yalnız girişte: dondurulan hesap açıldı ya da silinen hesap süresi içinde geri açıldı */
+  reopened?: "dondurma" | "silme";
 }
 
 export const accessCookie = (value: string) => ({ name: ACCESS_COOKIE, value, ...base, maxAge: ACCESS_MAX_AGE });
