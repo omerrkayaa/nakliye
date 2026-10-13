@@ -1,7 +1,7 @@
 import { trDay } from "@nakliye/shared";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Platform, ScrollView, Text } from "react-native";
 import { Button, Card, ErrorText, Field, Muted, s } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
@@ -20,7 +20,23 @@ export default function Hesap() {
   );
 }
 
+const EXPORT_PREFIX = "nakliye-verilerim-";
+
+/**
+ * Önceki dökümlerden önbellekte kalan dosyaları siler. Paylaşımın hemen ardından silinmez: shareAsync'in hedef
+ * uygulama dosyayı okuyunca mı döndüğü belgede yazmıyor, erken silmek kaydetmeyi bozabilir.
+ */
+function removeOldExports() {
+  if (Platform.OS === "web") return;
+  try {
+    for (const f of Paths.cache.list()) if (f instanceof File && f.name.startsWith(EXPORT_PREFIX)) f.delete();
+  } catch {
+    // Önbellek okunamazsa döküm yine çalışır; sistem önbelleği zamanla temizler
+  }
+}
+
 function Export() {
+  useEffect(removeOldExports, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -31,7 +47,7 @@ function Export() {
     setDone(false);
     try {
       const text = JSON.stringify(await api<unknown>("/me/export"), null, 2);
-      const name = `nakliye-verilerim-${trDay(new Date())}.json`;
+      const name = `${EXPORT_PREFIX}${trDay(new Date())}.json`;
       if (Platform.OS === "web") {
         // Expo web derlemesi (geliştirme ve testler): tarayıcı indirmesi
         const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
@@ -42,6 +58,7 @@ function Export() {
         setTimeout(() => URL.revokeObjectURL(url), 1000);
       } else {
         // Telefonda dosya önbelleğe yazılır, sistemin paylaşım menüsüyle kaydedilir ya da gönderilir
+        removeOldExports();
         const file = new File(Paths.cache, name);
         file.create({ overwrite: true });
         file.write(text);
@@ -99,6 +116,7 @@ function Delete() {
     setError(null);
     try {
       await api("/me", { method: "DELETE", body: { code } });
+      removeOldExports();
       await endSession("Hesabınız silindi; kişisel verileriniz anonimleştirildi. Aynı numarayla giriş yaparsanız yeni, boş bir hesap açılır.");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Hesap silinemedi");
@@ -114,7 +132,7 @@ function Delete() {
       <Muted>• Numaranız, adınız, firma bilgileriniz, araç plakalarınız, bildirimleriniz ve rota alarmlarınız silinir.</Muted>
       <Muted>• Yayındaki ilanlarınız ve boş araç ilanlarınız kapanır; bekleyen teklifleriniz geri çekilir.</Muted>
       <Muted>• Tamamlanmış taşımalar ve verdiğiniz puanlar karşı tarafın geçmişi için “Silinmiş kullanıcı” adıyla kalır; notlarınız ve yorumlarınız silinir.</Muted>
-      <Muted>• Süren bir taşımanız varken hesabınız silinemez.</Muted>
+      <Muted>• Süren bir taşımanız ya da hesabınızla ilgili sonuçlanmamış bir inceleme varken hesabınız silinemez.</Muted>
       <Text style={s.text}>Bu işlem geri alınamaz. Aynı numarayla yeniden giriş yaparsanız yeni, boş bir hesap açılır.</Text>
       {sent && (
         <>

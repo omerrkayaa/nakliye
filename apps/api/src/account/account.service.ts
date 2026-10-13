@@ -1,8 +1,8 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { DELETED_USER_NAME, OPEN_JOB_STATUSES, VISIBLE_LOAD_STATUSES } from "@nakliye/shared";
 import { and, asc, count, eq, inArray, isNotNull, lt, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import { AuthService } from "../auth/auth.service.js";
+import { AuthService, SUSPENDED_MESSAGE } from "../auth/auth.service.js";
 import { DB, type Db, type Tx } from "../db/db.module.js";
 import {
   callLogs,
@@ -50,6 +50,8 @@ const otherC = alias(companies, "other_c");
  */
 @Injectable()
 export class AccountService {
+  private readonly logger = new Logger(AccountService.name);
+
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly auth: AuthService,
@@ -80,7 +82,11 @@ export class AccountService {
 
   // ── Hesap silme ────────────────────────────────────────────────────
 
-  /** Silmeyi engelleyen durum: yönetici hesabı ya da sonuçlanmamış taşıma (karşı tarafın işi yarım kalmasın). */
+  /**
+   * Silmeyi engelleyen durum: yönetici hesabı, sonuçlanmamış taşıma (karşı tarafın işi yarım kalmasın) ya da hesap veya
+   * ilanları hakkında açık şikayet (silip aynı numarayla yeniden kaydolarak incelemeden kaçılmasın). Şikayetin kimden ve
+   * ne olduğu söylenmez.
+   */
   private async deletionBlocker(userId: string, db: Db | Tx = this.db): Promise<string | null> {
     const [admin] = await db.select({ n: count() }).from(userRoles).where(and(eq(userRoles.userId, userId), eq(userRoles.role, "admin")));
     if (admin && admin.n > 0) return "Yönetici hesabı silinemez.";
@@ -89,6 +95,17 @@ export class AccountService {
       .from(jobs)
       .where(and(or(eq(jobs.shipperId, userId), eq(jobs.carrierId, userId)), inArray(jobs.status, [...OPEN_JOB_STATUSES])));
     if (open && open.n > 0) return `Sonuçlanmamış ${open.n} taşımanız var. Hesabınızı silmeden önce tamamlanmalı ya da iptal edilmeli.`;
+    const ownLoads = db.select({ id: loadPosts.id }).from(loadPosts).where(eq(loadPosts.shipperId, userId));
+    const [rep] = await db
+      .select({ n: count() })
+      .from(reports)
+      .where(
+        and(
+          eq(reports.status, "acik"),
+          or(and(eq(reports.targetType, "user"), eq(reports.targetId, userId)), and(eq(reports.targetType, "load_post"), inArray(reports.targetId, ownLoads))),
+        ),
+      );
+    if (rep && rep.n > 0) return "Hesabınızla ilgili sonuçlanmamış bir inceleme var. İnceleme sonuçlanınca hesabınızı silebilirsiniz.";
     return null;
   }
 
@@ -115,12 +132,14 @@ export class AccountService {
     const blocker = await this.deletionBlocker(userId);
     if (blocker) throw new ConflictException(blocker);
     // Yanlış/süresi dolmuş onay kodu oturum hatası değildir: 401 dönseydi istemciler oturumu düşmüş sayıp girişe atardı
-    await this.auth.consumeOtp(phone, code).catch((e: unknown) => {
+    await this.auth.consumeOtp(phone, code, "silme").catch((e: unknown) => {
       throw e instanceof UnauthorizedException ? new BadRequestException(e.message) : e;
     });
 
     await this.db.transaction(async (tx) => {
-      await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("update");
+      const [locked] = await tx.select({ status: users.status }).from(users).where(eq(users.id, userId)).for("update");
+      // Kilitten önce askıya alınmış olabilir: silme askı kaydını siler, kişi aynı numarayla temiz hesap açardı
+      if (locked?.status !== "aktif") throw new ConflictException(locked?.status === "askida" ? SUSPENDED_MESSAGE : "Hesap zaten silinmiş");
       // Bekleyen teklifler önce geri çekilir: aynı anda kabul edilen teklifte (kabul teklif satırını kilitler) ya kabul
       // önce biter ve iş aşağıdaki kontrolde görülür (silme 409, bu transaction geri alınır) ya da teklif artık beklemede değildir.
       await tx.update(offers).set({ status: "geri_cekildi" }).where(and(eq(offers.carrierId, userId), eq(offers.status, "beklemede")));
@@ -130,7 +149,13 @@ export class AccountService {
       await tx.update(users).set({ status: "silindi", deletedAt: now }).where(eq(users.id, userId));
       await tx.delete(refreshTokens).where(eq(refreshTokens.userId, userId));
     });
-    await this.finishDeletion(userId, now);
+    // Hesap artık silinmiş sayılır (giriş kapalı): anonimleştirme burada yarıda kalırsa (ör. ilanın iyimser kilidi)
+    // istemciye hata dönülmez, zamanlayıcı tamamlar (finishPendingDeletions)
+    try {
+      await this.finishDeletion(userId, now);
+    } catch (e) {
+      this.logger.error(`Hesap ${userId} anonimleştirmesi yarıda kaldı; zamanlayıcı tamamlayacak`, e instanceof Error ? e.stack : String(e));
+    }
     return { deleted: true };
   }
 
@@ -152,11 +177,20 @@ export class AccountService {
       await tx.delete(documents).where(eq(documents.ownerUserId, userId));
       // Plaka kişiyi gösterebilir; araç kaydı karşı tarafın iş geçmişi için kalır
       await tx.update(vehicles).set({ status: "silindi", plate: "—" }).where(eq(vehicles.ownerUserId, userId));
-      // Serbest metinler kişisel bilgi (ad, numara) içerebilir. Açık şikayetin notu yönetici kararı için kalır.
+      // Serbest metinler kişisel bilgi (ad, numara) içerebilir. Açık şikayetin notu yönetici kararı için kalır; şikayet
+      // sonuçlanınca silinir (AdminService.resolveReport).
       await tx.update(loadPosts).set({ note: null }).where(eq(loadPosts.shipperId, userId));
       await tx.update(offers).set({ note: null }).where(eq(offers.carrierId, userId));
       await tx.update(ratings).set({ comment: null }).where(eq(ratings.raterId, userId));
       await tx.update(reports).set({ note: null }).where(and(eq(reports.reporterId, userId), ne(reports.status, "acik")));
+      // Kullanıcının yazdığı iptal ve itiraz sebebi. Olayın sahibine göre süzülür: yönetici kararıyla iptalde
+      // cancelled_by nakliyecidir ama metin yöneticinin ("Yönetici kararı: …") ve kalır.
+      const ownCancels = tx.select({ jobId: jobEvents.jobId }).from(jobEvents).where(and(eq(jobEvents.actorId, userId), eq(jobEvents.type, "iptal")));
+      await tx.update(jobs).set({ cancelReason: null }).where(inArray(jobs.id, ownCancels));
+      await tx
+        .update(jobEvents)
+        .set({ meta: sql`${jobEvents.meta} - 'reason'` })
+        .where(and(eq(jobEvents.actorId, userId), sql`${jobEvents.meta} ->> 'reason' is not null`));
     });
   }
 
@@ -166,8 +200,17 @@ export class AccountService {
       .select({ id: users.id })
       .from(users)
       .where(and(eq(users.status, "silindi"), isNotNull(users.phone), lt(users.deletedAt, new Date(now.getTime() - PENDING_DELETION_GRACE_MS))));
-    for (const r of rows) await this.finishDeletion(r.id, now);
-    return rows.length;
+    let done = 0;
+    // Bir hesaptaki hata (ör. iyimser kilit) diğerlerini bekletmesin; kalan bir sonraki turda yeniden denenir
+    for (const r of rows) {
+      try {
+        await this.finishDeletion(r.id, now);
+        done++;
+      } catch (e) {
+        this.logger.error(`Hesap ${r.id} anonimleştirmesi tamamlanamadı`, e instanceof Error ? e.stack : String(e));
+      }
+    }
+    return done;
   }
 
   // ── Veri dökümü ────────────────────────────────────────────────────

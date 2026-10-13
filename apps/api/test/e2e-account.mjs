@@ -223,5 +223,155 @@ console.log("\nYönetici: silinmiş hesap askıya alınamaz");
 r = await api("POST", `/admin/users/${C2id}/suspend`, A, { reason: "silinmiş hesabı deniyorum" });
 check("409 'Hesap silinmiş'", r.status === 409 && r.body.message === "Hesap silinmiş", JSON.stringify(r.body));
 
+console.log("\nOTP: paralel tahmin, tek kullanım, amaç ayrımı");
+const verify = (p, c) => api("POST", "/auth/otp/verify", null, { phone: p, code: c });
+const otpFor = async (p) => {
+  await api("POST", "/auth/otp/request", null, { phone: p });
+  await sleep(300);
+  return lastCode(p, "giriş");
+};
+const other = (c, i) => String((Number(c) + 1 + i) % 1e6).padStart(6, "0"); // i < 999999 için c'den farklı
+let good = await otpFor(phone(10));
+let burst = await Promise.all(Array.from({ length: 50 }, (_, i) => verify(phone(10), other(good, i))));
+let judged = burst.filter((x) => x.body?.message === "Kod hatalı").length;
+check("50 paralel yanlış koddan tam 5'i karşılaştırıldı, hepsi 401", judged === 5 && burst.every((x) => x.status === 401), `karşılaştırılan ${judged}`);
+check("deneme sayacı 5", psql(`select attempts from otp_codes where phone='${phone(10)}' and purpose='giris'`) === "5");
+r = await verify(phone(10), good);
+check("hak bitince doğru kod da geçmez", r.status === 401 && /süresi doldu/.test(r.body.message), JSON.stringify(r.body));
+good = await otpFor(phone(11));
+burst = await Promise.all(Array.from({ length: 50 }, (_, i) => verify(phone(11), i === 25 ? good : other(good, i))));
+judged = burst.filter((x) => x.body?.message === "Kod hatalı" || x.body?.accessToken).length;
+check("doğru kod araya karışınca da en çok 5 deneme karşılaştırılır", judged <= 5 && burst.filter((x) => x.body?.accessToken).length <= 1, `karşılaştırılan ${judged}`);
+good = await otpFor(phone(12));
+burst = await Promise.all([verify(phone(12), good), verify(phone(12), good)]);
+check("aynı kodla iki paralel girişten yalnız biri oturum alır", burst.filter((x) => x.body?.accessToken).length === 1, JSON.stringify(burst.map((x) => x.status)));
+
+const D = await user(phone(13), ["shipper"]);
+const Did = idOf(phone(13));
+check("silme kodu istendi", (await api("POST", "/me/deletion-code", D.access)).status === 204);
+check("ardından giriş kodu istenebilir (ayrı kod, 429 değil)", (await api("POST", "/auth/otp/request", null, { phone: phone(13) })).status === 204);
+await sleep(300);
+const dCode = lastCode(phone(13), "hesap silme"), gCode = lastCode(phone(13), "giriş");
+check("iki ayrı kod", !!dCode && !!gCode && dCode !== gCode && psql(`select count(*) from otp_codes where phone='${phone(13)}'`) === "2");
+r = await api("DELETE", "/me", D.access, { code: gCode });
+check("giriş kodu silmede geçmez 400", r.status === 400 && r.body.message === "Kod hatalı", JSON.stringify(r.body));
+r = await verify(phone(13), dCode);
+check("silme kodu girişte geçmez 401", r.status === 401 && r.body.message === "Kod hatalı", JSON.stringify(r.body));
+r = await api("DELETE", "/me", D.access, { code: dCode });
+check("giriş kodu istemek silme kodunu bozmadı: silindi", r.status === 200 && r.body.deleted === true, JSON.stringify(r.body));
+check("silinen numaranın iki kodu da kalmadı", psql(`select count(*) from otp_codes where phone='${phone(13)}'`) === "0" && psql(`select phone is null from users where id='${Did}'`) === "t");
+
+console.log("\nAçık şikayet varken silinemez");
+const T = await user(phone(14), ["shipper"]);
+const Tid = idOf(phone(14));
+const LT = await load(T.access, 12);
+const Rp = await user(phone(15), ["carrier"]); // şikayetçi; şikayet açıkken kendi hesabını siler
+const Rpid = idOf(phone(15));
+const U = await user(phone(16), ["carrier"]);
+const Uid = idOf(phone(16));
+r = await api("POST", "/reports", Rp.access, { targetType: "load_post", targetId: LT, reason: "sahte", note: "Rp'nin notu: 0532 999 88 77" });
+const repLoad = r.body.id;
+check("ilana şikayet", r.status === 201 && !!repLoad, JSON.stringify(r.body));
+r = await api("POST", "/reports", C.access, { targetType: "user", targetId: Uid, reason: "sahte", note: "C'nin notu" });
+const repUser = r.body.id;
+check("kullanıcıya şikayet", r.status === 201 && !!repUser, JSON.stringify(r.body));
+r = await api("POST", "/me/deletion-code", T.access);
+check("ilanına açık şikayet varken kod gönderilmez 409", r.status === 409 && /sonuçlanmamış bir inceleme/.test(r.body.message), JSON.stringify(r.body));
+check("silme de 409", (await api("DELETE", "/me", T.access, { code: "123456" })).status === 409);
+r = await api("POST", "/me/deletion-code", U.access);
+check("hakkında açık şikayet varken 409", r.status === 409 && /sonuçlanmamış bir inceleme/.test(r.body.message), JSON.stringify(r.body));
+check("şikayetçi olmak engel değil (Rp kod alır)", (await api("POST", "/me/deletion-code", Rp.access)).status === 204);
+await sleep(300);
+r = await api("DELETE", "/me", Rp.access, { code: lastCode(phone(15), "hesap silme") });
+check("şikayetçi hesabını sildi", r.status === 200, JSON.stringify(r.body));
+check("açık şikayetin notu karar için kaldı", psql(`select note is not null from reports where id='${repLoad}'`) === "t");
+r = await api("POST", `/admin/reports/${repLoad}/resolve`, A, { decision: "haksiz", note: "İlan gerçek" });
+check("şikayet sonuçlandı", r.status === 200, JSON.stringify(r.body));
+check("şikayetçi silinmiş: not silindi, karar metni kaldı", psql(`select coalesce(note,'-')||'|'||resolution from reports where id='${repLoad}'`) === "-|İlan gerçek");
+await api("POST", `/admin/reports/${repUser}/resolve`, A, { decision: "haksiz" });
+check("şikayetçisi silinmeyen şikayetin notu kalır", psql(`select coalesce(note,'-')||'|'||status from reports where id='${repUser}'`) === "C'nin notu|haksiz");
+check("şikayet sonuçlanınca T kod alır", (await api("POST", "/me/deletion-code", T.access)).status === 204);
+check("U da kod alır", (await api("POST", "/me/deletion-code", U.access)).status === 204);
+await sleep(300);
+check("T silindi", (await api("DELETE", "/me", T.access, { code: lastCode(phone(14), "hesap silme") })).status === 200 && psql(`select status from users where id='${Tid}'`) === "silindi");
+
+console.log("\nİptal ve itiraz sebebi");
+const W = await user(phone(17), ["shipper"]);
+const Wid = idOf(phone(17));
+const K = await user(phone(18), ["carrier"]);
+const VK = await vehicle(K.access, `62 AE ${run}`);
+async function acceptedJob(from) {
+  const l = await load(W.access, from);
+  return (await api("POST", `/offers/${await offer(K.access, l, VK)}/accept`, W.access)).body;
+}
+const JW1 = (await acceptedJob(14)).job.id;
+check("W iptal eder", (await api("POST", `/jobs/${JW1}/cancel`, W.access, { reason: "W'nin sebebi: Ahmet 0532 000 11 22" })).status === 200);
+const JW2 = (await acceptedJob(15)).job.id;
+check("K iptal eder", (await api("POST", `/jobs/${JW2}/cancel`, K.access, { reason: "K'nin sebebi: araç arızalandı" })).status === 200);
+const acc3w = await acceptedJob(16);
+const JW3 = acc3w.job.id;
+await api("POST", `/jobs/${JW3}/deliver`, K.access, { code: acc3w.deliveryCode });
+check("W itiraz eder", (await api("POST", `/jobs/${JW3}/dispute`, W.access, { reason: "W'nin itirazı: yük eksik" })).status === 200);
+r = await api("POST", `/admin/disputes/${JW3}/resolve`, A, { outcome: "iptal", note: "Yöneticinin gerekçesi" });
+check("yönetici iptal kararı", r.status === 200, JSON.stringify(r.body));
+await api("POST", "/me/deletion-code", W.access);
+await sleep(300);
+check("W silindi", (await api("DELETE", "/me", W.access, { code: lastCode(phone(17), "hesap silme") })).status === 200);
+const reasons = (j) => psql(`select coalesce(cancel_reason,'-') from jobs where id='${j}'`);
+check("W'nin iptal sebebi silindi", reasons(JW1) === "-", reasons(JW1));
+check("K'nin iptal sebebi kaldı", reasons(JW2) === "K'nin sebebi: araç arızalandı", reasons(JW2));
+check("yönetici kararı metni kaldı (cancelled_by K)", reasons(JW3) === "Yönetici kararı: Yöneticinin gerekçesi", reasons(JW3));
+check("W'nin olaylarında sebep kalmadı", psql(`select count(*) from job_events where actor_id='${Wid}' and meta ? 'reason'`) === "0" && psql(`select count(*) from job_events where actor_id='${Wid}' and type in ('iptal','itirazli')`) === "2");
+check("K'nin olayındaki sebep ve yöneticinin notu kaldı",
+  psql(`select meta->>'reason' from job_events where job_id='${JW2}' and type='iptal'`) === "K'nin sebebi: araç arızalandı" &&
+  psql(`select meta->>'note' from job_events where job_id='${JW3}' and type='iptal'`) === "Yöneticinin gerekçesi");
+
+console.log("\nAnonimleştirme yarıda kalırsa");
+const F = await user(phone(19), ["shipper"]);
+const Fid = idOf(phone(19));
+const LF = await load(F.access, 17);
+const G = await user(phone(20), ["shipper"]);
+const Gid = idOf(phone(20));
+// Geçici tetikleyici: F'nin ilanı kapatılamasın (ör. iyimser kilit çakışması yerine)
+const trig = `e2e_account_fail_${run}`;
+psql(`create function ${trig}() returns trigger language plpgsql as $$ begin raise exception 'e2e: ilan kapatılamadı'; end $$`);
+psql(`create trigger ${trig} before update on load_posts for each row when (old.id = '${LF}' and new.status is distinct from old.status) execute function ${trig}()`);
+try {
+  await api("POST", "/me/deletion-code", F.access);
+  await sleep(300);
+  r = await api("DELETE", "/me", F.access, { code: lastCode(phone(19), "hesap silme") });
+  check("anonimleştirme hata verse de 200 { deleted: true }", r.status === 200 && r.body.deleted === true, JSON.stringify(r.body));
+  check("hesap silindi işaretli, numara henüz duruyor, ilan açık", psql(`select status||'|'||(phone is not null) from users where id='${Fid}'`) === "silindi|true" && psql(`select status from load_posts where id='${LF}'`) !== "iptal");
+  check("erişim belirteci kapandı", (await api("GET", "/me", F.access)).status === 401);
+  check("hata loglandı", /Hesap .* anonimleştirmesi yarıda kaldı/.test(log()));
+  psql(`update users set deleted_at=now() - interval '10 minutes' where id='${Fid}'`);
+  psql(`update users set status='silindi', deleted_at=now() - interval '10 minutes' where id='${Gid}'`);
+  r = await api("POST", "/admin/tick", A);
+  check("tur: hatalı hesap diğerini bekletmedi (G tamamlandı)", r.status === 200 && psql(`select phone is null from users where id='${Gid}'`) === "t", JSON.stringify(r.body));
+  check("F hâlâ yarım", psql(`select phone is not null from users where id='${Fid}'`) === "t");
+} finally {
+  psql(`drop trigger if exists ${trig} on load_posts`);
+  psql(`drop function if exists ${trig}()`);
+}
+r = await api("POST", "/admin/tick", A);
+check("engel kalkınca sonraki tur F'yi tamamladı", psql(`select coalesce(phone,'-')||'|'||name from users where id='${Fid}'`) === "-|Silinmiş kullanıcı" && psql(`select status from load_posts where id='${LF}'`) === "iptal", JSON.stringify(r.body));
+
+console.log("\nAskıya alma ile silme aynı anda");
+let both = 0, lost = 0;
+// Askı 0–15 ms gecikmeli: kimi turda silme kazanır, kimi turda askı silme isteği guard'ı geçtikten sonra gelir
+for (let i = 0; i < 8; i++) {
+  const p = phone(30 + i);
+  const Z = await user(p, ["shipper"]);
+  const Zid = idOf(p);
+  await api("POST", "/me/deletion-code", Z.access);
+  await sleep(300);
+  const zc = lastCode(p, "hesap silme");
+  const [del, sus] = await Promise.all([api("DELETE", "/me", Z.access, { code: zc }), sleep((i % 4) * 5).then(() => api("POST", `/admin/users/${Zid}/suspend`, A, { reason: "aynı anda deneme" }))]);
+  const st = psql(`select status from users where id='${Zid}'`);
+  if (del.status === 200 && sus.status === 200) both++;
+  if (sus.status === 200 && st !== "askida") lost++;
+}
+check("askı ve silme ikisi birden başarılı olmaz; başarılı askı kalır", both === 0 && lost === 0, `ikisi birden ${both}, kaybolan askı ${lost}`);
+
 console.log(`\nSonuç: ${pass} geçti, ${fail} kaldı`);
 process.exitCode = fail ? 1 : 0;

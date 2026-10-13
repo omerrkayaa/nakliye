@@ -1,6 +1,6 @@
 import { ForbiddenException, HttpException, HttpStatus, Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull, lt, sql } from "drizzle-orm";
 import { randomToken, sha256, sixDigitCode } from "../common/hash.js";
 import { SmsService } from "../common/sms.service.js";
 import { DB, type Db } from "../db/db.module.js";
@@ -20,6 +20,8 @@ const OTP_SMS = {
   // Türkçe karakterli SMS 70 karakterle sınırlı (UCS-2); bu metin 58 karakter
   silme: (code: string) => `Nakliye hesap silme kodunuz: ${code}. Kimseyle paylaşmayın.`,
 };
+/** Kodun amacı (otp_codes.purpose): giriş kodu silmede, silme kodu girişte geçmez */
+export type OtpPurpose = keyof typeof OTP_SMS;
 
 /**
  * Demo hesabı (mobil uygulamayı telefonda denemek için): DEMO_PHONE'a her zaman DEMO_OTP gider.
@@ -48,29 +50,38 @@ export class AuthService {
     return sha256(`${phone}:${code}:${process.env.OTP_PEPPER ?? ""}`);
   }
 
-  async requestOtp(phone: string, purpose: keyof typeof OTP_SMS = "giris"): Promise<void> {
-    const [existing] = await this.db.select().from(otpCodes).where(eq(otpCodes.phone, phone));
+  private otpKey(phone: string, purpose: OtpPurpose) {
+    return and(eq(otpCodes.phone, phone), eq(otpCodes.purpose, purpose));
+  }
+
+  async requestOtp(phone: string, purpose: OtpPurpose = "giris"): Promise<void> {
+    const [existing] = await this.db.select().from(otpCodes).where(this.otpKey(phone, purpose));
     if (existing && existing.expiresAt.getTime() - OTP_TTL_MS + OTP_RESEND_MS > Date.now()) {
       throw new HttpException("Yeni kod için biraz bekleyin", HttpStatus.TOO_MANY_REQUESTS);
     }
 
     const code = demoCode(phone) ?? sixDigitCode();
-    const row = { phone, codeHash: this.otpHash(phone, code), expiresAt: new Date(Date.now() + OTP_TTL_MS), attempts: 0 };
-    await this.db.insert(otpCodes).values(row).onConflictDoUpdate({ target: otpCodes.phone, set: row });
+    const row = { phone, purpose, codeHash: this.otpHash(phone, code), expiresAt: new Date(Date.now() + OTP_TTL_MS), attempts: 0 };
+    await this.db.insert(otpCodes).values(row).onConflictDoUpdate({ target: [otpCodes.phone, otpCodes.purpose], set: row });
     await this.sms.send(phone, OTP_SMS[purpose](code));
   }
 
-  /** Kodu doğrular ve harcar (tek kullanımlık); yanlış kod deneme hakkından düşer. Giriş ve hesap silme kullanır. */
-  async consumeOtp(phone: string, code: string): Promise<void> {
-    const [otp] = await this.db.select().from(otpCodes).where(eq(otpCodes.phone, phone));
-    if (!otp || otp.expiresAt < new Date() || otp.attempts >= OTP_MAX_ATTEMPTS) {
-      throw new UnauthorizedException("Kodun süresi doldu, yeni kod isteyin");
-    }
-    if (otp.codeHash !== this.otpHash(phone, code)) {
-      await this.db.update(otpCodes).set({ attempts: otp.attempts + 1 }).where(eq(otpCodes.phone, phone));
-      throw new UnauthorizedException("Kod hatalı");
-    }
-    await this.db.delete(otpCodes).where(eq(otpCodes.phone, phone));
+  /** Kodu doğrular ve harcar (tek kullanımlık); her deneme hakkından düşer. Giriş ve hesap silme kullanır. */
+  async consumeOtp(phone: string, code: string, purpose: OtpPurpose = "giris"): Promise<void> {
+    const key = this.otpKey(phone, purpose);
+    const expired = () => new UnauthorizedException("Kodun süresi doldu, yeni kod isteyin");
+    // Deneme hakkı karşılaştırmadan önce atomik ayrılır: aynı anda gelen denemelerden (doğrusu dahil) en çok
+    // OTP_MAX_ATTEMPTS tanesi karşılaştırılır. Önce okuyup sonra artırmak paralel tahminlerin hepsini değerlendirirdi.
+    const [otp] = await this.db
+      .update(otpCodes)
+      .set({ attempts: sql`${otpCodes.attempts} + 1` })
+      .where(and(key, lt(otpCodes.attempts, OTP_MAX_ATTEMPTS), gt(otpCodes.expiresAt, new Date())))
+      .returning({ codeHash: otpCodes.codeHash });
+    if (!otp) throw expired();
+    if (otp.codeHash !== this.otpHash(phone, code)) throw new UnauthorizedException("Kod hatalı");
+    // Aynı doğru kodla gelen paralel isteklerden yalnız satırı silen geçer (kod tek kullanımlık)
+    const used = await this.db.delete(otpCodes).where(and(key, eq(otpCodes.codeHash, otp.codeHash))).returning({ phone: otpCodes.phone });
+    if (used.length === 0) throw expired();
   }
 
   async verifyOtp(phone: string, code: string) {

@@ -46,7 +46,7 @@ export default function AccountPage() {
           <li>Telefon numaranız, adınız, firma bilgileriniz, araç plakalarınız, bildirimleriniz ve rota alarmlarınız silinir.</li>
           <li>Yayındaki ilanlarınız ve boş araç ilanlarınız kapanır; bekleyen teklifleriniz geri çekilir.</li>
           <li>Tamamlanmış taşımalar ve verdiğiniz puanlar karşı tarafın geçmişi için “Silinmiş kullanıcı” adıyla kalır; yazdığınız notlar ve yorumlar silinir.</li>
-          <li>Süren bir taşımanız varken hesabınız silinemez.</li>
+          <li>Süren bir taşımanız ya da hesabınızla ilgili sonuçlanmamış bir inceleme varken hesabınız silinemez.</li>
           <li>
             <strong>Bu işlem geri alınamaz.</strong> Aynı numarayla yeniden giriş yaparsanız yeni, boş bir hesap açılır.
           </li>

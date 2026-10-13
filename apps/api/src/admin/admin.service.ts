@@ -1,14 +1,11 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { VISIBLE_LOAD_STATUSES, type AdminReportListInput, type ResolveReportInput } from "@nakliye/shared";
+import type { AdminReportListInput, ResolveReportInput } from "@nakliye/shared";
 import { and, count, desc, eq, ilike, inArray, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { AccountService } from "../account/account.service.js";
 import { DB, type Db } from "../db/db.module.js";
-import { capacityPosts, districts, loadPosts, offers, provinces, refreshTokens, reports, userRoles, users } from "../db/schema.js";
-import { OffersService } from "../jobs/offers.service.js";
-import { LoadsService } from "../loads/loads.service.js";
+import { districts, loadPosts, provinces, refreshTokens, reports, userRoles, users } from "../db/schema.js";
 import { TrustService } from "../ratings/trust.service.js";
-import { CapacityService } from "../vehicles/capacity.service.js";
 
 const PAGE_SIZE = 20;
 const reporter = alias(users, "reporter");
@@ -16,9 +13,6 @@ const od = alias(districts, "od");
 const op = alias(provinces, "op");
 const dd = alias(districts, "dd");
 const dp = alias(provinces, "dp");
-
-/** Askıya alınca kapanan ilanlar: yayındakiler ve moderasyonda bekleyenler */
-const CLOSABLE_LOADS = [...VISIBLE_LOAD_STATUSES, "moderasyonda" as const];
 
 type UserRow = { id: string; name: string | null; phone: string | null; status: string; trustScore: number; suspendedAt: Date | null; suspendReason: string | null };
 
@@ -103,11 +97,15 @@ export class AdminService {
     };
   }
 
-  /** Şikayeti sonuçlandır. Haklıysa hedefin sahibinin güven skoru yenilenir (BR-30 şikayet terimi). */
+  /**
+   * Şikayeti sonuçlandır. Haklıysa hedefin sahibinin güven skoru yenilenir (BR-30 şikayet terimi). Şikayetçi bu arada
+   * hesabını sildiyse notu (serbest metin, kişisel bilgi içerebilir) karar için tutulmuştu, artık silinir (FR-07).
+   */
   async resolveReport(adminId: string, id: string, input: ResolveReportInput, now = new Date()) {
+    const reporterDeleted = sql`exists (select 1 from ${users} where ${users.id} = ${reports.reporterId} and ${users.status} = 'silindi')`;
     const [row] = await this.db
       .update(reports)
-      .set({ status: input.decision, resolution: input.note ?? null, resolvedAt: now, resolvedBy: adminId })
+      .set({ status: input.decision, resolution: input.note ?? null, resolvedAt: now, resolvedBy: adminId, note: sql`case when ${reporterDeleted} then null else ${reports.note} end` })
       .where(and(eq(reports.id, id), eq(reports.status, "acik")))
       .returning({ targetType: reports.targetType, targetId: reports.targetId });
     if (!row) {

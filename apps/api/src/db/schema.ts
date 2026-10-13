@@ -123,12 +123,18 @@ export const companies = pgTable("companies", {
   createdAt: createdAt(),
 });
 
-export const otpCodes = pgTable("otp_codes", {
-  phone: varchar("phone", { length: 16 }).primaryKey(),
-  codeHash: varchar("code_hash", { length: 64 }).notNull(),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  attempts: smallint("attempts").notNull().default(0),
-});
+// Amaç başına ayrı kod (giriş / hesap silme): biri istenince diğeri geçersiz olmaz, giriş kodu silmede geçmez
+export const otpCodes = pgTable(
+  "otp_codes",
+  {
+    phone: varchar("phone", { length: 16 }).notNull(),
+    purpose: varchar("purpose", { length: 8 }).notNull().default("giris"),
+    codeHash: varchar("code_hash", { length: 64 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    attempts: smallint("attempts").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.phone, t.purpose] })],
+);
 
 export const refreshTokens = pgTable("refresh_tokens", {
   id: uuid("id").primaryKey().defaultRandom(),
