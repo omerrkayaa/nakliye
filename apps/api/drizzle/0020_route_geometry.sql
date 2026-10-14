@@ -1,0 +1,1 @@
+ALTER TABLE "district_routes" ADD COLUMN "geometry" jsonb;

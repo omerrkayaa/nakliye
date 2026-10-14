@@ -94,6 +94,18 @@ export class LoadsService {
     return this.page(rows, q.page, (r) => this.withReputation(this.view(r, false), rep.get(r.load.shipperId)!));
   }
 
+  /**
+   * Kimlikleri verilen görünür ilanların kartları, verilen sırayla (besleme biçimi, yük sahibinin itibarıyla). Dönüş
+   * planı (F4) kendi seçtiği adayları bu biçimde döndürür; mobil aynı kartı kullanır.
+   */
+  async cards(ids: string[]) {
+    if (ids.length === 0) return [];
+    const rows = await this.selectLoads().where(and(inArray(loadPosts.id, ids), inArray(loadPosts.status, [...VISIBLE_LOAD_STATUSES])));
+    const rep = await this.trust.reputationMany(rows.map((r) => r.load.shipperId));
+    const byId = new Map(rows.map((r) => [r.load.id, this.withReputation(this.view(r, false), rep.get(r.load.shipperId)!)]));
+    return ids.flatMap((id) => byId.get(id) ?? []);
+  }
+
   /** Yük sahibinin kendi ilanları (A18 "İlanlarım"), tüm durumlar. */
   async mine(userId: string, page: number) {
     const rows = await this.selectLoads()

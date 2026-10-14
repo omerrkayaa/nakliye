@@ -496,6 +496,8 @@ export const districtRoutes = pgTable(
     destDistrictId: integer("dest_district_id").notNull().references(() => districts.id),
     distanceM: integer("distance_m").notNull(),
     durationS: integer("duration_s").notNull(),
+    // F4 rota üstü (BR-23): OSRM'nin sadeleştirilmiş çizgisi, [boylam, enlem] dizisi; mesafe için sorulan çiftte boş
+    geometry: jsonb("geometry").$type<[number, number][]>(),
     createdAt: createdAt(),
   },
   (t) => [primaryKey({ columns: [t.originDistrictId, t.destDistrictId] })],

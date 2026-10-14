@@ -60,6 +60,29 @@ export interface Load {
   };
 }
 
+/** GET /return-plan/:jobId (F4, A10) */
+export interface ReturnPlan {
+  job: {
+    id: string;
+    status: JobStatus;
+    origin: Place;
+    dest: Place;
+    loadFrom: string;
+    loadTo: string;
+    deliveredAt: string | null;
+    vehicle: { plate: string; vehicleType: VehicleType; bodyType: BodyType; capacityTon: number };
+    arrivalDay: string;
+    window: { from: string; to: string };
+    outboundKm: number;
+    returnKm: number;
+    /** "kus_ucusu": yol bilgisi alınamadı, rota üstü doğru çizgiyle (yaklaşık) */
+    routeSource: "osrm" | "kus_ucusu";
+  };
+  returnLoads: (Load & { match: { score: number; originKm: number; destKm: number | null } })[];
+  onRouteLoads: (Load & { route: { originDevKm: number; destDevKm: number; coverage: number } })[];
+  alert: { originDistrictId: number; destDistrictId: number; vehicleType: VehicleType; exists: boolean };
+}
+
 /** GET /documents öğesi (FR-05) */
 export interface MyDocument {
   id: string;

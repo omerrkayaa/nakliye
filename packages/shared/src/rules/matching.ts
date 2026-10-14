@@ -59,6 +59,24 @@ function rangesOverlap(aFrom: number, aTo: number, bFrom: number, bTo: number) {
 }
 
 /**
+ * Konumdan bağımsız uyum: araç tipi, kasa, kapasite ve tarih (± tolerans). Uymuyorsa sebep, uyuyorsa null.
+ * Eşleştirme (BR-20) ve rota üstü dönüş yükü (BR-23) ortak kullanır.
+ */
+export function fitRejectReason(
+  load: Pick<LoadForMatch, "loadFrom" | "loadTo" | "weightTon" | "vehicleType" | "bodyType">,
+  cap: Pick<CapacityForMatch, "availableFrom" | "availableTo" | "vehicle">,
+  p: Pick<MatchParams, "dateToleranceDays"> = DEFAULT_MATCH_PARAMS,
+): RejectReason | null {
+  // Büyük araç küçük tip isteyen yükü taşıyabilir (kapasite ayrıca aranır; doluluk puanı doğru boyutu öne alır)
+  if (!vehicleCanCarry(cap.vehicle.type, load.vehicleType)) return "arac_tipi";
+  if (load.bodyType && cap.vehicle.bodyType !== load.bodyType) return "kasa_tipi";
+  if (cap.vehicle.capacityTon < load.weightTon) return "kapasite";
+  const tol = p.dateToleranceDays;
+  if (!rangesOverlap(dayIndex(load.loadFrom), dayIndex(load.loadTo), dayIndex(cap.availableFrom) - tol, dayIndex(cap.availableTo) + tol)) return "tarih";
+  return null;
+}
+
+/**
  * Bir yük ile bir boş araç ilanını karşılaştırır.
  * @param trust araç sahibinin (yük tarafından bakılırken) ya da yük sahibinin güven skoru, 0–1
  */
@@ -68,17 +86,13 @@ export function matchLoadWithCapacity(
   trust: number,
   p: MatchParams = DEFAULT_MATCH_PARAMS,
 ): MatchResult {
-  // Büyük araç küçük tip isteyen yükü taşıyabilir (kapasite ayrıca aranır; doluluk puanı doğru boyutu öne alır)
-  if (!vehicleCanCarry(cap.vehicle.type, load.vehicleType)) return { candidate: false, reason: "arac_tipi" };
-  if (load.bodyType && cap.vehicle.bodyType !== load.bodyType) return { candidate: false, reason: "kasa_tipi" };
-  if (cap.vehicle.capacityTon < load.weightTon) return { candidate: false, reason: "kapasite" };
+  const reject = fitRejectReason(load, cap, p);
+  if (reject) return { candidate: false, reason: reject };
 
   const lf = dayIndex(load.loadFrom);
   const lt = dayIndex(load.loadTo);
   const cf = dayIndex(cap.availableFrom);
   const ct = dayIndex(cap.availableTo);
-  const tol = p.dateToleranceDays;
-  if (!rangesOverlap(lf, lt, cf - tol, ct + tol)) return { candidate: false, reason: "tarih" };
 
   const originKm = haversineKm(load.origin, cap.origin);
   if (originKm > p.originRadiusKm) return { candidate: false, reason: "kalkis_uzak" };

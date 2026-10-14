@@ -11,7 +11,8 @@ import { LoadsModule } from "./loads/loads.module.js";
 import { LocationsController } from "./locations.controller.js";
 import { PriceController } from "./price.controller.js";
 import { PublicRoutesController } from "./public-routes.controller.js";
-import { RoutesService } from "./routes.service.js";
+import { ReturnPlanModule } from "./return-plan/return-plan.module.js";
+import { RoutesModule } from "./routes.service.js";
 import { MatchingModule } from "./matching/matching.module.js";
 import { NotificationsModule } from "./notifications/notifications.module.js";
 import { ReportsModule } from "./reports/reports.module.js";
@@ -22,6 +23,7 @@ import { VehiclesModule } from "./vehicles/vehicles.module.js";
 @Module({
   imports: [
     DbModule,
+    RoutesModule,
     FilesModule,
     AuthModule,
     NotificationsModule,
@@ -33,10 +35,10 @@ import { VehiclesModule } from "./vehicles/vehicles.module.js";
     VehiclesModule,
     DocumentsModule,
     JobsModule,
+    ReturnPlanModule,
     SchedulerModule,
     AdminModule,
   ],
   controllers: [HealthController, LocationsController, PriceController, PublicRoutesController],
-  providers: [RoutesService],
 })
 export class AppModule {}
