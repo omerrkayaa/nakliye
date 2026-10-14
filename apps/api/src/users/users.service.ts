@@ -81,20 +81,23 @@ export class UsersService {
   }
 
   async updateCompany(userId: string, input: UpdateCompanyInput) {
-    const [current] = await this.db.select().from(companies).where(eq(companies.ownerUserId, userId));
-    if (!current) throw new NotFoundException("Kayıtlı firma yok");
-
-    // Onaylı firmanın kimlik bilgisi değişirse onay düşer; yönetici yeniden onaylamalı (BR-10, F2).
-    const identityChanged =
-      (input.title !== undefined && input.title !== current.title) ||
-      (input.taxNo !== undefined && input.taxNo !== current.taxNo);
-    const [company] = await this.db
-      .update(companies)
-      .set({ ...input, ...(identityChanged ? { verifiedAt: null } : {}) })
-      .where(eq(companies.id, current.id))
-      .returning();
-    if (identityChanged && current.verifiedAt) await this.trust.refresh(userId);
-    return this.companyView(company!);
+    // Satır kilitli: vergi levhası onayıyla yarışta okunan "onaylı mı" bilgisi bayat kalmasın
+    const { company, identityChanged } = await this.db.transaction(async (tx) => {
+      const [current] = await tx.select().from(companies).where(eq(companies.ownerUserId, userId)).for("update");
+      if (!current) throw new NotFoundException("Kayıtlı firma yok");
+      // Onaylı firmanın kimlik bilgisi değişirse onay düşer; yönetici yeniden onaylamalı (BR-10, F2).
+      const changed =
+        (input.title !== undefined && input.title !== current.title) ||
+        (input.taxNo !== undefined && input.taxNo !== current.taxNo);
+      const [row] = await tx
+        .update(companies)
+        .set({ ...input, ...(changed ? { verifiedAt: null } : {}) })
+        .where(eq(companies.id, current.id))
+        .returning();
+      return { company: row!, identityChanged: changed };
+    });
+    if (identityChanged) await this.trust.refresh(userId);
+    return this.companyView(company);
   }
 
   private companyView(c: typeof companies.$inferSelect) {

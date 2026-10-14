@@ -208,9 +208,9 @@ export class AccountService {
     await this.closeOpenActivity(userId, now);
     // Belge dosyaları (ruhsat, vergi levhası fotoğrafı) satırlardan önce: dosya silinemezse (hata) tur yeniden dener
     await this.documents.purge({ ownerUserId: userId });
-    await this.db.transaction(async (tx) => {
+    const lateFiles = await this.db.transaction(async (tx) => {
       const [u] = await tx.select({ phone: users.phone }).from(users).where(eq(users.id, userId)).for("update");
-      if (!u) return;
+      if (!u) return [];
       if (u.phone) await tx.delete(otpCodes).where(eq(otpCodes.phone, u.phone));
       // Seviye 0: belgeler ve firma silindi; geri açılan hesap (ya da numarayı devralan) belgesiz rozet almasın
       await tx.update(users).set({ phone: null, name: DELETED_USER_NAME, suspendedAt: null, suspendReason: null, verificationLevel: 0 }).where(eq(users.id, userId));
@@ -221,7 +221,8 @@ export class AccountService {
       await tx.delete(notifications).where(eq(notifications.userId, userId));
       await tx.delete(routeAlerts).where(eq(routeAlerts.userId, userId));
       await tx.delete(favoriteCarriers).where(or(eq(favoriteCarriers.shipperId, userId), eq(favoriteCarriers.carrierId, userId)));
-      await tx.delete(documents).where(eq(documents.ownerUserId, userId));
+      // purge'dan sonra bir belge eklendiyse (yükleme aktif durumu kilit altında denetlediği için beklenmez) dosyası da gider
+      const late = await tx.delete(documents).where(eq(documents.ownerUserId, userId)).returning({ fileKey: documents.fileKey });
       // Plaka kişiyi gösterebilir; araç kaydı karşı tarafın iş geçmişi için kalır
       await tx.update(vehicles).set({ status: "silindi", plate: "—" }).where(eq(vehicles.ownerUserId, userId));
       // Serbest metinler kişisel bilgi (ad, numara) içerebilir. Açık şikayetin notu yönetici kararı için kalır; şikayet
@@ -238,7 +239,9 @@ export class AccountService {
         .update(jobEvents)
         .set({ meta: sql`${jobEvents.meta} - 'reason'` })
         .where(and(eq(jobEvents.actorId, userId), sql`${jobEvents.meta} ->> 'reason' is not null`));
+      return late.map((d) => d.fileKey);
     });
+    await this.documents.removeFiles(lateFiles);
   }
 
   /** Zamanlayıcı: geri açma süresi (ACCOUNT_DELETION.restoreDays) dolan silinmiş numara özetlerini siler. */

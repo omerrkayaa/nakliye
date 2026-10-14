@@ -136,6 +136,9 @@ export interface AdminDocument {
   reviewedAt: string | null;
   owner: { id: string; name: string | null; phone: string | null; status: UserStatus };
   company: { title: string; taxNo: string | null; taxOffice: string | null; verifiedAt: string | null } | null;
+  /** Vergi levhası yüklenirken firmanın kimliği; onay yalnız firma hâlâ bu kimlikteyse doğrular */
+  uploadedAs: { title: string; taxNo: string | null } | null;
+  companyChanged: boolean;
   vehicle: { id: string; plate: string; vehicleType: VehicleType } | null;
 }
 

@@ -195,6 +195,10 @@ export const documents = pgTable(
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
     rejectReason: text("reject_reason"),
     expiresAt: date("expires_at"),
+    // Vergi levhası yüklenirken firmanın kimliği: onay yalnız firma hâlâ bu kimlikteyse doğrular (inceleme sırasında
+    // unvan/vergi no değiştirilip başka firma doğrulatılamasın; güvenlik incelemesi 2026-10-14)
+    companyTitle: varchar("company_title", { length: 160 }),
+    companyTaxNo: varchar("company_tax_no", { length: 11 }),
     // Süresi geçen onaylı belge için seviye yenilendi ve sahibine bildirildi (zamanlayıcı bir kez yapar)
     expiryHandledAt: timestamp("expiry_handled_at", { withTimezone: true }),
     createdAt: createdAt(),

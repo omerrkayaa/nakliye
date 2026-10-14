@@ -74,11 +74,17 @@ async function Documents({ searchParams }: Pick<PageProps<"/panel/yonetim/belgel
                     Araç: <span className="font-medium">{d.vehicle.plate}</span> · {VEHICLE_TYPES[d.vehicle.vehicleType]}
                   </p>
                 )}
-                {d.type === "vergi_levhasi" && d.company && (
+                {d.type === "vergi_levhasi" && d.uploadedAs && (
                   <p>
-                    Firma: <span className="font-medium">{d.company.title}</span>
-                    {d.company.taxNo && ` · VKN ${d.company.taxNo}`}
-                    {d.company.taxOffice && ` · ${d.company.taxOffice} VD`}
+                    Firma (yüklemede): <span className="font-medium">{d.uploadedAs.title}</span>
+                    {d.uploadedAs.taxNo && ` · VKN ${d.uploadedAs.taxNo}`}
+                    {d.company?.taxOffice && ` · ${d.company.taxOffice} VD`}
+                  </p>
+                )}
+                {d.companyChanged && (
+                  <p role="status" className="font-medium text-destructive">
+                    Firma bilgisi yüklemeden sonra değişti{d.company ? ` (şimdi: ${d.company.title}${d.company.taxNo ? `, VKN ${d.company.taxNo}` : ""})` : ""}. Onaylanamaz; belgeyi
+                    reddedin.
                   </p>
                 )}
               </div>

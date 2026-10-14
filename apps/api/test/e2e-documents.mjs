@@ -1,7 +1,7 @@
 // FR-05/FR-50/FR-06 + BR-10: belge yükleme, imzalı dosya bağlantısı, yönetici kararı ve doğrulama seviyesi — uçtan uca test.
 // Yalıtım: Hakkari/Yüksekova → Şırnak/Cizre ve +90549… numaraları. Çalıştırma kimliği DB'de boş olana kadar yeniden üretilir.
 // Ön koşul ve kullanım: e2e-confirmation.mjs ile aynı (JOBS_ENABLED=false). node test/e2e-documents.mjs api.log
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 
 const LOG = process.argv[2];
@@ -196,6 +196,21 @@ await api("PATCH", "/companies", S, { title: `Yüksekova Lojistik ${run}` });
 r = await api("GET", "/me", S);
 check("unvan değişince firma onayı ve seviye düşer", r.body.company?.verified === false && r.body.verificationLevel === 0, JSON.stringify(r.body));
 
+console.log("\nVergi levhası onayı yüklemedeki firma kimliğine bağlı");
+const S2 = await user(phone(6), ["shipper"]);
+const S2id = idOf(phone(6));
+await api("POST", "/companies", S2, { title: `İlk Unvan ${run}`, taxNo: "1111111111" });
+const Dw = (await upload(S2, { type: "vergi_levhasi" }, PDF)).body.id;
+await api("PATCH", "/companies", S2, { title: `Başka Firma ${run}`, taxNo: "2222222222" });
+r = await api("GET", "/admin/documents", A);
+const qw = r.body.items?.find((d) => d.id === Dw);
+check("kuyrukta yüklemedeki kimlik ve 'değişti' işareti", qw?.uploadedAs?.title === `İlk Unvan ${run}` && qw?.uploadedAs?.taxNo === "1111111111" && qw?.company?.title === `Başka Firma ${run}` && qw?.companyChanged === true, JSON.stringify(qw));
+r = await api("POST", `/admin/documents/${Dw}/review`, A, { decision: "onay" });
+check("kimlik değiştiyse onay 409, belge incelemede kalır, firma doğrulanmaz", r.status === 409 && /belge yüklendikten sonra değişti/.test(r.body.message) && psql(`select status from documents where id='${Dw}'`) === "bekliyor" && psql(`select verified_at is null from companies where owner_user_id='${S2id}'`) === "t" && level(S2id) === "0", JSON.stringify(r.body));
+check("reddedilebilir", (await api("POST", `/admin/documents/${Dw}/review`, A, { decision: "ret", rejectReason: "Firma bilgisi değişmiş" })).status === 200);
+const Dw2 = (await upload(S2, { type: "vergi_levhasi" }, PDF)).body.id;
+check("güncel kimlikle yüklenen levha onaylanır", (await api("POST", `/admin/documents/${Dw2}/review`, A, { decision: "onay" })).status === 200 && level(S2id) === "1");
+
 console.log("\nGünlük yükleme sınırı");
 const U = await user(phone(4), ["carrier"]);
 const Uid = idOf(phone(4));
@@ -215,6 +230,24 @@ await sleep(300);
 r = await api("DELETE", "/me", X, { code: lastCode(phone(5), "hesap silme") });
 check("hesap silindi", r.status === 200, JSON.stringify(r.body));
 check("belge satırı ve dosyası silindi, seviye 0", psql(`select count(*) from documents where owner_user_id='${Xid}'`) === "0" && (await fetchFile(xUrl)).status === 404 && level(Xid) === "0");
+
+console.log("\nHesap silme ile yükleme aynı anda");
+let orphans = 0, errors5xx = 0;
+for (let i = 0; i < 6; i++) {
+  const p = phone(20 + i);
+  const t = await user(p, ["carrier"]);
+  const id = idOf(p);
+  await api("POST", "/me/deletion-code", t);
+  await sleep(300);
+  const code = lastCode(p, "hesap silme");
+  // Yükleme 0–15 ms gecikmeli: kimi turda silmeden önce, kimi turda silme işaretlendikten sonra gelir
+  const [del, up] = await Promise.all([api("DELETE", "/me", t, { code }), sleep((i % 4) * 5).then(() => upload(t, { type: "src" }, PDF))]);
+  if (del.status >= 500 || up.status >= 500) errors5xx++;
+  const dir = `storage/documents/${id}`;
+  const files = existsSync(dir) ? readdirSync(dir).length : 0;
+  if (del.status === 200 && (psql(`select count(*) from documents where owner_user_id='${id}'`) !== "0" || files !== 0)) orphans++;
+}
+check("silinen hesapta belge satırı ya da dosyası kalmaz, 5xx yok", orphans === 0 && errors5xx === 0, `kalan ${orphans}, 5xx ${errors5xx}`);
 
 console.log(`\nSonuç: ${pass} geçti, ${fail} kaldı`);
 process.exitCode = fail ? 1 : 0;

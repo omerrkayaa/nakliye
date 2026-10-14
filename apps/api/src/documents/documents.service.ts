@@ -79,9 +79,10 @@ export class DocumentsService {
     } else if (input.vehicleId) {
       throw new BadRequestException(`${DOCUMENT_TYPES[input.type]} araca bağlı değil`);
     }
+    let company: { title: string; taxNo: string | null } | null = null;
     if (input.type === "vergi_levhasi") {
-      const [c] = await this.db.select({ id: companies.id }).from(companies).where(eq(companies.ownerUserId, userId));
-      if (!c) throw new ConflictException("Önce firma bilgilerinizi girin");
+      [company = null] = await this.db.select({ title: companies.title, taxNo: companies.taxNo }).from(companies).where(eq(companies.ownerUserId, userId));
+      if (!company) throw new ConflictException("Önce firma bilgilerinizi girin");
     }
 
     const id = randomUUID();
@@ -90,8 +91,15 @@ export class DocumentsService {
     let replacedKey: string | null = null;
     try {
       await this.db.transaction(async (tx) => {
-        // Kullanıcı satırı kilidi: aynı anda iki yükleme günlük sınırı aşmasın, aynı belge için iki bekleyen açılmasın
-        await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("update");
+        // Kullanıcı satırı kilidi: aynı anda iki yükleme günlük sınırı aşmasın, aynı belge için iki bekleyen açılmasın.
+        // Durum kilit altında yeniden: silme/dondurma ile yarışta silinen hesaba belge (sahipsiz dosya) kalmasın.
+        const [u] = await tx.select({ status: users.status }).from(users).where(eq(users.id, userId)).for("update");
+        if (u?.status !== "aktif") throw new ConflictException("Hesabınız aktif değil");
+        // Araç silmeyle yarış: araç kilitli (araç silme FOR UPDATE alır) ve hâlâ etkin olmalı
+        if (vehicleId) {
+          const [v] = await tx.select({ id: vehicles.id }).from(vehicles).where(and(eq(vehicles.id, vehicleId), eq(vehicles.status, "aktif"))).for("share");
+          if (!v) throw new NotFoundException("Araç bulunamadı");
+        }
         const [{ n }] = (await tx
           .select({ n: count() })
           .from(documents)
@@ -105,7 +113,18 @@ export class DocumentsService {
           replacedKey = pending.fileKey;
           await tx.delete(documents).where(eq(documents.id, pending.id));
         }
-        await tx.insert(documents).values({ id, ownerUserId: userId, vehicleId, type: input.type, fileKey: key, contentType, sizeBytes: file.size, createdAt: now });
+        await tx.insert(documents).values({
+          id,
+          ownerUserId: userId,
+          vehicleId,
+          type: input.type,
+          fileKey: key,
+          contentType,
+          sizeBytes: file.size,
+          companyTitle: company?.title ?? null,
+          companyTaxNo: company?.taxNo ?? null,
+          createdAt: now,
+        });
       });
     } catch (e) {
       await this.storage.delete(key).catch(() => {});
@@ -164,6 +183,7 @@ export class DocumentsService {
         reviewedAt: documents.reviewedAt,
         owner: { id: owner.id, name: owner.name, phone: owner.phone, status: owner.status },
         company: { title: companies.title, taxNo: companies.taxNo, taxOffice: companies.taxOffice, verifiedAt: companies.verifiedAt },
+        uploadedAs: { title: documents.companyTitle, taxNo: documents.companyTaxNo },
         vehicle: { id: vehicles.id, plate: vehicles.plate, vehicleType: vehicles.vehicleType },
       })
       .from(documents)
@@ -175,7 +195,18 @@ export class DocumentsService {
       .limit(PAGE_SIZE + 1)
       .offset((page - 1) * PAGE_SIZE);
     return {
-      items: rows.slice(0, PAGE_SIZE).map((r) => ({ ...r, company: r.company?.title ? r.company : null, vehicle: r.vehicle?.id ? r.vehicle : null })),
+      items: rows.slice(0, PAGE_SIZE).map((r) => {
+        const uploadedAs = r.uploadedAs?.title ? r.uploadedAs : null;
+        const company = r.company?.title ? r.company : null;
+        return {
+          ...r,
+          company,
+          uploadedAs,
+          // Vergi levhası yüklendikten sonra firma kimliği değişti: onay 409 döner, belge reddedilmeli
+          companyChanged: !!uploadedAs && (!company || company.title !== uploadedAs.title || company.taxNo !== uploadedAs.taxNo),
+          vehicle: r.vehicle?.id ? r.vehicle : null,
+        };
+      }),
       page,
       hasMore: rows.length > PAGE_SIZE,
     };
@@ -204,7 +235,21 @@ export class DocumentsService {
       }
       let oldKeys: string[] = [];
       if (d.status === "onay") {
-        if (d.type === "vergi_levhasi") await tx.update(companies).set({ verifiedAt: now }).where(eq(companies.ownerUserId, d.ownerUserId));
+        if (d.type === "vergi_levhasi") {
+          // Yalnız levhanın yüklendiği kimlikteki firma doğrulanır; kimlik değiştiyse onay geri alınır (transaction)
+          const verified = await tx
+            .update(companies)
+            .set({ verifiedAt: now })
+            .where(
+              and(
+                eq(companies.ownerUserId, d.ownerUserId),
+                eq(companies.title, d.companyTitle ?? ""),
+                d.companyTaxNo === null ? isNull(companies.taxNo) : eq(companies.taxNo, d.companyTaxNo),
+              ),
+            )
+            .returning({ id: companies.id });
+          if (verified.length === 0) throw new ConflictException("Firma unvanı ya da vergi numarası belge yüklendikten sonra değişti; belgeyi reddedin, kullanıcı güncel levhayı yüklesin");
+        }
         const old = await tx
           .delete(documents)
           .where(and(sameDocument(d.ownerUserId, d.type, d.vehicleId), ne(documents.id, d.id), ne(documents.status, "bekliyor")))
@@ -272,6 +317,11 @@ export class DocumentsService {
   async vehicleRemoved(ownerUserId: string, vehicleId: string) {
     await this.purge({ ownerUserId, vehicleId });
     await this.trust.refresh(ownerUserId);
+  }
+
+  /** Satırı başka yerde (transaction'da) silinmiş belgelerin dosyaları: commit'ten sonra çağrılır */
+  async removeFiles(keys: string[]) {
+    for (const k of keys) await this.removeFile(k);
   }
 
   private async removeFile(key: string) {

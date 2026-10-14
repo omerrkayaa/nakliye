@@ -134,6 +134,13 @@
       "when": 1791912792127,
       "tag": "0018_documents_upload",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791970807476,
+      "tag": "0019_document_company_snapshot",
+      "breakpoints": true
     }
   ]
 }
