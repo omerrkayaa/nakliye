@@ -18,7 +18,9 @@ async function uiLogin(page: Page, p: string, chooseRole: boolean) {
   await page.goto("/");
   await page.getByLabel("Cep telefonu").locator("visible=true").fill(`0${p.slice(3)}`);
   await vis(page, "SMS kodu gönder").click();
-  await page.getByLabel("SMS kodu").locator("visible=true").fill(await otpFor(p));
+  const codeInput = page.getByLabel("SMS kodu").locator("visible=true");
+  await expect(codeInput).toBeVisible(); // yeni kod gönderildi (günlükte API girişinin eski kodu da var)
+  await codeInput.fill(await otpFor(p));
   await vis(page, "Giriş yap").click();
   if (chooseRole) await vis(page, "Devam").click();
   await expect(page.getByRole("tab", { name: /Profil/ })).toBeVisible({ timeout: 20_000 });

@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { AccountService } from "../account/account.service.js";
+import { AuthService } from "../auth/auth.service.js";
 import { DocumentsService } from "../documents/documents.service.js";
 import { JobsService } from "../jobs/jobs.service.js";
 import { OffersService } from "../jobs/offers.service.js";
@@ -33,6 +34,8 @@ export interface TickStats {
   frozenClosed: number;
   /** Geçerlilik sonu geçen onaylı belgeler: seviye yenilendi, sahibine bildirildi (FR-05) */
   documentsExpired: number;
+  /** Silinen eski kod isteği kayıtları (NFR-04 sınırları) */
+  otpRequestsPurged: number;
 }
 
 /** Periyodik görevlerin tek turu. Her adım tekrar çalıştırılabilir (idempotent). */
@@ -47,6 +50,7 @@ export class SchedulerService {
     private readonly ratings: RatingsService,
     private readonly account: AccountService,
     private readonly documents: DocumentsService,
+    private readonly auth: AuthService,
   ) {}
 
   async tick(now = new Date()): Promise<TickStats> {
@@ -61,6 +65,7 @@ export class SchedulerService {
     const deletedLinksExpired = await this.account.expireDeletedPhoneLinks(now);
     const frozenClosed = await this.account.closeFrozenLeftovers(now);
     const documentsExpired = await this.documents.processExpired(now);
-    return { ...confirmation, capacityExpired, matchSwept, offersClosed, jobsCompleted, ratingsRevealed, deletionsFinished, deletedLinksExpired, frozenClosed, documentsExpired };
+    const otpRequestsPurged = await this.auth.purgeOtpRequests(now);
+    return { ...confirmation, capacityExpired, matchSwept, offersClosed, jobsCompleted, ratingsRevealed, deletionsFinished, deletedLinksExpired, frozenClosed, documentsExpired, otpRequestsPurged };
   }
 }

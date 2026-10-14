@@ -25,7 +25,7 @@ export async function loginAction(_prev: LoginState, form: FormData): Promise<Lo
     const parsed = phoneSchema.safeParse(form.get("phone"));
     if (!parsed.success) return { step: "phone", error: parsed.error.issues[0]?.message };
     try {
-      await api("/auth/otp/request", { method: "POST", body: { phone: parsed.data }, auth: false });
+      await api("/auth/otp/request", { method: "POST", body: { phone: parsed.data }, auth: false, forwardIp: true });
     } catch (e) {
       return { step: form.get("resend") ? "code" : "phone", phone: parsed.data, error: failure(e) };
     }

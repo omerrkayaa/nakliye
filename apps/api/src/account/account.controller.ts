@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Ip, Post, UseGuards } from "@nestjs/common";
 import { deleteAccountSchema, type DeleteAccountInput } from "@nakliye/shared";
 import { AuthGuard, CurrentUser } from "../auth/auth.guard.js";
 import type { AccessPayload } from "../auth/auth.service.js";
@@ -19,8 +19,8 @@ export class AccountController {
   /** Silme onay kodu hesabın numarasına SMS'le gider; silmeyi engelleyen durum varsa (süren taşıma) kod gönderilmez (409). */
   @Post("deletion-code")
   @HttpCode(204)
-  async deletionCode(@CurrentUser() user: AccessPayload) {
-    await this.account.requestDeletionCode(user.sub);
+  async deletionCode(@CurrentUser() user: AccessPayload, @Ip() ip: string) {
+    await this.account.requestDeletionCode(user.sub, ip);
   }
 
   /** FR-08: hesabı dondur; SMS koduyla giriş açar. Süren taşıma ya da yönetici rolü varsa 409. */

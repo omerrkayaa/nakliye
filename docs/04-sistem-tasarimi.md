@@ -215,7 +215,7 @@ Parametreler (`price_params`) araç tipine göre tutulur ve yönetici panelinden
 ---
 
 ## 8. Güvenlik ve KVKK tasarımı
-- OTP: 6 hane, 3 dk geçerli, numara başına 5 deneme, IP başına hız sınırı.
+- OTP: 6 hane, 3 dk geçerli, kod başına 5 deneme; aynı amaçla 60 sn'de bir kod; numara başına 24 saatte en çok 10 kod (giriş ve silme kodu birlikte); IP başına saatte en çok 20 farklı numara (IPv6'da /64 ağı sayılır). Aşılınca 429 ve kalan süre ("… 3 saat 20 dakika sonra tekrar deneyin"). İstemci IP'si `X-Forwarded-For`'dan yalnız güvenilen vekil (`TRUST_PROXY`) aracılığıyla alınır; yayında web'in önünde gerçek adresi yazan ters vekil gerekir. Kaba kuvvet üst sınırı: numara başına günde 10 × 5 = 50 tahmin → 50 / 10⁶ = %0,005.
 - Belgeler: özel bucket, 5 dk geçerli imzalı URL, sadece sahibi ve yönetici görür.
 - Telefon numarası: listede maskeli (0532 *** ** 12), "Ara" ile açılır ve loglanır (BR-40).
 - Teslim kodu veritabanında hash olarak saklanır.

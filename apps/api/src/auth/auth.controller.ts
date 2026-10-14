@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Post } from "@nestjs/common";
+import { Body, Controller, HttpCode, Ip, Post } from "@nestjs/common";
 import { otpRequestSchema, otpVerifySchema } from "@nakliye/shared";
 import { z } from "zod";
 import { ZodPipe } from "../common/zod.pipe.js";
@@ -12,8 +12,9 @@ export class AuthController {
 
   @Post("otp/request")
   @HttpCode(204)
-  async requestOtp(@Body(new ZodPipe(otpRequestSchema)) body: z.infer<typeof otpRequestSchema>) {
-    await this.auth.requestOtp(body.phone);
+  async requestOtp(@Body(new ZodPipe(otpRequestSchema)) body: z.infer<typeof otpRequestSchema>, @Ip() ip: string) {
+    // ip: Express trust proxy ile çözülür (main.ts); web BFF istemcinin adresini X-Forwarded-For ile iletir
+    await this.auth.requestOtp(body.phone, "giris", ip);
   }
 
   @Post("otp/verify")

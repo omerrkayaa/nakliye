@@ -261,3 +261,31 @@ test("çıkış: panele erişim kapanır, refresh API'de iptal edilir", async ()
   await expect(page).toHaveURL(/\/giris\?sonra=/);
   expect((await api("POST", "/auth/refresh", undefined, { refreshToken: oldRefresh })).status).toBe(401);
 });
+
+test("kod sınırı (NFR-04): numaraya 24 saatte 10 kod istendiyse form kalan süreyi gösterir", async ({ browser }) => {
+  const p = phone(70);
+  psql(`insert into otp_requests(phone, ip, purpose) select '${p}', null, 'giris' from generate_series(1, 10)`);
+  const ctx = await browser.newContext({ baseURL: BASE });
+  const pg = await ctx.newPage();
+  await pg.goto("/giris");
+  await pg.getByLabel("Cep telefonu").fill(localPhone(p));
+  await pg.getByRole("button", { name: "SMS kodu gönder" }).click();
+  await expect(pg.locator("#login-error")).toHaveText("Bu numara için çok fazla kod istendi. 24 saat sonra tekrar deneyin.");
+  await ctx.close();
+});
+
+test("kod isteğinde istemcinin adresi API'ye iletilir; vekilsiz yayında başlığı istemci yazabilir (yayında ters vekil şart)", async ({ browser }) => {
+  const ipOf = (p: string) => psql(`select ip from otp_requests where phone='${p}'`);
+  for (const [n, xff] of [[71, undefined], [72, "198.51.100.23"]] as const) {
+    const ctx = await browser.newContext({ baseURL: BASE, extraHTTPHeaders: xff ? { "x-forwarded-for": xff } : {} });
+    const pg = await ctx.newPage();
+    await pg.goto("/giris");
+    await pg.getByLabel("Cep telefonu").fill(localPhone(phone(n)));
+    await pg.getByRole("button", { name: "SMS kodu gönder" }).click();
+    await expect(pg.getByLabel(/numarasına gelen kod/)).toBeVisible();
+    await ctx.close();
+  }
+  // Başlıksız: Next soket adresini yazar (aynı makine); başlıklı: Next ezmez, olduğu gibi iletilir
+  expect(ipOf(phone(71))).toMatch(/^(127\.0\.0\.1|0:0:0:0::\/64)$/); // ::1 → /64 ağı
+  expect(ipOf(phone(72))).toBe("198.51.100.23");
+});

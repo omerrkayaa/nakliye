@@ -141,6 +141,21 @@ export const otpCodes = pgTable(
   (t) => [primaryKey({ columns: [t.phone, t.purpose] })],
 );
 
+// NFR-04 (docs/04 §8): kod isteği kaydı — numara başına günlük, IP başına saatlik sınır (SMS maliyeti, kaba kuvvet,
+// taciz). 2 günden eskiler zamanlayıcıda silinir. ip: istemci adresinin sınır anahtarı (IPv4 ya da IPv6 /64 ağı;
+// AuthService.ipLimitKey; adres main.ts trust proxy ile çözülür).
+export const otpRequests = pgTable(
+  "otp_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    phone: varchar("phone", { length: 16 }).notNull(),
+    ip: varchar("ip", { length: 45 }),
+    purpose: varchar("purpose", { length: 8 }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("otp_requests_phone_idx").on(t.phone, t.createdAt), index("otp_requests_ip_idx").on(t.ip, t.createdAt)],
+);
+
 export const refreshTokens = pgTable("refresh_tokens", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),

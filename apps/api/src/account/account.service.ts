@@ -156,10 +156,10 @@ export class AccountService {
   }
 
   /** Silme onay kodu hesabın kendi numarasına gider (giriş kodu gibi; tekrar istemek için 60 sn beklenir). */
-  async requestDeletionCode(userId: string, now = new Date()): Promise<void> {
+  async requestDeletionCode(userId: string, ip: string | null = null, now = new Date()): Promise<void> {
     const blocker = await this.deletionBlocker(userId, now, this.db, true);
     if (blocker) throw new ConflictException(blocker);
-    await this.auth.requestOtp(await this.phoneOf(userId), "silme");
+    await this.auth.requestOtp(await this.phoneOf(userId), "silme", ip, now);
   }
 
   /**

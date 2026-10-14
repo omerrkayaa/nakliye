@@ -1,4 +1,5 @@
-import { cookies } from "next/headers";
+import { isIP } from "node:net";
+import { cookies, headers as requestHeaders } from "next/headers";
 import { redirect } from "next/navigation";
 import { ACCESS_COOKIE, API_URL } from "./session";
 
@@ -24,6 +25,8 @@ interface Options {
   body?: unknown;
   /** false: oturumsuz uç nokta (OTP, SMS teyit linki) */
   auth?: boolean;
+  /** İstemcinin adresi API'ye iletilir (kod istekleri: IP başına sınır, NFR-04) */
+  forwardIp?: boolean;
 }
 
 /**
@@ -31,7 +34,7 @@ interface Options {
  * Belirteç yoksa ya da API reddederse (ör. JWT anahtarı değişti) giriş sayfasına; yan etkili bir GET adresi
  * (çerez silen) kullanılmaz, çünkü link önyüklemesi onu da çağırabilir. Yeni giriş çerezlerin üzerine yazar.
  */
-export async function api<T>(path: string, { method = "GET", body, auth = true }: Options = {}): Promise<T> {
+export async function api<T>(path: string, { method = "GET", body, auth = true, forwardIp = false }: Options = {}): Promise<T> {
   const multipart = body instanceof FormData;
   // Çok parçalı gövdede content-type'ı fetch sınır (boundary) ile kendi yazar
   const headers: Record<string, string> = multipart ? {} : { "content-type": "application/json" };
@@ -39,6 +42,10 @@ export async function api<T>(path: string, { method = "GET", body, auth = true }
     const token = (await cookies()).get(ACCESS_COOKIE)?.value;
     if (!token) redirect(INVALID_SESSION);
     headers.authorization = `Bearer ${token}`;
+  }
+  if (forwardIp) {
+    const ip = await clientIp();
+    if (ip) headers["x-forwarded-for"] = ip;
   }
   const res = await fetch(API_URL + path, {
     method,
@@ -52,6 +59,16 @@ export async function api<T>(path: string, { method = "GET", body, auth = true }
   if (res.status === 403 && auth && messageOf(json, res.status) === SUSPENDED) redirect("/giris?oturum=askida");
   if (!res.ok) throw new ApiError(res.status, messageOf(json, res.status), fieldsOf(json));
   return json as T;
+}
+
+/**
+ * İstemci adresi: X-Forwarded-For'un en sağdaki girdisi, yani Next'e bağlanan son taraf. Önde ters vekil varsa onun
+ * eklediği gerçek adres; yoksa Next başlık hiç gelmediğinde soket adresini yazar ama istemcinin gönderdiğini ezmez —
+ * vekilsiz yayında IP sınırı atlatılabilir (numara sınırı yine geçerli). Geçersiz değer iletilmez.
+ */
+async function clientIp(): Promise<string | undefined> {
+  const last = (await requestHeaders()).get("x-forwarded-for")?.split(",").pop()?.trim();
+  return last && isIP(last) ? last : undefined;
 }
 
 function fieldsOf(json: unknown): Record<string, string> {

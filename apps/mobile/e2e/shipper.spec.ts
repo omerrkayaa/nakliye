@@ -208,7 +208,9 @@ test("yük sahibi: teslim edilen taşımaya itiraz (sebep zorunlu)", async ({ pa
   await page.goto("/");
   await page.getByLabel("Cep telefonu").locator("visible=true").fill(`0${me.slice(3)}`);
   await vis(page, "SMS kodu gönder").click();
-  await page.getByLabel("SMS kodu").locator("visible=true").fill(await otpFor(me));
+  const codeInput = page.getByLabel("SMS kodu").locator("visible=true");
+  await expect(codeInput).toBeVisible(); // yeni kod gönderildi (günlükte API girişinin eski kodu da var)
+  await codeInput.fill(await otpFor(me));
   await vis(page, "Giriş yap").click();
   await page.getByRole("tab", { name: /İşlerim/ }).click();
   await btn(page, /Efeler, Aydın/).first().click();
@@ -246,7 +248,9 @@ test("yük sahibi: iptal edilen işin ilanı eski bilgilerle yeniden yayınlanı
   await page.goto("/");
   await page.getByLabel("Cep telefonu").locator("visible=true").fill(`0${me.slice(3)}`);
   await vis(page, "SMS kodu gönder").click();
-  await page.getByLabel("SMS kodu").locator("visible=true").fill(await otpFor(me));
+  const codeInput = page.getByLabel("SMS kodu").locator("visible=true");
+  await expect(codeInput).toBeVisible(); // yeni kod gönderildi (günlükte API girişinin eski kodu da var)
+  await codeInput.fill(await otpFor(me));
   await vis(page, "Giriş yap").click();
   await page.getByRole("tab", { name: /İşlerim/ }).click();
   await vis(page, "Geçmiş", true).click();

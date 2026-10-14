@@ -1,5 +1,6 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import { AppModule } from "./app.module.js";
 
 async function bootstrap() {
@@ -15,7 +16,13 @@ async function bootstrap() {
     if (!value) throw new Error(`${key} tanımlı değil (.env.example'a bakın)`);
     if (process.env.NODE_ENV === "production" && value === "degistir-beni") throw new Error(`${key} örnek değerde; yayında güçlü, gizli bir değer verin`);
   }
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // İstemci IP'si (OTP sınırı, NFR-04): X-Forwarded-For yalnız güvenilen vekilden gelirse dikkate alınır; aksi hâlde
+  // başlığı uyduran IP sınırını aşardı. Varsayılan "loopback": aynı makinedeki web BFF (Next) ve ters vekil. Yayında
+  // vekilin adresi/alt ağı verilir (TRUST_PROXY=10.0.0.0/8 gibi; "false" = hiç güvenme). Next, istemcinin gönderdiği
+  // X-Forwarded-For'u ezmez: Next'in önünde gerçek adresi yazan bir ters vekil (nginx/Caddy) olmalı.
+  const trust = process.env.TRUST_PROXY ?? "loopback";
+  app.set("trust proxy", trust === "false" ? false : trust === "true" ? true : /^\d+$/.test(trust) ? Number(trust) : trust);
   app.setGlobalPrefix("api/v1");
   // Kapanışta zamanlayıcı (pg-boss) düzgün dursun
   app.enableShutdownHooks();

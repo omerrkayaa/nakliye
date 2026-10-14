@@ -1,12 +1,13 @@
+import { isIP } from "node:net";
 import { ForbiddenException, HttpException, HttpStatus, Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 import { ACCOUNT_DELETION } from "@nakliye/shared";
 import { JwtService } from "@nestjs/jwt";
-import { and, eq, gt, isNull, lt, sql } from "drizzle-orm";
-import { trDateTime } from "../common/format.js";
+import { and, asc, eq, gt, isNull, lt, ne, sql } from "drizzle-orm";
+import { trDateTime, trDuration } from "../common/format.js";
 import { deletedPhoneHmac, randomToken, sha256, sixDigitCode } from "../common/hash.js";
 import { SmsService } from "../common/sms.service.js";
 import { DB, type Db, type Tx } from "../db/db.module.js";
-import { otpCodes, refreshTokens, userRoles, users } from "../db/schema.js";
+import { otpCodes, otpRequests, refreshTokens, userRoles, users } from "../db/schema.js";
 
 // docs/04 §8: OTP 6 hane, 3 dk geçerli, 5 deneme
 const OTP_TTL_MS = 3 * 60_000;
@@ -14,6 +15,40 @@ const OTP_MAX_ATTEMPTS = 5;
 const OTP_RESEND_MS = 60_000;
 const REFRESH_TTL_MS = 30 * 24 * 3_600_000;
 const DAY_MS = 24 * 3_600_000;
+const HOUR_MS = 3_600_000;
+
+/**
+ * NFR-04 kod isteği sınırları (2026-10-14 karar: numara başına günde ~5–10, IP başına saatte ~20 farklı
+ * numara). Ortam değişkeniyle değişir; 0 = kapalı. Test sunucusunda IP sınırı kapalı çalışır (tüm takımlar tek
+ * makineden yüzlerce numarayla girer); güvenlik takımı sınırları açık kendi sunucusunu başlatır.
+ */
+const limit = (key: string, fallback: number) => {
+  const v = process.env[key];
+  const n = v === undefined || v === "" ? NaN : Number(v);
+  return Number.isInteger(n) && n >= 0 ? n : fallback;
+};
+export const otpPhoneDailyLimit = () => limit("OTP_PHONE_DAILY_LIMIT", 10);
+export const otpIpHourlyLimit = () => limit("OTP_IP_HOURLY_LIMIT", 20);
+
+/**
+ * IP sınırının anahtarı: IPv4 adresin kendisi (IPv4-eşlemeli IPv6 da); IPv6'da /64 ağı. Bir abone genelde koca bir /64
+ * alır: adres başına saymak, her istekte başka adres kullananı hiç durdurmazdı. IP değilse null (sınır uygulanmaz).
+ */
+export function ipLimitKey(ip: string | null): string | null {
+  if (!ip) return null;
+  const v = isIP(ip);
+  if (v === 4) return ip;
+  if (v !== 6) return null;
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip);
+  if (mapped) return mapped[1]!;
+  // Sondaki gömülü IPv4 (a.b.c.d) iki 16 bitlik gruba çevrilir; "::" eksik sıfır gruplarıyla açılır
+  const hex = ip.replace(/(\d+)\.(\d+)\.(\d+)\.(\d+)$/, (_, a, b, c, d) => `${((+a << 8) | +b).toString(16)}:${((+c << 8) | +d).toString(16)}`);
+  const [head, tail] = hex.split("::");
+  const h = head ? head.split(":") : [];
+  const t = tail ? tail.split(":") : [];
+  const groups = tail === undefined ? h : [...h, ...Array<string>(8 - h.length - t.length).fill("0"), ...t];
+  return `${groups.slice(0, 4).map((g) => parseInt(g, 16).toString(16)).join(":")}::/64`;
+}
 // Destek kanalı (W4 iletişim) gelince mesaja eklenmeli
 export const SUSPENDED_MESSAGE = "Hesabınız askıya alındı.";
 /** Silme başladı ama anonimleştirme bitmedi (zamanlayıcı tamamlar); numara o ana kadar yeni hesaba açılamaz */
@@ -63,16 +98,68 @@ export class AuthService {
     return and(eq(otpCodes.phone, phone), eq(otpCodes.purpose, purpose));
   }
 
-  async requestOtp(phone: string, purpose: OtpPurpose = "giris"): Promise<void> {
-    const [existing] = await this.db.select().from(otpCodes).where(this.otpKey(phone, purpose));
-    if (existing && existing.expiresAt.getTime() - OTP_TTL_MS + OTP_RESEND_MS > Date.now()) {
-      throw new HttpException("Yeni kod için biraz bekleyin", HttpStatus.TOO_MANY_REQUESTS);
-    }
-
-    const code = demoCode(phone) ?? sixDigitCode();
-    const row = { phone, purpose, codeHash: this.otpHash(phone, code), expiresAt: new Date(Date.now() + OTP_TTL_MS), attempts: 0 };
-    await this.db.insert(otpCodes).values(row).onConflictDoUpdate({ target: [otpCodes.phone, otpCodes.purpose], set: row });
+  /**
+   * Kod gönderir. Sınırlar (NFR-04): aynı amaçla 60 sn'de bir; numara başına 24 saatte OTP_PHONE_DAILY_LIMIT kod (giriş +
+   * silme birlikte); IP başına saatte OTP_IP_HOURLY_LIMIT farklı numara (aynı numarayı yeniden istemek sayılmaz). Sınırı
+   * aşan istek 429 ve ne zaman tekrar denenebileceği. Denetim ve kayıt numara (ve IP) kilidi altında: paralel istekler
+   * sınırı aşamaz. Kilit sırası her zaman numara → IP (kilitlenme olmasın). Demo numarası (yalnız geliştirme) sınırsız.
+   * @param rawIp istemci adresi (Express trust proxy ile çözülmüş); yoksa ya da IP değilse IP sınırı uygulanmaz (güvenilen
+   *   vekil zincirinin sonundaki değer istemcinin yazdığı bir metin olabilir). Kayda ipLimitKey yazılır.
+   */
+  async requestOtp(phone: string, purpose: OtpPurpose = "giris", rawIp: string | null = null, now = new Date()): Promise<void> {
+    const ip = ipLimitKey(rawIp);
+    const demo = demoCode(phone);
+    const code = demo ?? sixDigitCode();
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`otp:${phone}`}))`);
+      const [existing] = await tx.select().from(otpCodes).where(this.otpKey(phone, purpose));
+      if (existing && existing.expiresAt.getTime() - OTP_TTL_MS + OTP_RESEND_MS > now.getTime()) {
+        throw new HttpException("Yeni kod için biraz bekleyin", HttpStatus.TOO_MANY_REQUESTS);
+      }
+      if (!demo) await this.checkRequestLimits(tx, phone, ip, now);
+      await tx.insert(otpRequests).values({ phone, ip, purpose, createdAt: now });
+      const row = { phone, purpose, codeHash: this.otpHash(phone, code), expiresAt: new Date(now.getTime() + OTP_TTL_MS), attempts: 0 };
+      await tx.insert(otpCodes).values(row).onConflictDoUpdate({ target: [otpCodes.phone, otpCodes.purpose], set: row });
+    });
     await this.sms.send(phone, OTP_SMS[purpose](code));
+  }
+
+  private async checkRequestLimits(tx: Tx, phone: string, ip: string | null, now: Date) {
+    const daily = otpPhoneDailyLimit();
+    if (daily > 0) {
+      const recent = await tx
+        .select({ at: otpRequests.createdAt })
+        .from(otpRequests)
+        .where(and(eq(otpRequests.phone, phone), gt(otpRequests.createdAt, new Date(now.getTime() - DAY_MS))))
+        .orderBy(asc(otpRequests.createdAt))
+        .limit(daily);
+      if (recent.length >= daily) {
+        // En eski istek 24 saati doldurunca bir hak açılır
+        const wait = recent[0]!.at.getTime() + DAY_MS - now.getTime();
+        throw new HttpException(`Bu numara için çok fazla kod istendi. ${trDuration(wait)} sonra tekrar deneyin.`, HttpStatus.TOO_MANY_REQUESTS);
+      }
+    }
+    const hourly = otpIpHourlyLimit();
+    if (ip && hourly > 0) {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`otp-ip:${ip}`}))`);
+      // Bu IP'den son bir saatte kod istenen başka numaralar; her numaranın son isteği (o çıkınca sayı düşer)
+      const others = await tx
+        .select({ last: sql<string>`max(${otpRequests.createdAt})` })
+        .from(otpRequests)
+        .where(and(eq(otpRequests.ip, ip), gt(otpRequests.createdAt, new Date(now.getTime() - HOUR_MS)), ne(otpRequests.phone, phone)))
+        .groupBy(otpRequests.phone)
+        .orderBy(sql`max(${otpRequests.createdAt})`);
+      if (others.length >= hourly) {
+        const wait = new Date(others[0]!.last).getTime() + HOUR_MS - now.getTime();
+        throw new HttpException(`Çok fazla deneme yaptınız. ${trDuration(wait)} sonra tekrar deneyin.`, HttpStatus.TOO_MANY_REQUESTS);
+      }
+    }
+  }
+
+  /** Zamanlayıcı: 2 günden eski kod isteği kayıtları (sınırlar en çok 24 saate bakar) */
+  async purgeOtpRequests(now = new Date()): Promise<number> {
+    const r = await this.db.delete(otpRequests).where(lt(otpRequests.createdAt, new Date(now.getTime() - 2 * DAY_MS))).returning({ id: otpRequests.id });
+    return r.length;
   }
 
   /** Kodu doğrular ve harcar (tek kullanımlık); her deneme hakkından düşer. Giriş ve hesap silme kullanır. */

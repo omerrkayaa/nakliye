@@ -15,7 +15,7 @@ export interface DeletionState {
 /** Silme onay kodu hesabın numarasına gider. Süren taşıma varsa API kod göndermez (409, mesaj gösterilir). */
 export async function requestDeletionCodeAction(prev: DeletionState): Promise<DeletionState> {
   try {
-    await api("/me/deletion-code", { method: "POST" });
+    await api("/me/deletion-code", { method: "POST", forwardIp: true });
   } catch (e) {
     if (e instanceof ApiError) return { sent: prev.sent, error: e.message };
     throw e;
