@@ -2,6 +2,7 @@
 // Testler Node.js'te çalışır (Playwright); uygulama kodu Node tiplerini görmez.
 import { expect, type Page } from "@playwright/test";
 import { execFileSync, execSync } from "node:child_process";
+import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -61,12 +62,40 @@ export async function apiUser(p: string, roles: string[] = []) {
   return (await api<{ accessToken: string }>("POST", "/me/roles", t.accessToken, { roles })).body.accessToken;
 }
 
-/** Yönetici belirteci: rol DB'den verilir, refresh ile rolü taşıyan belirteç alınır */
+/** Yönetici belirteci: rol DB'den verilir; yönetici rolü belirtece ikinci adımla girer (NFR-04) */
 export async function adminToken(p: string) {
+  return (await adminSession(p)).accessToken;
+}
+
+/** Yönetici oturumu: giriş + rol + doğrulama uygulaması kurulumu (setup → kod → enable); anahtar ve kurtarma kodlarıyla */
+export async function adminSession(p: string) {
   await api("POST", "/auth/otp/request", undefined, { phone: p });
-  const t = (await api<{ refreshToken: string }>("POST", "/auth/otp/verify", undefined, { phone: p, code: await otpFor(p) })).body;
+  const t = (await api<{ accessToken: string }>("POST", "/auth/otp/verify", undefined, { phone: p, code: await otpFor(p) })).body;
   psql(`insert into user_roles(user_id, role) select id, 'admin' from users where phone='${p}' on conflict do nothing`);
-  return (await api<{ accessToken: string }>("POST", "/auth/refresh", undefined, { refreshToken: t.refreshToken })).body.accessToken;
+  const s = await api<{ secret: string }>("POST", "/me/totp/setup", t.accessToken, {});
+  const e = await api<{ accessToken: string; recoveryCodes: string[] }>("POST", "/me/totp/enable", t.accessToken, { code: totp(s.body.secret) });
+  if (e.status !== 201) throw new Error(`TOTP etkinleşmedi: ${e.status} ${JSON.stringify(e.body)}`);
+  return { ...e.body, secret: s.body.secret };
+}
+
+/** RFC 6238 (HMAC-SHA-1, 6 hane, 30 sn) — API'nin kodundan bağımsız: doğrulama uygulamasının o an göstereceği kod */
+export function totp(secretB32: string, offset = 0, ms = Date.now()): string {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = 0, value = 0;
+  const bytes: number[] = [];
+  for (const ch of secretB32) {
+    value = (value << 5) | alphabet.indexOf(ch);
+    bits += 5;
+    if (bits >= 8) {
+      bytes.push((value >>> (bits - 8)) & 255);
+      bits -= 8;
+    }
+  }
+  const msg = Buffer.alloc(8);
+  msg.writeBigUInt64BE(BigInt(Math.floor(ms / 30_000) + offset));
+  const h = createHmac("sha1", Buffer.from(bytes)).update(msg).digest();
+  const o = h[19]! & 0xf;
+  return String((h.readUInt32BE(o) & 0x7fffffff) % 1_000_000).padStart(6, "0");
 }
 
 export const demoToken = () => apiUser(DEMO_PHONE);

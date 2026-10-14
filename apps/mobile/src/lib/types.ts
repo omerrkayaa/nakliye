@@ -23,6 +23,13 @@ export interface Tokens {
   reopened?: "dondurma" | "silme";
 }
 
+/** İkinci adımı kurulu hesapta (yönetici, NFR-04) otp/verify belirteç yerine bunu döner; kod POST /auth/totp ile */
+export interface MfaChallenge {
+  mfaRequired: true;
+  challenge: string;
+  reopened?: "dondurma" | "silme";
+}
+
 export interface Province {
   id: number;
   name: string;

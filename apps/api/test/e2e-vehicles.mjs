@@ -3,6 +3,7 @@
 // Kullanım (apps/api içinden): node test/e2e-vehicles.mjs api.log
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { adminSession } from "./lib/admin.mjs";
 
 const LOG = process.argv[2];
 const B = "http://localhost:3000/api/v1";
@@ -49,7 +50,7 @@ const C2 = await user(phone(2), ["carrier"]);
 const S = await user(phone(3), ["shipper"]);
 const aLogin = await login(phone(9));
 psql(`insert into user_roles(user_id, role) select id, 'admin' from users where phone='${phone(9)}' on conflict do nothing`);
-const A = (await api("POST", "/auth/refresh", null, { refreshToken: aLogin.refreshToken })).body.accessToken;
+const A = (await adminSession(api, aLogin.accessToken)).accessToken; // NFR-04: yönetici rolü ikinci adımla
 
 const locs = (await api("GET", "/locations")).body;
 const district = (prov, name) => locs.find((p) => p.name === prov).districts.find((d) => d.name === name).id;

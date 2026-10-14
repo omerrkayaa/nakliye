@@ -2,6 +2,7 @@
 // Yalıtım: +90543… numaraları, Sinop → Bartın ilanları (sonda iptal). Ön koşul: e2e-confirmation.mjs ile aynı.
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { adminSession } from "./lib/admin.mjs";
 
 const LOG = process.argv[2];
 const B = "http://localhost:3000/api/v1";
@@ -42,7 +43,7 @@ const S = (await api("POST", "/me/roles", s.accessToken, { roles: ["shipper"] })
 await api("PATCH", "/me", S, { name: "Paylaşım Deneme" });
 const a = await login(phone(9));
 psql(`insert into user_roles(user_id, role) select id, 'admin' from users where phone='${phone(9)}' on conflict do nothing`);
-const A = (await api("POST", "/auth/refresh", null, { refreshToken: a.refreshToken })).body.accessToken;
+const A = (await adminSession(api, a.accessToken)).accessToken; // NFR-04: yönetici rolü ikinci adımla
 
 const locs = (await api("GET", "/locations")).body;
 const district = (prov, name) => locs.find((p) => p.name === prov).districts.find((d) => d.name === name).id;

@@ -4,6 +4,8 @@ import { SmsService } from "../common/sms.service.js";
 import { AuthController } from "./auth.controller.js";
 import { AuthGuard } from "./auth.guard.js";
 import { AuthService } from "./auth.service.js";
+import { MfaController } from "./mfa.controller.js";
+import { MfaService } from "./mfa.service.js";
 
 @Global()
 @Module({
@@ -16,8 +18,8 @@ import { AuthService } from "./auth.service.js";
       },
     }),
   ],
-  controllers: [AuthController],
-  providers: [AuthService, AuthGuard, SmsService],
-  exports: [AuthService, AuthGuard, JwtModule, SmsService],
+  controllers: [AuthController, MfaController],
+  providers: [AuthService, MfaService, AuthGuard, SmsService],
+  exports: [AuthService, MfaService, AuthGuard, JwtModule, SmsService],
 })
 export class AuthModule {}

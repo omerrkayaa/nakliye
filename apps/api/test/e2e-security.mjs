@@ -6,6 +6,7 @@
 // Ön koşul: npm run build (dist), DB ayakta. Kullanım (apps/api içinden): node test/e2e-security.mjs
 import { spawn, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { adminSession } from "./lib/admin.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const psql = (q) => execFileSync("docker", ["exec", "nakliye-db-1", "psql", "-U", "nakliye", "-d", "nakliye", "-tAc", q]).toString().trim();
@@ -174,7 +175,7 @@ try {
   const adminPhone = phone(600);
   const a = await login(adminPhone, ip(50));
   psql(`insert into user_roles(user_id, role) select id, 'admin' from users where phone='${adminPhone}' on conflict do nothing`);
-  const adminToken = (await api(A, "POST", "/auth/refresh", { body: { refreshToken: a.refreshToken } })).body.accessToken;
+  const adminToken = (await adminSession((m, path, token, body) => api(A, m, path, { token, body }), a.accessToken)).accessToken;
   psql(`insert into otp_requests(phone, ip, purpose, created_at) values ('${phone(601)}', null, 'giris', now() - interval '49 hours'), ('${phone(602)}', null, 'giris', now() - interval '47 hours')`);
   r = await api(A, "POST", "/admin/tick", { token: adminToken });
   check("tur eski kaydı sildi, 2 günden yenisi kaldı", r.status === 200 && r.body.otpRequestsPurged >= 1 && rows(`phone='${phone(601)}'`) === 0 && rows(`phone='${phone(602)}'`) === 1, JSON.stringify(r.body).slice(0, 200));

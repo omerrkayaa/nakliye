@@ -5,6 +5,7 @@
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { corridorEstimate, roadEstimate } from "@nakliye/shared";
+import { adminSession } from "./lib/admin.mjs";
 
 const LOG = process.argv[2];
 const B = "http://localhost:3000/api/v1";
@@ -59,7 +60,7 @@ const C = await userWithRoles(phone(3), ["carrier"]);
 const adminLogin = await login(phone(4));
 const adminId = psql(`select id from users where phone='${phone(4)}'`);
 psql(`insert into user_roles(user_id, role) values ('${adminId}','admin') on conflict do nothing`);
-const A = (await api("POST", "/auth/refresh", null, { refreshToken: adminLogin.refreshToken })).body.accessToken;
+const A = (await adminSession(api, adminLogin.accessToken)).accessToken; // NFR-04: yönetici rolü ikinci adımla
 
 const locs = (await api("GET", "/locations")).body;
 const district = (prov, name) => locs.find((p) => p.name === prov).districts.find((d) => d.name === name).id;
@@ -93,8 +94,14 @@ check("nakliyeci detayda 404", (await api("GET", `/loads/${L1}`, C)).status === 
 check("sahibi İlanlarım'da görür", (await api("GET", "/loads/mine", S)).body.items.some((l) => l.id === L1));
 check("moderasyonda teyit 409", (await api("POST", `/loads/${L1}/confirm`, S, { answer: "gecerli" })).status === 409);
 check("yönetici olmayan kuyruğa erişemez 403", (await api("GET", "/admin/loads", S)).status === 403);
-r = await api("GET", "/admin/loads", A);
-check("yönetici kuyrukta görür + telefon", r.body.items?.some((l) => l.id === L1 && l.shipperPhone === phone(1)));
+// Kuyruk en eskiden başlar ve sayfalıdır: DB'de başka takımların bekleyen ilanları varsa yeni ilan sonraki sayfalarda
+let queued;
+for (let pg = 1; pg <= 50 && !queued; pg++) {
+  r = await api("GET", `/admin/loads?page=${pg}`, A);
+  queued = r.body.items?.find((l) => l.id === L1);
+  if (!r.body.hasMore) break;
+}
+check("yönetici kuyrukta görür + telefon", queued?.shipperPhone === phone(1), JSON.stringify(r.body).slice(0, 120));
 r = await api("POST", `/admin/loads/${L1}/review`, A, { decision: "onay" });
 check("onay → teyitli", r.body.status === "teyitli" && r.body.moderation === "onay");
 

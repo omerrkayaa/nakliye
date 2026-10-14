@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -61,8 +61,37 @@ export async function adminToken(n = 900) {
   const p = phone(n);
   const t = await apiLogin(p);
   psql(`insert into user_roles(user_id, role) select id, 'admin' from users where phone='${p}' on conflict do nothing`);
-  return (await api("POST", "/auth/refresh", undefined, { refreshToken: t.refreshToken })).body.accessToken!;
+  return (await adminSession(t.accessToken)).accessToken;
 }
+
+/** RFC 6238 (HMAC-SHA-1, 6 hane, 30 sn) — API'nin kodundan bağımsız: doğrulama uygulamasının o an göstereceği kod */
+export function totp(secretB32: string, offset = 0, ms = Date.now()): string {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = 0, value = 0;
+  const bytes: number[] = [];
+  for (const ch of secretB32.replace(/\s/g, "")) {
+    value = (value << 5) | alphabet.indexOf(ch);
+    bits += 5;
+    if (bits >= 8) {
+      bytes.push((value >>> (bits - 8)) & 255);
+      bits -= 8;
+    }
+  }
+  const msg = Buffer.alloc(8);
+  msg.writeBigUInt64BE(BigInt(Math.floor(ms / 30_000) + offset));
+  const h = createHmac("sha1", Buffer.from(bytes)).update(msg).digest();
+  const o = h[19]! & 0xf;
+  return String((h.readUInt32BE(o) & 0x7fffffff) % 1_000_000).padStart(6, "0");
+}
+
+/** NFR-04: rolü DB'den verilmiş yöneticinin ikinci adım kurulumu; dönen belirteçler yönetici rolünü taşır */
+export async function adminSession(accessToken: string) {
+  const s = await api<{ secret: string }>("POST", "/me/totp/setup", accessToken, {});
+  const e = await api<{ accessToken: string; refreshToken: string; recoveryCodes: string[] }>("POST", "/me/totp/enable", accessToken, { code: totp(s.body.secret) });
+  if (e.status !== 201) throw new Error(`TOTP etkinleşmedi: ${e.status} ${JSON.stringify(e.body)}`);
+  return { ...e.body, secret: s.body.secret };
+}
+
 
 const trDay = (offset: number) => new Date(Date.now() + 3 * 3600e3 + offset * 86400e3).toISOString().slice(0, 10);
 

@@ -7,7 +7,7 @@ import { trDateTime, trDuration } from "../common/format.js";
 import { deletedPhoneHmac, randomToken, sha256, sixDigitCode } from "../common/hash.js";
 import { SmsService } from "../common/sms.service.js";
 import { DB, type Db, type Tx } from "../db/db.module.js";
-import { otpCodes, otpRequests, refreshTokens, userRoles, users } from "../db/schema.js";
+import { mfaChallenges, otpCodes, otpRequests, refreshTokens, userRoles, users, userTotp } from "../db/schema.js";
 
 // docs/04 §8: OTP 6 hane, 3 dk geçerli, 5 deneme
 const OTP_TTL_MS = 3 * 60_000;
@@ -16,6 +16,10 @@ const OTP_RESEND_MS = 60_000;
 const REFRESH_TTL_MS = 30 * 24 * 3_600_000;
 const DAY_MS = 24 * 3_600_000;
 const HOUR_MS = 3_600_000;
+/** NFR-04: SMS kodundan sonra ikinci adım için süre; yönetici rolünün ikinci adımdan sonra geçerli kaldığı süre */
+const MFA_CHALLENGE_MS = 5 * 60_000;
+export const ADMIN_MFA_MS = 12 * HOUR_MS;
+const mfaFresh = (mfaAt: Date | null, now = new Date()) => !!mfaAt && mfaAt <= now && now.getTime() - mfaAt.getTime() < ADMIN_MFA_MS;
 
 /**
  * NFR-04 kod isteği sınırları (2026-10-14 karar: numara başına günde ~5–10, IP başına saatte ~20 farklı
@@ -72,7 +76,7 @@ function demoCode(phone: string): string | null {
 }
 
 /** Girişte hesap bu arada aktiflikten çıktıysa (askı, silme, dondurma ile yarış) */
-const loginDenied = (status: string | undefined) =>
+export const loginDenied = (status: string | undefined) =>
   status === "askida" ? new ForbiddenException(SUSPENDED_MESSAGE) : status === "silindi" ? new ForbiddenException(DELETING_MESSAGE) : new UnauthorizedException("Giriş yapılamadı; tekrar deneyin");
 /** Askıya alınan hesabın belirteçleri askıya alırken iptal edilir; bu ikinci kilit (yarışta açık kalanlar için) */
 const refreshDenied = (status: string | undefined) => new UnauthorizedException(status === "askida" ? SUSPENDED_MESSAGE : "Oturum süresi doldu");
@@ -80,6 +84,8 @@ const refreshDenied = (status: string | undefined) => new UnauthorizedException(
 export interface AccessPayload {
   sub: string;
   roles: string[];
+  /** İkinci adımın geçildiği an (epoch ms); yalnız yönetici rolü belirtece girdiyse */
+  mfa?: number;
 }
 
 @Injectable()
@@ -203,6 +209,13 @@ export class AuthService {
     if (user!.status === "askida") throw new ForbiddenException(SUSPENDED_MESSAGE);
     if (user!.status === "silindi") throw new ForbiddenException(DELETING_MESSAGE);
 
+    // NFR-04: ikinci adımı kurulu hesap (yönetici) SMS koduyla tek başına oturum almaz: 5 dk geçerli challenge döner,
+    // doğrulama uygulamasındaki kod POST /auth/totp ile (MfaService.login)
+    if (await this.totpEnabled(user!.id)) {
+      const challenge = randomToken();
+      await this.db.insert(mfaChallenges).values({ tokenHash: sha256(challenge), userId: user!.id, expiresAt: new Date(Date.now() + MFA_CHALLENGE_MS) });
+      return { isNew, ...(reopened ? { reopened } : {}), mfaRequired: true as const, challenge };
+    }
     const tokens = await this.db.transaction((tx) => this.issueTokens(tx, user!.id, loginDenied));
     return { isNew, ...(reopened ? { reopened } : {}), ...tokens };
   }
@@ -244,19 +257,21 @@ export class AuthService {
   async refresh(refreshToken: string) {
     const hash = sha256(refreshToken);
     return this.db.transaction(async (tx) => {
-      const [found] = await tx.select({ userId: refreshTokens.userId }).from(refreshTokens).where(eq(refreshTokens.tokenHash, hash));
+      const [found] = await tx.select({ userId: refreshTokens.userId, mfaAt: refreshTokens.mfaAt }).from(refreshTokens).where(eq(refreshTokens.tokenHash, hash));
       if (!found) throw new UnauthorizedException("Oturum süresi doldu");
       // Kilit sırası dondurma ve silmeyle aynı (önce kullanıcı satırı, sonra belirteç): ters sıra kilitlenme (deadlock) üretirdi
       const [owner] = await tx.select({ status: users.status }).from(users).where(eq(users.id, found.userId)).for("share");
       if (owner?.status !== "aktif") throw refreshDenied(owner?.status);
       const now = new Date();
+      // Yönetici (ikinci adımı kurulu) oturumu ikinci adımdan en çok 12 saat sonra kapanır: SMS + uygulama koduyla yeniden giriş
+      if (!mfaFresh(found.mfaAt, now) && (await this.totpEnabled(found.userId, tx))) throw new UnauthorizedException("Yönetici oturumunun süresi doldu; yeniden giriş yapın.");
       const [row] = await tx
         .update(refreshTokens)
         .set({ revokedAt: now })
         .where(and(eq(refreshTokens.tokenHash, hash), isNull(refreshTokens.revokedAt), gt(refreshTokens.expiresAt, now)))
         .returning({ userId: refreshTokens.userId });
       if (!row) throw new UnauthorizedException("Oturum süresi doldu");
-      return this.issueTokens(tx, row.userId, refreshDenied);
+      return this.issueTokens(tx, row.userId, refreshDenied, found.mfaAt);
     });
   }
 
@@ -270,27 +285,40 @@ export class AuthService {
   /**
    * Güncel rollerle erişim belirteci üretir. Roller belirtecin içinde taşındığı için rol değişince
    * (POST /me/roles) yeni belirteç verilir; yoksa kullanıcı belirteç süresi dolana kadar eski rollerle kalır.
+   * Yönetici rolü yalnız ikinci adımı son 12 saatte geçmiş oturuma girer (NFR-04): kurulumsuz yöneticinin belirtecinde
+   * rol yoktur, böylece tüm yönetici denetimleri (Roles guard, "yönetici her belgeyi görür") ikinci adım ister.
+   * @param mfaAt oturumun ikinci adım anı (refresh_tokens.mfa_at; belirteçte `mfa`)
    */
-  async accessTokenFor(userId: string): Promise<string> {
-    const roles = await this.db.select({ role: userRoles.role }).from(userRoles).where(eq(userRoles.userId, userId));
-    const payload: AccessPayload = { sub: userId, roles: roles.map((r) => r.role) };
+  async accessTokenFor(userId: string, mfaAt: Date | null = null, db: Db | Tx = this.db): Promise<string> {
+    const rows = await db.select({ role: userRoles.role }).from(userRoles).where(eq(userRoles.userId, userId));
+    const mfa = mfaFresh(mfaAt) && (await this.totpEnabled(userId, db));
+    const roles = rows.map((r) => r.role).filter((r) => mfa || r !== "admin");
+    const payload: AccessPayload = { sub: userId, roles, ...(mfa ? { mfa: mfaAt!.getTime() } : {}) };
     return this.jwt.signAsync(payload);
+  }
+
+  /** İkinci adım (TOTP) kurulu ve etkin mi */
+  async totpEnabled(userId: string, db: Db | Tx = this.db): Promise<boolean> {
+    const [t] = await db.select({ on: userTotp.enabledAt }).from(userTotp).where(eq(userTotp.userId, userId));
+    return !!t?.on;
   }
 
   /**
    * Yeni belirteç çifti, kullanıcı satırı paylaşımlı kilitliyken ve hesap hâlâ aktifse yazılır. Dondurma, silme ve askıya
    * alma satırı güncelleyip (satır kilidi) belirteçleri iptal eder: bu sıra sayesinde onlarla yarışan bir giriş ya da
    * yenileme, iptal edilmemiş (hesap açılınca yeniden geçerli olacak) bir belirteç bırakamaz.
+   * @param mfaAt ikinci adım anı (MfaService girişte/kurulumda verir, yenileme taşır)
    */
-  private async issueTokens(tx: Tx, userId: string, denied: (status: string | undefined) => Error) {
+  async issueTokens(tx: Tx, userId: string, denied: (status: string | undefined) => Error, mfaAt: Date | null = null) {
     const [u] = await tx.select({ status: users.status }).from(users).where(eq(users.id, userId)).for("share");
     if (u?.status !== "aktif") throw denied(u?.status);
-    const accessToken = await this.accessTokenFor(userId);
+    const accessToken = await this.accessTokenFor(userId, mfaAt, tx);
     const refreshToken = randomToken();
     await tx.insert(refreshTokens).values({
       userId,
       tokenHash: sha256(refreshToken),
       expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
+      mfaAt,
     });
     return { accessToken, refreshToken };
   }

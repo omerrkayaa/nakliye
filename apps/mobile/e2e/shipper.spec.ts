@@ -267,5 +267,7 @@ test("yük sahibi: iptal edilen işin ilanı eski bilgilerle yeniden yayınlanı
   const fresh = psql(`select id from load_posts where shipper_id=(select id from users where phone='${me}') and id<>'${loadId}'`);
   const cols = "origin_district_id, dest_district_id, cargo_type, weight_ton, vehicle_type, price_type, load_from, load_to";
   expect(psql(`select ${cols} from load_posts where id='${fresh}'`)).toBe(psql(`select ${cols} from load_posts where id='${loadId}'`));
+  // Temizlik: moderasyonda kalırsa her koşuda biri birikiyor, yönetici kuyruğunun ilk sayfasını dolduruyordu
+  expect((await api("POST", `/admin/loads/${fresh}/review`, admin, { decision: "ret" })).status).toBe(200);
   expect(errors).toEqual([]);
 });

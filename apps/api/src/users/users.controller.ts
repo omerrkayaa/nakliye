@@ -20,8 +20,9 @@ export class MeController {
   constructor(private readonly users: UsersService) {}
 
   @Get()
-  me(@CurrentUser() user: AccessPayload) {
-    return this.users.getMe(user.sub);
+  async me(@CurrentUser() user: AccessPayload) {
+    const me = await this.users.getMe(user.sub);
+    return { ...me, adminMfa: await this.users.adminMfa(user.sub, me.roles, user.roles) };
   }
 
   @Patch()
@@ -31,7 +32,7 @@ export class MeController {
 
   @Post("roles")
   addRoles(@CurrentUser() user: AccessPayload, @Body(new ZodPipe(addRolesSchema)) body: AddRolesInput) {
-    return this.users.addRoles(user.sub, body);
+    return this.users.addRoles(user.sub, body, user.mfa ? new Date(user.mfa) : null);
   }
 }
 

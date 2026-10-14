@@ -35,6 +35,12 @@ export const isoDaySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tarih YYYY-
 
 export const otpRequestSchema = z.object({ phone: phoneSchema });
 export const otpVerifySchema = z.object({ phone: phoneSchema, code: z.string().regex(/^\d{6}$/) });
+/** Yönetici ikinci adımı (NFR-04): doğrulama uygulamasındaki 6 hane ya da bir kurtarma kodu (ABCDE-FGH23) */
+const secondFactorCode = z.string().trim().min(6, "Uygulamadaki 6 haneli kodu ya da bir kurtarma kodunu girin").max(20, "Kod en çok 20 karakter");
+export const totpLoginSchema = z.object({ challenge: z.string().min(20).max(100), code: secondFactorCode });
+export const totpCodeSchema = z.object({ code: secondFactorCode });
+/** Kurulu hesapta (cihaz değiştirme) mevcut uygulamadan kod istenir */
+export const totpSetupSchema = z.object({ code: secondFactorCode.optional() });
 /** Hesap silme (FR-07): geri dönüşü olmadığı için hesabın numarasına giden kodla yeniden doğrulanır. */
 export const deleteAccountSchema = z.object({ code: z.string().regex(/^\d{6}$/, "6 haneli kodu girin") });
 
@@ -321,6 +327,9 @@ export const suspendUserSchema = z.object({ reason: z.string().trim().min(5, "Se
 
 export type UpdateMeInput = z.infer<typeof updateMeSchema>;
 export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;
+export type TotpLoginInput = z.infer<typeof totpLoginSchema>;
+export type TotpCodeInput = z.infer<typeof totpCodeSchema>;
+export type TotpSetupInput = z.infer<typeof totpSetupSchema>;
 export type AddRolesInput = z.infer<typeof addRolesSchema>;
 export type CreateCompanyInput = z.infer<typeof createCompanySchema>;
 export type UpdateCompanyInput = z.infer<typeof updateCompanySchema>;

@@ -9,17 +9,19 @@ import { useAuth } from "@/lib/auth";
 import { inform } from "@/lib/confirm";
 import { WEB_URL } from "@/lib/share";
 import { C, TOUCH } from "@/lib/theme";
-import type { Tokens } from "@/lib/types";
+import type { MfaChallenge, Tokens } from "@/lib/types";
 
 // Demo hesabı: apps/api/.env'deki DEMO_PHONE / DEMO_OTP ile aynı olmalı (yalnız geliştirme derlemesinde görünür).
 const DEMO = { phone: "0555 010 20 30", code: "123456" };
 
-/** A2 — Telefonla giriş: numara → SMS kodu */
+/** A2 — Telefonla giriş: numara → SMS kodu (→ yönetici hesabında doğrulama uygulamasındaki kod, NFR-04) */
 export default function Giris() {
   const { signIn, notice } = useAuth();
-  const [step, setStep] = useState<"phone" | "code">("phone");
+  const [step, setStep] = useState<"phone" | "code" | "totp">("phone");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
+  const [challenge, setChallenge] = useState("");
+  const [totp, setTotp] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -43,20 +45,53 @@ export default function Giris() {
     setBusy(true);
     setError(null);
     try {
-      const t = await api<Tokens>("/auth/otp/verify", { method: "POST", body: { phone: p, code: c }, auth: false });
-      await signIn(t);
-      if (t.reopened) {
-        inform(
-          "Hesabınız yeniden açıldı",
-          t.reopened === "dondurma"
-            ? "Dondururken kapanan ilanlarınızı “Benzerini yayınla” ile yeniden açabilirsiniz."
-            : "Puanlarınız ve geçmişiniz duruyor. Adınızı, firma ve araç bilgilerinizi yeniden girin.",
-        );
+      const t = await api<Tokens | MfaChallenge>("/auth/otp/verify", { method: "POST", body: { phone: p, code: c }, auth: false });
+      if ("mfaRequired" in t) {
+        setChallenge(t.challenge);
+        setStep("totp");
+        setBusy(false);
+        return;
       }
+      await finish(t);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Bir sorun oluştu");
       setBusy(false);
     }
+  }
+
+  async function finish(t: Tokens) {
+    await signIn(t);
+    if (t.reopened) {
+      inform(
+        "Hesabınız yeniden açıldı",
+        t.reopened === "dondurma"
+          ? "Dondururken kapanan ilanlarınızı “Benzerini yayınla” ile yeniden açabilirsiniz."
+          : "Puanlarınız ve geçmişiniz duruyor. Adınızı, firma ve araç bilgilerinizi yeniden girin.",
+      );
+    }
+  }
+
+  /** Yönetici hesabı: uygulamadaki 6 hane ya da kurtarma kodu */
+  async function verifyTotp() {
+    if (totp.trim().length < 6) return setError("Uygulamadaki 6 haneli kodu ya da bir kurtarma kodunu girin");
+    setBusy(true);
+    setError(null);
+    try {
+      await finish(await api<Tokens>("/auth/totp", { method: "POST", body: { challenge, code: totp.trim() }, auth: false }));
+    } catch (e) {
+      const message = e instanceof ApiError ? e.message : "Bir sorun oluştu";
+      // 5 dk geçtiyse baştan: yeni SMS kodu gerekir
+      if (message.startsWith("Doğrulama süresi doldu")) restart();
+      setError(message);
+      setBusy(false);
+    }
+  }
+
+  function restart() {
+    setStep("phone");
+    setCode("");
+    setTotp("");
+    setChallenge("");
   }
 
   async function demo() {
@@ -100,6 +135,33 @@ export default function Giris() {
                 />
                 {error && <ErrorText>{error}</ErrorText>}
                 <Button title="SMS kodu gönder" onPress={() => requestCode()} busy={busy} />
+              </>
+            ) : step === "totp" ? (
+              <>
+                <Muted>Yönetici hesabı: Google Authenticator ya da Microsoft Authenticator’daki “Nakliye” kodunu girin. Telefon yanınızda değilse kurtarma kodlarınızdan birini yazabilirsiniz.</Muted>
+                <Field
+                  label="Doğrulama uygulamasındaki kod"
+                  placeholder="6 haneli kod"
+                  autoComplete="one-time-code"
+                  textContentType="oneTimeCode"
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  maxLength={20}
+                  value={totp}
+                  onChangeText={setTotp}
+                  onSubmitEditing={verifyTotp}
+                  style={{ letterSpacing: 4, fontSize: 20 }}
+                />
+                {error && <ErrorText>{error}</ErrorText>}
+                <Button title="Doğrula" onPress={verifyTotp} busy={busy} />
+                <Button
+                  title="Baştan başla"
+                  variant="outline"
+                  onPress={() => {
+                    restart();
+                    setError(null);
+                  }}
+                />
               </>
             ) : (
               <>

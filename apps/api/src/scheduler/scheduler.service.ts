@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { AccountService } from "../account/account.service.js";
 import { AuthService } from "../auth/auth.service.js";
+import { MfaService } from "../auth/mfa.service.js";
 import { DocumentsService } from "../documents/documents.service.js";
 import { JobsService } from "../jobs/jobs.service.js";
 import { OffersService } from "../jobs/offers.service.js";
@@ -36,6 +37,8 @@ export interface TickStats {
   documentsExpired: number;
   /** Silinen eski kod isteği kayıtları (NFR-04 sınırları) */
   otpRequestsPurged: number;
+  /** Süresi dolan ikinci adım bekleyen girişler */
+  mfaChallengesPurged: number;
 }
 
 /** Periyodik görevlerin tek turu. Her adım tekrar çalıştırılabilir (idempotent). */
@@ -51,6 +54,7 @@ export class SchedulerService {
     private readonly account: AccountService,
     private readonly documents: DocumentsService,
     private readonly auth: AuthService,
+    private readonly mfa: MfaService,
   ) {}
 
   async tick(now = new Date()): Promise<TickStats> {
@@ -66,6 +70,7 @@ export class SchedulerService {
     const frozenClosed = await this.account.closeFrozenLeftovers(now);
     const documentsExpired = await this.documents.processExpired(now);
     const otpRequestsPurged = await this.auth.purgeOtpRequests(now);
-    return { ...confirmation, capacityExpired, matchSwept, offersClosed, jobsCompleted, ratingsRevealed, deletionsFinished, deletedLinksExpired, frozenClosed, documentsExpired, otpRequestsPurged };
+    const mfaChallengesPurged = await this.mfa.purgeChallenges(now);
+    return { ...confirmation, capacityExpired, matchSwept, offersClosed, jobsCompleted, ratingsRevealed, deletionsFinished, deletedLinksExpired, frozenClosed, documentsExpired, otpRequestsPurged, mfaChallengesPurged };
   }
 }

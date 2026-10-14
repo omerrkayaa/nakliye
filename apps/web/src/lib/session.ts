@@ -20,6 +20,13 @@ export interface Tokens {
   reopened?: "dondurma" | "silme";
 }
 
+/** İkinci adımı kurulu hesapta (yönetici, NFR-04) otp/verify belirteç yerine bunu döner; kod POST /auth/totp ile */
+export interface MfaChallenge {
+  mfaRequired: true;
+  challenge: string;
+  reopened?: "dondurma" | "silme";
+}
+
 export const accessCookie = (value: string) => ({ name: ACCESS_COOKIE, value, ...base, maxAge: ACCESS_MAX_AGE });
 export const refreshCookie = (value: string) => ({ name: REFRESH_COOKIE, value, ...base, maxAge: REFRESH_MAX_AGE });
 

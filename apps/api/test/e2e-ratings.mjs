@@ -5,6 +5,7 @@
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { trustScore } from "@nakliye/shared";
+import { adminSession } from "./lib/admin.mjs";
 
 const LOG = process.argv[2];
 const B = "http://localhost:3000/api/v1";
@@ -57,7 +58,7 @@ const C = await user(phone(2), ["carrier"]);
 const X = await user(phone(3), ["carrier"]);
 const aLogin = await login(phone(9));
 psql(`insert into user_roles(user_id, role) select id, 'admin' from users where phone='${phone(9)}' on conflict do nothing`);
-const A = (await api("POST", "/auth/refresh", null, { refreshToken: aLogin.refreshToken })).body.accessToken;
+const A = (await adminSession(api, aLogin.accessToken)).accessToken; // NFR-04: yönetici rolü ikinci adımla
 await api("PATCH", "/me", S, { name: "Yük Sahibi Test" });
 const sId = (await api("GET", "/me", S)).body.id, cId = (await api("GET", "/me", C)).body.id;
 

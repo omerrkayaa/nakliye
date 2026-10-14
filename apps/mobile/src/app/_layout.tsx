@@ -37,7 +37,8 @@ function RootStack() {
     );
 
   const signedIn = status === "signedIn";
-  const hasRole = (me?.roles.length ?? 0) > 0;
+  // Uygulamanın rolleri nakliyeci ve yük sahibi; yalnız yönetici rolü olan hesap da rol seçer (yoksa sekmeler 403 alırdı)
+  const hasRole = me?.roles.some((r) => r === "carrier" || r === "shipper") ?? false;
   return (
     <Stack
       screenOptions={{

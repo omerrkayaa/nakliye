@@ -155,6 +155,13 @@
       "when": 1791987805994,
       "tag": "0021_otp_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791989748538,
+      "tag": "0022_admin_totp",
+      "breakpoints": true
     }
   ]
 }

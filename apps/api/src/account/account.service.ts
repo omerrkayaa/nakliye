@@ -16,6 +16,7 @@ import {
   documents,
   favoriteCarriers,
   jobEvents,
+  mfaChallenges,
   jobs,
   loadConfirmations,
   loadPosts,
@@ -27,8 +28,10 @@ import {
   refreshTokens,
   reports,
   routeAlerts,
+  totpRecoveryCodes,
   userRoles,
   users,
+  userTotp,
   vehicles,
 } from "../db/schema.js";
 import { OffersService } from "../jobs/offers.service.js";
@@ -217,6 +220,9 @@ export class AccountService {
       await tx.delete(userRoles).where(eq(userRoles.userId, userId));
       await tx.delete(companies).where(eq(companies.ownerUserId, userId));
       await tx.delete(refreshTokens).where(eq(refreshTokens.userId, userId));
+      await tx.delete(mfaChallenges).where(eq(mfaChallenges.userId, userId));
+      await tx.delete(totpRecoveryCodes).where(eq(totpRecoveryCodes.userId, userId));
+      await tx.delete(userTotp).where(eq(userTotp.userId, userId));
       await tx.delete(devices).where(eq(devices.userId, userId));
       await tx.delete(notifications).where(eq(notifications.userId, userId));
       await tx.delete(routeAlerts).where(eq(routeAlerts.userId, userId));

@@ -15,6 +15,7 @@ import {
 } from "@nakliye/shared";
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
   customType,
   date,
@@ -162,8 +163,46 @@ export const refreshTokens = pgTable("refresh_tokens", {
   tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  /** İkinci adımın geçildiği an (NFR-04); yenilemede taşınır, yönetici rolü bundan 12 saat sonra düşer */
+  mfaAt: timestamp("mfa_at", { withTimezone: true }),
   createdAt: createdAt(),
 });
+
+// NFR-04 yönetici iki adımlı doğrulaması (auth/mfa.service.ts). Anahtarlar AES-256-GCM ile şifreli (auth/totp.ts).
+// pending_enc: kurulumda ya da cihaz değiştirirken onaylanmamış yeni anahtar. last_step: kullanılan son 30 sn'lik adım
+// (aynı kod ikinci kez geçmez). failed_count/locked_until: ardışık 5 hatalı kod → 15 dk kilit.
+export const userTotp = pgTable("user_totp", {
+  userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  secretEnc: text("secret_enc"),
+  pendingEnc: text("pending_enc"),
+  enabledAt: timestamp("enabled_at", { withTimezone: true }),
+  lastStep: bigint("last_step", { mode: "number" }).notNull().default(0),
+  failedCount: integer("failed_count").notNull().default(0),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }),
+  createdAt: createdAt(),
+});
+
+/** Tek kullanımlık kurtarma kodları (anahtarlı özet; düz kod yalnız üretildiği yanıtta görünür) */
+export const totpRecoveryCodes = pgTable(
+  "totp_recovery_codes",
+  {
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    codeHash: varchar("code_hash", { length: 64 }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.codeHash] })],
+);
+
+/** SMS kodu doğrulanmış, ikinci adımı bekleyen giriş (5 dk; süresi dolanları zamanlayıcı siler) */
+export const mfaChallenges = pgTable(
+  "mfa_challenges",
+  {
+    tokenHash: varchar("token_hash", { length: 64 }).primaryKey(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("mfa_challenges_user_idx").on(t.userId)],
+);
 
 export const devices = pgTable("devices", {
   id: uuid("id").primaryKey().defaultRandom(),

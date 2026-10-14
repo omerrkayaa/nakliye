@@ -13,6 +13,17 @@ export interface Me {
   roles: Role[];
   verified: boolean;
   company: { title: string; taxNo: string | null; taxOffice: string | null; address: string | null; verified: boolean } | null;
+  /** Yönetim bölümü (NFR-04): "tamam" = oturum ikinci adımı geçti, "kurulum" = uygulama kurulmamış, "giris" = yeniden giriş gerekli */
+  adminMfa: "tamam" | "kurulum" | "giris" | null;
+}
+
+/** GET /me/totp */
+export interface TotpStatus {
+  enabled: boolean;
+  enabledAt: string | null;
+  pending: boolean;
+  recoveryCodesLeft: number;
+  lockedUntil: string | null;
 }
 
 export interface Province {

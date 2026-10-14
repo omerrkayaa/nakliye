@@ -3,6 +3,7 @@
 // Ön koşul ve kullanım: e2e-confirmation.mjs ile aynı (JOBS_ENABLED=false). node test/e2e-documents.mjs api.log
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { adminSession } from "./lib/admin.mjs";
 
 const LOG = process.argv[2];
 const B = "http://localhost:3000/api/v1";
@@ -72,7 +73,7 @@ const Sid = idOf(phone(2));
 const O = await user(phone(3), ["carrier"]); // başka nakliyeci
 const aLogin = await login(phone(9));
 psql(`insert into user_roles(user_id, role) select id, 'admin' from users where phone='${phone(9)}' on conflict do nothing`);
-const A = (await api("POST", "/auth/refresh", null, { refreshToken: aLogin.refreshToken })).body.accessToken;
+const A = (await adminSession(api, aLogin.accessToken)).accessToken; // NFR-04: yönetici rolü ikinci adımla
 const vehicle = async (t, plate) => (await api("POST", "/vehicles", t, { plate, vehicleType: "kamyon", bodyType: "kapali", capacityTon: 10 })).body.id;
 const V1 = await vehicle(C, `30 DA ${run}`), V2 = await vehicle(C, `30 DB ${run}`), VO = await vehicle(O, `30 DC ${run}`);
 

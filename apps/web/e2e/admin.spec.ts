@@ -1,7 +1,7 @@
 // Yönetici paneli: ilan moderasyonu (Y4), şikayet kuyruğu (Y3), kullanıcı arama ve askıya alma (Y2), itirazlar.
 // Hazırlık API ile; tarayıcı yöneticidir. Yönetici olmayan kullanıcı bölümü göremez.
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
-import { api, apiLogin, apiUser, localPhone, phone, psql } from "./helpers";
+import { adminSession, api, apiLogin, apiUser, localPhone, phone, psql } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 
@@ -48,7 +48,7 @@ test.beforeAll(async ({ browser }) => {
   const ap = phone(902);
   const a = await apiLogin(ap);
   psql(`insert into user_roles(user_id, role) select id, 'admin' from users where phone='${ap}' on conflict do nothing`);
-  const admin = (await api<{ accessToken: string; refreshToken: string }>("POST", "/auth/refresh", undefined, { refreshToken: a.refreshToken })).body;
+  const admin = await adminSession(a.accessToken); // NFR-04: yönetici rolü ikinci adımla
   await api("PATCH", "/me", admin.accessToken, { name: "Test Yönetici" });
   adminAccess = admin.accessToken;
 
@@ -94,10 +94,22 @@ test("telefon genişliğinde yönetici sayfaları yatay taşmaz (menüde Yöneti
   await page.setViewportSize({ width: 1280, height: 720 });
 });
 
+/** Moderasyon kuyruğu eskiden yeniye ve 20'lik sayfalı: başka takımların bekleyen ilanları öndeyse ilan sonraki sayfadadır */
+async function queuePageOf(id: string) {
+  for (let n = 1; n <= 50; n++) {
+    const r = await api<{ items: { id: string }[]; hasMore: boolean }>("GET", `/admin/loads?page=${n}`, adminAccess);
+    if (r.body.items.some((l) => l.id === id)) return n;
+    if (!r.body.hasMore) break;
+  }
+  throw new Error(`İlan kuyrukta yok: ${id}`);
+}
+
 test("moderasyon: onayla → yayında; reddet → onay sorulur, iptal", async () => {
   await page.goto("/panel");
   await page.getByRole("link", { name: "Yönetim" }).click();
   await expect(page).toHaveURL(/\/panel\/yonetim\/moderasyon$/);
+  const p1 = await queuePageOf(L1);
+  if (p1 > 1) await page.goto(`/panel/yonetim/moderasyon?sayfa=${p1}`);
   const row1 = page.locator(`li[data-load-id="${L1}"]`);
   const row2 = page.locator(`li[data-load-id="${L2}"]`);
   await expect(row1).toContainText("Menteşe, Muğla → Muratpaşa, Antalya");
@@ -107,6 +119,8 @@ test("moderasyon: onayla → yayında; reddet → onay sorulur, iptal", async ()
   await row1.getByRole("button", { name: "Onayla" }).click();
   await expect(row1).toHaveCount(0);
   expect((await api("GET", `/loads/${L1}`, S.accessToken)).body.status).toBe("teyitli");
+  const p2 = await queuePageOf(L2);
+  if (p2 !== p1) await page.goto(`/panel/yonetim/moderasyon?sayfa=${p2}`);
 
   await row2.getByRole("button", { name: "Reddet" }).click();
   await expect(row2).toHaveCount(0);

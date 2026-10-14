@@ -37,6 +37,50 @@ export function LoginForm({ next }: { next: string }) {
     );
   }
 
+  if (state.step === "totp") {
+    return (
+      <div className="space-y-4">
+        <form action={action} className="space-y-4">
+          <input type="hidden" name="intent" value="totp" />
+          <input type="hidden" name="phone" value={state.phone} />
+          <input type="hidden" name="challenge" value={state.challenge} />
+          <input type="hidden" name="sonra" value={next} />
+          <div className="space-y-2">
+            <Label htmlFor="totp">Doğrulama uygulamasındaki kod</Label>
+            {/* Kurtarma kodu harf de içerir: sayısal klavye zorlanmaz */}
+            <Input
+              id="totp"
+              name="code"
+              autoComplete="one-time-code"
+              autoCapitalize="characters"
+              spellCheck={false}
+              maxLength={20}
+              placeholder="6 haneli kod"
+              required
+              autoFocus
+              className="h-12 text-center text-lg tracking-[0.3em]"
+              aria-invalid={!!state.error}
+              aria-describedby={state.error ? "login-error totp-hint" : "totp-hint"}
+            />
+            <p id="totp-hint" className="text-sm text-muted-foreground">
+              Yönetici hesabı: Google Authenticator ya da Microsoft Authenticator’daki “Nakliye” kodunu girin. Telefonunuz yanınızda değilse kurtarma kodlarınızdan birini yazabilirsiniz.
+            </p>
+          </div>
+          <ErrorText message={state.error} />
+          <Button type="submit" disabled={pending} className="h-12 w-full text-base">
+            {pending ? "Doğrulanıyor…" : "Doğrula"}
+          </Button>
+        </form>
+        <form action={action}>
+          <input type="hidden" name="intent" value="change" />
+          <Button type="submit" variant="link" className="px-0 text-sm">
+            Baştan başla
+          </Button>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <form action={action} className="space-y-4">

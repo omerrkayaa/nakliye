@@ -46,13 +46,23 @@ export class UsersService {
     };
   }
 
+  /**
+   * Yönetim bölümü için (NFR-04): "tamam" = bu oturum ikinci adımı geçti (belirteçte yönetici rolü var); "kurulum" =
+   * doğrulama uygulaması kurulmamış; "giris" = kurulu ama oturum ikinci adımsız (çıkıp yeniden girilmeli). Yönetici değilse null.
+   */
+  async adminMfa(userId: string, dbRoles: string[], tokenRoles: string[]): Promise<"tamam" | "kurulum" | "giris" | null> {
+    if (!dbRoles.includes("admin")) return null;
+    if (tokenRoles.includes("admin")) return "tamam";
+    return (await this.auth.totpEnabled(userId)) ? "giris" : "kurulum";
+  }
+
   async updateMe(userId: string, input: UpdateMeInput) {
     await this.db.update(users).set({ name: input.name }).where(eq(users.id, userId));
     return this.getMe(userId);
   }
 
   /** Rol ekler (FR-02); var olan rol tekrar eklenirse sessizce geçilir. Güncel rollerle yeni erişim belirteci döner. */
-  async addRoles(userId: string, input: AddRolesInput) {
+  async addRoles(userId: string, input: AddRolesInput, mfaAt: Date | null = null) {
     await this.db
       .insert(userRoles)
       .values(input.roles.map((role) => ({ userId, role })))
@@ -60,7 +70,7 @@ export class UsersService {
     const roles = await this.db.select({ role: userRoles.role }).from(userRoles).where(eq(userRoles.userId, userId));
     // Seviye rollere bağlı (BR-10: nakliyecide ruhsat, yük sahibinde vergi levhası sayılır)
     await this.trust.refresh(userId);
-    return { roles: roles.map((r) => r.role), accessToken: await this.auth.accessTokenFor(userId) };
+    return { roles: roles.map((r) => r.role), accessToken: await this.auth.accessTokenFor(userId, mfaAt) };
   }
 
   async createCompany(userId: string, input: CreateCompanyInput) {
