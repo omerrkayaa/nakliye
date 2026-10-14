@@ -222,4 +222,4 @@ Bir kullanıcı hem nakliyeci hem yük sahibi rolüne sahip olabilir (ör. komis
 | Bayat ilan şikayet oranı | "yük yok" şikayeti / gösterilen ilan | F1, F2 |
 | Teyit cevap oranı ve süresi | Hatırlatmaya cevap verenlerin oranı ve medyan cevap süresi | F1 |
 | Eşleşme isabeti | Bildirilen eşleşmelerden teklif ya da aramaya dönüşen oran | BR-20/21 |
-| Boş km azalması (simülasyon) | Dönüş planı ile ve onsuz senaryo karşılaştırması | F4 |
+| Boş km azalması (simülasyon) | Dönüş planı ile ve onsuz senaryo karşılaştırması (sonuç: `tez/simulasyon/README.md` §7, Deney 2) | F4 |

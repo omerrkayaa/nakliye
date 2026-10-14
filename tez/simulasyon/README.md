@@ -4,7 +4,7 @@ Bu klasör, tezin Faz 6 deneylerinin (docs/05) simülasyon kodunu, testlerini ve
 
 - **Deney 1:** Kural tabanlı eşleştirme (sistemin kendisi) ile Macar algoritması tabanlı küresel eşleştirmenin karşılaştırılması (docs/04 §4 "Tez katkısı").
 - **Deney 3:** Canlı ilan teyidinin (F1, BR-01…05) ilan tazeliğine etkisi ve teyit sürelerinin duyarlılık analizi.
-- **Deney 2** (dönüş planının boş km'ye etkisi) henüz yapılmadı: sistemde dönüş planı (F4) yok. Plan en altta.
+- **Deney 2:** Dönüş planının (F4: dönüş yükleri + rota üstü ara yükler) boş km'ye etkisi (§7).
 
 Bütün veriler **sentetiktir**. Sonuçlar yöntemlerin ve kuralların davranışını karşılaştırmak içindir; platformun gerçek eşleşme oranını ya da gerçek ilan tazeliğini ölçmez. Saha (pilot) verisi gelince aynı ölçütler gerçek veriyle hesaplanmalıdır.
 
@@ -15,16 +15,16 @@ Bütün veriler **sentetiktir**. Sonuçlar yöntemlerin ve kuralların davranı�
 Kökten (`C:\Users\omerk\Desktop\nakliye`). PowerShell'de `npx` yerine `npx.cmd` yazın.
 
 ```bash
-# Testler (Node'un kendi test koşucusu; 27 test, ~1 sn)
+# Testler (Node'un kendi test koşucusu; 32 test, ~3 sn)
 npx tsx --test tez/simulasyon/test/*.test.ts
 
-# Bütün deneyler (30 tohum; bu makinede ~3 dk: Deney 1 ~170 sn, Deney 3 ~10 sn)
+# Bütün deneyler (30 tohum; bu makinede ~7 dk: Deney 1 ~170 sn, Deney 2 ~190 sn, Deney 3 ~10 sn)
 npx tsx tez/simulasyon/calistir.ts
 
 # Seçenekler
-npx tsx tez/simulasyon/calistir.ts --deney=1      # ya da --deney=3
+npx tsx tez/simulasyon/calistir.ts --deney=1      # ya da --deney=2, --deney=3
 npx tsx tez/simulasyon/calistir.ts --tohum=5      # hızlı deneme → sonuclar/deneme-5/
-npx tsx tez/simulasyon/calistir.ts --haversine    # OSRM'i hiç deneme → sonuclar/deneme-30-haversine/
+npx tsx tez/simulasyon/calistir.ts --haversine    # OSRM'i hiç deneme (Deney 2'de rota: doğru çizgi) → sonuclar/deneme-30-haversine/
 
 # Tip denetimi
 npx tsc -p tez/simulasyon/tsconfig.json
@@ -34,15 +34,17 @@ Bağımlılık eklenmedi; kökteki `node_modules` kullanılır (`tsx`, `typescri
 
 **Mesafe kaynağı:** `veri/osrm-ilce-matrisi.bin` varsa o kullanılır. Yoksa ve `http://localhost:5000` (ya da `OSRM_URL`) üzerinde OSRM çalışıyorsa 973 × 973 ilçe matrisi bir kez alınıp oraya yazılır (~25 sn, 400 GET isteği, yalnız okuma). İkisi de yoksa kuş uçuşu × 1,3'e düşülür ve bu, sonuç dosyalarına yazılır. **Bu çalıştırmada OSRM kullanıldı** (rota bulunamayan çift: 0).
 
+**Dönüş yolu geometrisi (Deney 2, rota üstü):** `veri/osrm-rotalar.json.gz` (ilçe çifti → kodlanmış çoklu çizgi, Google polyline 1e-5; 11 120 çift, 0,9 MB). Eksik çiftler OSRM çalışıyorsa `route` servisinden alınır (API'deki dönüş planıyla aynı istek: `overview=simplified&geometries=geojson`; 30 tohumda ~10 000 çift, ~30 sn, yalnız okuma). OSRM yoksa eksik çift kuş uçuşu doğru çizgiye düşer (API'deki yedekle aynı) ve sayısı raporlanır. **Bu çalıştırmada bütün rotalar OSRM'den** (doğru çizgiye düşülen: 0).
+
 Çıktılar `sonuclar/` altındadır:
 
 | Dosya | İçerik |
 |---|---|
-| `deney1.md`, `deney3.md` | Tezde kullanılabilecek tablolar (virgül ondalık) |
-| `deney1_ham.csv`, `deney3_ham.csv` | Her tohum × yapılandırma × yöntem için ham ölçüler (nokta ondalık) |
-| `deney1_ozet.csv`, `deney3_ozet.csv` | n, ortalama, standart sapma, %95 GA |
-| `deney1_farklar.csv`, `deney3_farklar.csv` | Eşleştirilmiş farklar: GA, t, p, Wilcoxon W ve p, Holm düzeltmeli p |
-| `calisma_bilgisi.json` | Tarih, Node sürümü, tohum, mesafe kaynağı, süreler |
+| `deney1.md`, `deney2.md`, `deney3.md` | Tezde kullanılabilecek tablolar (virgül ondalık) |
+| `deney1_ham.csv`, `deney2_ham.csv`, `deney3_ham.csv` | Her tohum × yapılandırma × yöntem için ham ölçüler (nokta ondalık) |
+| `deney1_ozet.csv`, `deney2_ozet.csv`, `deney3_ozet.csv` | n, ortalama, standart sapma, %95 GA |
+| `deney1_farklar.csv`, `deney2_farklar.csv`, `deney3_farklar.csv` | Eşleştirilmiş farklar: GA, t, p, Wilcoxon W ve p, Holm düzeltmeli p |
+| `calisma_bilgisi.json`, `calisma_bilgisi_deney2.json` | Tarih, Node sürümü, tohum, mesafe ve rota kaynağı, süreler (Deney 2 ayrı çalıştırıldı: `--deney=2`) |
 
 Tüm sayılar `KOK_TOHUM` (parametreler.ts) ile belirlenir; aynı makinede aynı komut aynı sonuçları verir (süre ölçümleri hariç).
 
@@ -53,20 +55,23 @@ tez/simulasyon/
 ├─ calistir.ts          tek giriş noktası
 ├─ parametreler.ts      TÜM varsayımlar ([T]) — tek dosya
 ├─ deney1.ts            Deney 1 + rapor
+├─ deney2.ts            Deney 2 + rapor
 ├─ deney3.ts            Deney 3 + rapor
 ├─ lib/
 │  ├─ prng.ts           mulberry32 + tohum karıştırma + dağılımlar
 │  ├─ konum.ts          il/ilçe koordinatları (apps/api/src/db/seed/locations.json, yalnız okunur)
-│  ├─ uretici.ts        sentetik yük ve boş araç ilanları (Deney 2 de kullanacak)
-│  ├─ mesafe.ts         OSRM matrisi / haversine × 1,3 (Deney 2 de kullanacak)
+│  ├─ uretici.ts        sentetik yük ve boş araç ilanları (Deney 1 ve 2)
+│  ├─ mesafe.ts         OSRM matrisi / haversine × 1,3 (boş km; Deney 1 ve 2)
+│  ├─ rota.ts           Deney 2 dönüş yolu geometrisi: OSRM route önbelleği / doğru çizgi
+│  ├─ donus.ts          Deney 2 örnek, adaylar (shared F4 kuralları), yöntemler A–C-Macar, ölçütler
 │  ├─ eslestirme.ts     aday matrisi (shared) + yöntemler (a)–(e)
 │  ├─ macar.ts          Macar algoritması (Kuhn–Munkres, potansiyelli kısa yol, O(r²c))
 │  ├─ akis.ts           tam k eşleşmeli en az maliyetli atama (ardışık en kısa yollar)
 │  ├─ teyit-sim.ts      Deney 3 ayrık olay simülasyonu
 │  ├─ istatistik.ts     t, eşleştirilmiş t, Wilcoxon, Holm
 │  └─ tablo.ts          CSV / Markdown
-├─ test/                27 test (aşağıda)
-├─ veri/                OSRM matris önbelleği (OSM türevi, ODbL)
+├─ test/                32 test (aşağıda)
+├─ veri/                OSRM matris ve rota önbellekleri (OSM türevi, ODbL)
 └─ sonuclar/            çıktılar
 ```
 
@@ -87,6 +92,9 @@ Simülasyon sistemin kurallarını `@nakliye/shared`'dan içe aktarır; kendi ko
 | SMS yedeği (30 dk) | `shouldSendSmsFallback` | `lib/teyit-sim.ts` |
 | BR-05 eşiği | `shouldForceReconfirm` | `lib/teyit-sim.ts` |
 | TR günü başı/sonu | `trDayStart`, `trDayEnd`, `trDay` | `lib/teyit-sim.ts` |
+| F4 tahmini varış ve dönüş penceresi | `estimatedArrivalDay`, `returnWindow`, `RETURN_PLAN_PARAMS` | `lib/donus.ts` |
+| F4 dönüş yükü: sanal boş araç ilanı + BR-20 | `returnCapacity`, `matchLoadWithCapacity` | `lib/donus.ts` |
+| F4 rota üstü (BR-23) ve konumdan bağımsız uyum | `onRouteMatch` (`projectOnPolyline`), `fitRejectReason` | `lib/donus.ts` |
 
 Teyit fonksiyonları zaten bir `ConfirmationParams` parametresi aldığı için parametreli bir kopya **gerekmedi**: Deney 3'ün duyarlılık analizi shared fonksiyonlarını farklı parametrelerle çağırır. Varsayılan yapılandırma `DEFAULT_CONFIRMATION_PARAMS`'ın kendisidir; testler bunu ve el ile hesaplanmış geçiş zamanlarını sınar.
 
@@ -284,7 +292,7 @@ Duyarlılık (p = 0,7, q = 0,5; tam ızgara p ∈ {0,5; 0,7; 0,9} için `deney3.
 
 ## 6. Testler
 
-`npx tsx --test tez/simulasyon/test/*.test.ts` → **27 test, 27 geçti, 0 kaldı** (bu makinede ~1 sn).
+`npx tsx --test tez/simulasyon/test/*.test.ts` → **32 test, 32 geçti, 0 kaldı** (bu makinede ~3 sn).
 
 | Dosya | Ne sınanıyor |
 |---|---|
@@ -294,28 +302,71 @@ Duyarlılık (p = 0,7, q = 0,5; tam ızgara p ∈ {0,5; 0,7; 0,9} için `deney3.
 | `uretici.test.ts` | Aynı tohum aynı veri, farklı tohum farklı veri; araçların iç içeliği; her ilan shared zod şemalarından ve tarih kurallarından geçer; koridor payı ≈ %55 |
 | `teyit.test.ts` | Varsayılan parametrelerin shared ile aynılığı; BR-02…04 geçiş zamanları (el ile hesaplanmış); yükleme günü 6 saat kuralı; "geçerli" cevabın son teyidi yenilemesi ve gittikten sonraki cevabın kapatması; senaryo A; BR-05; uyku saatleri; **atlanan zamanlayıcı turlarının sonucu değiştirmediği** (her 5 dakikada tur atan sürümle 600 ilan × senaryo birebir aynı) |
 | `istatistik.test.ts` | t ve normal dağılım tablo değerleri, özet ve GA, eşleştirilmiş t, Wilcoxon, Holm |
+| `donus.test.ts` | Deney 2: aynı tohum aynı örnek, işler iç içe ve il dışı, varış günü shared `estimatedArrivalDay`; her iş × pazar yükü çiftinde aday kararı doğrudan shared (`matchLoadWithCapacity` sanal ilanla, değilse `fitRejectReason` + `onRouteMatch`) ve kabul kuralıyla aynı; küresel atama 60 küçük örnekte kaba kuvvetle aynı en az toplam boş km ve hiçbir yöntemden kötü değil; bir yük tek araca, B yalnız dönüş yükü, C dönüş adayı varken rota seçmez; polyline kodlaması (Google örneği) |
 
-Testlerin hata yakaladığı da denendi: Macar'daki ceza sabiti küçültülünce ve teyit simülasyonunda SMS turu atlanınca ilgili 4 test kırıldı (sonra geri alındı).
-
----
-
-## 7. Deney 2 — dönüş planının boş km'ye etkisi (YAPILACAK)
-
-Sistemde dönüş planı (F4) henüz yok; kural yazılınca eklenecek. Planlanan yöntem:
-
-1. **Örnek:** `Uretici` ile yükler ve araçlar; her araca bir "ev" ilçesi (dönmek istediği yer) gerekir. Şimdilik `hedefIlce` (null = her yer) var; Deney 2 için ev ilçesi alanı eklenecek (koridor ağırlıklı, [T]).
-2. **Senaryo:** her araç bir gidiş işi alır (kalkış → varış; Deney 1'in (a) yöntemiyle ya da rastgele). Varış noktasında:
-   - **Dönüş planı yok:** araç boş döner; boş km = karayolu(varış → ev).
-   - **Dönüş planı var:** F4 kuralı (shared'daki fonksiyon) varış çevresindeki ve eve doğru giden uygun yükleri önerir; araç en iyi öneriyi alırsa boş km = karayolu(varış → dönüş yükü kalkışı) + karayolu(dönüş yükü varışı → ev). Aynı dönüş yükünü iki araç alamaz (yine kural tabanlı sıra ya da Macar ile atanabilir; bu da Deney 1'le bağlantılı bir alt karşılaştırma olur).
-3. **Ölçütler:** toplam boş km, boş km oranı (boş / toplam km), dönüş yükü bulma oranı, araç başına ortalama boş km; aynı örnekler üzerinde eşleştirilmiş fark, %95 GA, t ve Wilcoxon (Deney 1 ile aynı `istatistik.ts`).
-4. **Duyarlılık:** dönüş yükü arama yarıçapı, zaman penceresi, "her yer"/ev oranı, araç/yük oranı.
-
-**Ana oturumun yapması gerekenler:**
-- F4 kuralını `packages/shared` içinde saf, parametreli bir fonksiyon olarak yazıp dışa aktarmak (ör. bir yük ve aracın varış/ev bilgisiyle dönüş adayı mı, skoru ne). Simülasyon onu `@nakliye/shared`'dan içe aktaracak; kopya yazılmayacak. Rota üstü (BR-23) koşulu kullanılacaksa OSRM rotası gerektirir: simülasyonda ilçe matrisi var ama rota geometrisi yok; ya kuş uçuşu/ilçe-yarıçap sürümü ya da önceden alınmış rota önbelleği gerekir.
-- Shared'ı yeniden derlemek (`npm run build -w @nakliye/shared`), sonra `tez/simulasyon/deney2.ts` ve testini eklemek, `calistir.ts`'e `--deney=2` bağlamak.
-- docs/03 §8'deki "Boş km azalması (simülasyon)" ölçütünü bu deneyle doldurmak.
+Testlerin hata yakaladığı da denendi: Macar'daki ceza sabiti küçültülünce ve teyit simülasyonunda SMS turu atlanınca ilgili 4 test kırıldı (sonra geri alındı). Deney 2'de küresel atamanın "eşleşmeden dön" maliyeti 0 yapılınca ve sistem sırası (önce dönüş, sonra rota) ters çevrilince ilgili testler kırıldı (geri alındı).
 
 ---
+
+## 7. Deney 2 — dönüş planının (F4) boş km'ye etkisi
+
+### 7.1 Yöntem
+
+Kurallar sistemle aynıdır ve shared'dan içe aktarılır (§2): tahmini varış, dönüş penceresi, sanal boş araç ilanıyla BR-20 dönüş yükü, BR-23 rota üstü. API'deki `ReturnPlanService` ile aynı karar sırası: önce dönüş yükü, değilse araç/tarih uyuyorsa rota üstü.
+
+- **Örnek:** *J* gidiş işi ve *J* × ρ pazar yükü (dönüşte alınabilecek). Gidiş işi = üreticinin bir yükü (**il dışı** [T]; il içiyse yeniden çekilir), aracı yükün istediği tiptir (kasa yük istiyorsa o, istemiyorsa tipin kasa dağılımından [T]; kapasite tip aralığından, yükten az değil). **Ev = işin kalkış ilçesi** (API'deki varsayım). Tahmini varış = yükleme başlangıcı + ⌈yol km / 600⌉ (shared, gecikmesiz). Pazar yükleri üreticinin olağan yükleridir (Deney 1 ile aynı dağılımlar), sahiplerinin güven skoru shared `trustScore` ile. İşler tohum başına iç içe (50 işin ilk 50'si 100 işinkiyle aynı), pazar yükleri oranlar arasında iç içe.
+- **Aday:** her iş için pazar yükü, (i) sanal boş araç ilanıyla (varıştan eve, varış … +2 gün, işteki araç) BR-20 adayıysa **dönüş yükü**; (ii) değilse araç/tarih uyuyor ve dönüş yolunun OSRM çizgisine kalkışı ve varışı ≤ 30 km, yönü doğruysa **rota üstü**. **Kabul [T]:** nakliyeci yalnız boş km'sini azaltan yükü alır (gelir modellenmedi).
+- **Boş km:** boş dönüş = karayolu(varış → ev); dönüş yüküyle = karayolu(varış → yük kalkışı) + karayolu(yük varışı → ev). Gidişte boş km yok (iş evden başlar). Boş km oranı = boş / (boş + yüklü), gidiş + dönüş.
+
+| Kod | Yöntem | Not |
+|---|---|---|
+| A | Dönüş planı yok: boş döner | |
+| B | Yalnız dönüş yükleri (BR-20) | Nakliyecinin varışta **elle boş araç ilanı** açmasının karşılığı: F4 olmadan da sistemde var |
+| C | Dönüş + rota üstü (**F4**) | Uygulamadaki sıra: dönüş listesinden en yüksek skorlu, yoksa rota üstü listesinden |
+| C-km | Aynı öneriler, nakliyeci boş km'si en az olanı seçer | Kullanıcı davranışı duyarlılığı |
+| C-Macar | Aynı adaylarla küresel atama, toplam boş km tasarrufu en çok | Merkezi planlayıcı üst sınırı; her işe "eşleşmeden dön" sahte sütunu (maliyet T), eşleşme maliyeti T − tasarruf |
+
+B, C ve C-km'de işler **varış gününe göre** seçer (önce varan önce alır); bir yükü tek araç alır. **Okuma:** C − B = F4'e özgü katkı (rota üstü + aynı listede sunma); B − A = dönüşte platformdan yük bulmanın etkisi (F4 bunu otomatikleştirir).
+
+**Tasarım:** *J* ∈ {50, 100, 200, 400}, ρ ∈ {1, 2, 4}, 30 tohum (12 × 30 = 360 örnek, her örnekte 5 yöntem); duyarlılık *J* = 200, ρ = 2'de bir parametre değiştirilerek (pencere 1/2/4 gün, sapma 15/30/50 km, dönüş yarıçapı 25/40, 50/80, 100/160 km). İstatistik Deney 1 ile aynı (`istatistik.ts`): eşleştirilmiş t, Wilcoxon, ana deneydeki 180 test üzerinde Holm.
+
+### 7.2 Sonuçlar (özet; tamamı `sonuclar/deney2.md`)
+
+Araç başına boş dönüş (A) ~634–650 km; boş km oranı A'da %50 (dönüş ≈ gidiş). İş başına aday: dönüş yükü 0,06 (J = 50, ρ = 1) – 1,59 (J = 400, ρ = 4), rota üstü 0,22 – 6,08.
+
+| İş | Pazar/iş | Yöntem | Dönüş yükü bulma, % | Araç başına boş km | Boş km oranı, % | Boş km azalması (A'ya göre), % |
+|---:|---:|:---|---:|---:|---:|---:|
+| 100 | 2 | B | 11,9 [11,1; 12,8] | 605 | 47,0 | 5,3 [4,6; 6,0] |
+| 100 | 2 | C (F4) | 31,6 [29,7; 33,6] | 576 | 44,6 | 9,7 [8,8; 10,6] |
+| 100 | 2 | C-Macar | 33,2 | 572 | 44,2 | 10,5 [9,6; 11,4] |
+| 200 | 2 | B | 17,4 [16,6; 18,2] | 599 | 45,5 | 8,0 [7,5; 8,5] |
+| 200 | 2 | C (F4) | 40,8 [39,7; 41,9] | 562 | 42,5 | 13,6 [12,9; 14,3] |
+| 200 | 2 | C-km | 41,0 | 561 | 42,4 | 13,7 [13,1; 14,4] |
+| 200 | 2 | C-Macar | 44,0 | 552 | 41,8 | 15,1 [14,3; 15,8] |
+| 400 | 4 | B | 36,1 [35,4; 36,7] | 526 | 39,6 | 19,1 [18,5; 19,6] |
+| 400 | 4 | C (F4) | 69,8 [69,0; 70,7] | 461 | 34,5 | 29,1 [28,3; 29,8] |
+| 400 | 4 | C-Macar | 74,4 | 438 | 32,7 | 32,7 [31,8; 33,5] |
+
+Bütün yapılandırmalarda (Holm sonrası p < 0,001): B < A, C < A ve **C < B** toplam boş km'de. C − B (F4'e özgü): dönüş yükü bulma +9,4 (J = 50, ρ = 1) ile +33,7 puan (J = 400, ρ = 4); boş km azalmasına +2,2 (J = 50, ρ = 1) ile +10,0 puan (J = 400, ρ = 4). Bulunan dönüşlerin %50–70'i rota üstü listesinden gelir. C-km − C: azalmada en çok +1,1 puan (yoğun pazarda; seyrekte anlamsız). C-Macar − C: azalmaya +0,3 ile +3,6 puan.
+
+Duyarlılık (J = 200, ρ = 2; C'nin boş km azalması): pencere 1 / 2 / 4 gün → %13,3 / 13,6 / 13,8; sapma 15 / 30 / 50 km → %11,0 / 13,6 / 17,0; dönüş yarıçapı 25/40 / 50/80 / 100/160 km → %11,1 / 13,6 / 20,2 (B: %2,6 / 8,0 / 17,6).
+
+### 7.3 Yorum
+
+1. **Dönüş planı boş km'yi belirgin biçimde azaltır ve etki pazar yoğunluğuyla büyür.** F4 (C), boş dönüşe göre toplam boş km'yi seyrek pazarda (J = 50–100, ρ = 1) %4–5, yoğun pazarda (J = 400, ρ = 4) %29 azaltır; araç başına ~650 km boş dönüş ~460 km'ye iner. docs/03 §8'deki "boş km azalması (simülasyon)" ölçütü budur.
+2. **F4'e özgü katkı rota üstü listesidir.** Yalnız BR-20 dönüş yükü (B) — ki nakliyeci varışta elle boş araç ilanı açarak F4 olmadan da alabilir — azalmanın %50–66'sını verir; rota üstü ara yükler bulma oranını yaklaşık iki ile üç katına (1,9–3,0) çıkarır ve azalmaya 2,2–10 puan ekler. Rota üstü yükler daha kısa olduğundan bulunan yük başına tasarrufları dönüş yükünden küçüktür (J = 200, ρ = 2'de B'de bulunan yük başına ~%0,46, C'de ~%0,33 azalma puanı).
+3. **Sıralama yeterince iyi.** Uygulamanın sırası (önce dönüş listesi, skor) ile "en az boş km'yi seçen nakliyeci" arasında fark en çok 1,1 puan; listedeki sıra boş km açısından kullanıcıyı yanlış yönlendirmiyor.
+4. **Merkezi koordinasyonun kazancı sınırlı.** Aynı adaylarla küresel atama, sıralı seçime göre en çok 3,6 puan ek azalma getirir (yoğun pazarda büyür). Deney 1'deki gibi: kural tabanlı sıralı seçim, üst sınıra yakındır; küresel atama dakikalık toplu bir iş olarak düşünülebilir ama önceliği düşüktür.
+5. **Pencere süresi önemsiz, sapma ve yarıçap belirleyici.** Dönüş penceresini 1'den 4 güne çıkarmak etkiyi yalnız ~0,5 puan değiştirir (BR-20'nin ±1 gün toleransı ve pazar yüklerinin tarih aralığı zaten geniş); sistemdeki 2 gün makul. Sapma sınırı 30 → 50 km etkiyi %13,6'dan %17'ye çıkarır, ama gerçekte 50 km sapmayı kabul eden nakliyeci oranı ölçülmedi; 30 km (BR-23) tutucu ve makul bir varsayılan. Dönüş yarıçapı B'yi çok etkiler (25/40 km'de %2,6), C'yi daha az (rota üstü listesi dar yarıçapı telafi eder).
+
+### 7.4 Sınırlılıklar (Deney 2'ye özgü)
+
+- **Rekabet yalnız deneydeki araçlar arasında:** pazardaki başka nakliyeciler (kendi boş araç ilanları, aramaları) dönüş yüklerini almaz. Gerçek bulma oranları daha düşük olur; mutlak düzeyler iyimserdir, yöntemler arası **farklar** yorumlanmalıdır.
+- **Statik pazar:** pazar yükleri baştan var; zaman içinde gelen ve giden ilanlar, yüklerin başka yollarla araç bulması yok.
+- **Tek dönüş yükü, zincir yok:** araç en çok bir dönüş yükü alır; dönüş yükünden sonra eve dönmeden ikinci bir yük aranmaz.
+- **Kabul ve davranış [T]:** nakliyeci yalnız boş km'yi azaltan yükü alır, öneriyi her zaman kabul eder; gelir, bekleme, sapma isteksizliği ve yük sahibinin kabulü modellenmedi. 50 km sapma gibi duyarlılık değerlerinin gerçekte kabul edilip edilmeyeceği bilinmez.
+- **Ev = işin kalkış ilçesi** (API'deki varsayım); nakliyecinin gerçek ev bölgesi (A4 "çalıştığı bölgeler") yok. Gidiş işi il dışı [T]; gecikme yok.
+- **Rota:** OSRM'nin sadeleştirilmiş otomobil profili çizgisi (kamyon kısıtları yok); konum ilçe merkezi. Rota üstü yük yalnız **dönüş** yolunda aranır (gidişte boş kapasiteyle ara yük yok, sistemde de yok). Sistem listede grup başına en çok 20 öneri gösterir; simülasyon bütün adayları kullanır (seçilen yük nadiren 20'nin dışındadır).
 
 ## 8. Varsayımlar ([T] = tahmin, `parametreler.ts`)
 
@@ -337,6 +388,11 @@ Sistemde dönüş planı (F4) henüz yok; kural yazılınca eklenecek. Planlanan
 | Yük [T] | Yükleme | başlangıç 0–7 gün (20/30/20/15/5/4/3/3), aralık 0–3 gün (50/25/15/10) |
 | Güven [T] | trustScore girdileri | %20 yeni üye; iş sayısı log-normal(15, 1); %60 puanlanmış; yıldız U(3,5; 5); doğrulama 0/1/2 = 10/50/40; iptal ≤ 0,1; şikayet ≤ 0,02 |
 | Mesafe | Boş km | OSRM karayolu (yoksa kuş uçuşu × 1,3) |
+| Deney 2 | Tasarım | iş ∈ {50, 100, 200, 400}, pazar/iş ∈ {1, 2, 4}; duyarlılık 200 iş, pazar/iş 2 |
+| Deney 2 [T] | Gidiş işi | üreticinin yükü, il dışı; araç = istenen tip, kasa yük istiyorsa o; kapasite tip aralığı, yükten az değil |
+| Deney 2 [T] | Ev | işin kalkış ilçesi (API ile aynı) |
+| Deney 2 [T] | Kabul | yalnız boş km'yi azaltan dönüş yükü; öneri kabul edilir; önce varan önce seçer |
+| Deney 2 | Sistem parametreleri | shared `RETURN_PLAN_PARAMS` (600 km/gün, pencere +2 gün, sapma 30 km), `DEFAULT_MATCH_PARAMS` (50/80 km, ±1 gün); ızgara: pencere {1, 2, 4}, sapma {15, 30, 50}, yarıçap {25/40, 50/80, 100/160} |
 | Deney 3 [T] | İlan geliş | 14 gün × 100 ilan/gün, saat ağırlıkları mesai yoğun |
 | Deney 3 [T] | Yükün gitmesi | log-normal, medyan 18 sa, σ = 1 |
 | Deney 3 [T] | Kendiliğinden kapama | q = 0,5 (duyarlılık 0,3 / 0,7), gecikme log-normal medyan 2 sa, σ = 1 |

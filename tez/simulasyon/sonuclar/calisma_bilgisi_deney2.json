@@ -1,0 +1,14 @@
+{
+  "tarih": "2026-10-14T13:49:27.056Z",
+  "node": "v24.18.0",
+  "platform": "win32 x64",
+  "kokTohum": 20261012,
+  "tohumSayisi": 30,
+  "mesafeKaynagi": "osrm",
+  "mesafeAciklama": "OSRM karayolu (http://localhost:5000, 2026-10-12 tarihli önbellek; rota bulunamayan 0 çift kuş uçuşu × 1.3)",
+  "rotaKaynagi": "osrm",
+  "rotaAciklama": "OSRM rota geometrisi (http://localhost:5000, overview=simplified; önbellekte 11120 çift, rota bulunamayan 0; eksik/bulunamayan çift kuş uçuşu doğru çizgi)",
+  "rotaYedekSayisi": 0,
+  "deney2Sn": 186,
+  "toplamSn": 217
+}

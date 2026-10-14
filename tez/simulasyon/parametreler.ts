@@ -231,6 +231,31 @@ export const DENEY1 = {
   aracYukOranlari: [0.5, 1, 2],
 };
 
+// ── Deney 2: dönüş planı (F4) ───────────────────────────────────────
+// Kurallar (tahmini varış, dönüş penceresi, BR-20 dönüş yükü, BR-23 rota üstü) shared'dan; burada yalnız örnek ve
+// davranış varsayımları.
+
+export const DENEY2 = {
+  /** Gidiş işi sayısı (her iş bir araç; ev = işin kalkış ilçesi, API'deki dönüş planıyla aynı) */
+  isSayilari: [50, 100, 200, 400],
+  /** İş başına pazardaki yük ilanı (dönüşte alınabilecek) [T] */
+  pazarOranlari: [1, 2, 4],
+  /** Gidiş işi il dışıdır [T]: il içi kısa işte dönüş planı anlamsız (boş dönüş zaten kısa) */
+  gidisIlDisi: true,
+  /** Duyarlılık analizinin yapılandırması (iş sayısı, pazar oranı) */
+  duyarlilik: { is: 200, pazar: 2 },
+  /** Duyarlılık: dönüş penceresi, gün (sistem: RETURN_PLAN_PARAMS.windowDays = 2) */
+  pencereGunleri: [1, 2, 4],
+  /** Duyarlılık: rota üstü sapma sınırı, km (sistem: BR-23 30) */
+  sapmaKmleri: [15, 30, 50],
+  /** Duyarlılık: dönüş yükü yarıçapları [kalkış, varış] km (sistem: BR-20 50 / 80) */
+  yaricaplar: [
+    [25, 40],
+    [50, 80],
+    [100, 160],
+  ] as readonly (readonly [number, number])[],
+};
+
 // ── Deney 3: teyit davranışı [T] ────────────────────────────────────
 
 export const DENEY3 = {
