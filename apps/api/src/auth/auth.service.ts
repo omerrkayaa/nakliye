@@ -5,7 +5,7 @@ import { and, eq, gt, isNull, lt, sql } from "drizzle-orm";
 import { trDateTime } from "../common/format.js";
 import { deletedPhoneHmac, randomToken, sha256, sixDigitCode } from "../common/hash.js";
 import { SmsService } from "../common/sms.service.js";
-import { DB, type Db } from "../db/db.module.js";
+import { DB, type Db, type Tx } from "../db/db.module.js";
 import { otpCodes, refreshTokens, userRoles, users } from "../db/schema.js";
 
 // docs/04 §8: OTP 6 hane, 3 dk geçerli, 5 deneme
@@ -35,6 +35,12 @@ function demoCode(phone: string): string | null {
   if (SMS_PROVIDER !== "console" || !DEMO_PHONE || !/^\d{6}$/.test(DEMO_OTP ?? "")) return null;
   return phone === DEMO_PHONE ? DEMO_OTP! : null;
 }
+
+/** Girişte hesap bu arada aktiflikten çıktıysa (askı, silme, dondurma ile yarış) */
+const loginDenied = (status: string | undefined) =>
+  status === "askida" ? new ForbiddenException(SUSPENDED_MESSAGE) : status === "silindi" ? new ForbiddenException(DELETING_MESSAGE) : new UnauthorizedException("Giriş yapılamadı; tekrar deneyin");
+/** Askıya alınan hesabın belirteçleri askıya alırken iptal edilir; bu ikinci kilit (yarışta açık kalanlar için) */
+const refreshDenied = (status: string | undefined) => new UnauthorizedException(status === "askida" ? SUSPENDED_MESSAGE : "Oturum süresi doldu");
 
 export interface AccessPayload {
   sub: string;
@@ -110,7 +116,8 @@ export class AuthService {
     if (user!.status === "askida") throw new ForbiddenException(SUSPENDED_MESSAGE);
     if (user!.status === "silindi") throw new ForbiddenException(DELETING_MESSAGE);
 
-    return { isNew, ...(reopened ? { reopened } : {}), ...(await this.issueTokens(user!.id)) };
+    const tokens = await this.db.transaction((tx) => this.issueTokens(tx, user!.id, loginDenied));
+    return { isNew, ...(reopened ? { reopened } : {}), ...tokens };
   }
 
   /**
@@ -142,25 +149,28 @@ export class AuthService {
       .returning();
   }
 
+  /**
+   * Yenileme belirteci tek kullanımlıktır (rotation). Kullanma atomik: aynı belirteçle gelen paralel isteklerden yalnız
+   * biri satırı iptal edip yeni çift alır (önce okuyup sonra koşulsuz yazmak ikisine de verirdi). Hesap aktif değilse
+   * belirteç kullanılmamış kalır (askı kalkınca yine çalışır).
+   */
   async refresh(refreshToken: string) {
-    const [row] = await this.db
-      .select()
-      .from(refreshTokens)
-      .where(
-        and(
-          eq(refreshTokens.tokenHash, sha256(refreshToken)),
-          isNull(refreshTokens.revokedAt),
-          gt(refreshTokens.expiresAt, new Date()),
-        ),
-      );
-    if (!row) throw new UnauthorizedException("Oturum süresi doldu");
-    // Askıya alınan hesabın belirteçleri askıya alırken iptal edilir; bu ikinci kilit (yarışta açık kalanlar için)
-    const [owner] = await this.db.select({ status: users.status }).from(users).where(eq(users.id, row.userId));
-    if (owner?.status === "askida") throw new UnauthorizedException(SUSPENDED_MESSAGE);
-    if (!owner || owner.status === "silindi" || owner.status === "donduruldu") throw new UnauthorizedException("Oturum süresi doldu");
-    // Yenileme belirteci tek kullanımlıktır (rotation).
-    await this.db.update(refreshTokens).set({ revokedAt: new Date() }).where(eq(refreshTokens.id, row.id));
-    return this.issueTokens(row.userId);
+    const hash = sha256(refreshToken);
+    return this.db.transaction(async (tx) => {
+      const [found] = await tx.select({ userId: refreshTokens.userId }).from(refreshTokens).where(eq(refreshTokens.tokenHash, hash));
+      if (!found) throw new UnauthorizedException("Oturum süresi doldu");
+      // Kilit sırası dondurma ve silmeyle aynı (önce kullanıcı satırı, sonra belirteç): ters sıra kilitlenme (deadlock) üretirdi
+      const [owner] = await tx.select({ status: users.status }).from(users).where(eq(users.id, found.userId)).for("share");
+      if (owner?.status !== "aktif") throw refreshDenied(owner?.status);
+      const now = new Date();
+      const [row] = await tx
+        .update(refreshTokens)
+        .set({ revokedAt: now })
+        .where(and(eq(refreshTokens.tokenHash, hash), isNull(refreshTokens.revokedAt), gt(refreshTokens.expiresAt, now)))
+        .returning({ userId: refreshTokens.userId });
+      if (!row) throw new UnauthorizedException("Oturum süresi doldu");
+      return this.issueTokens(tx, row.userId, refreshDenied);
+    });
   }
 
   async logout(refreshToken: string) {
@@ -180,10 +190,17 @@ export class AuthService {
     return this.jwt.signAsync(payload);
   }
 
-  private async issueTokens(userId: string) {
+  /**
+   * Yeni belirteç çifti, kullanıcı satırı paylaşımlı kilitliyken ve hesap hâlâ aktifse yazılır. Dondurma, silme ve askıya
+   * alma satırı güncelleyip (satır kilidi) belirteçleri iptal eder: bu sıra sayesinde onlarla yarışan bir giriş ya da
+   * yenileme, iptal edilmemiş (hesap açılınca yeniden geçerli olacak) bir belirteç bırakamaz.
+   */
+  private async issueTokens(tx: Tx, userId: string, denied: (status: string | undefined) => Error) {
+    const [u] = await tx.select({ status: users.status }).from(users).where(eq(users.id, userId)).for("share");
+    if (u?.status !== "aktif") throw denied(u?.status);
     const accessToken = await this.accessTokenFor(userId);
     const refreshToken = randomToken();
-    await this.db.insert(refreshTokens).values({
+    await tx.insert(refreshTokens).values({
       userId,
       tokenHash: sha256(refreshToken),
       expiresAt: new Date(Date.now() + REFRESH_TTL_MS),

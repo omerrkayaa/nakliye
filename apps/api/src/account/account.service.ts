@@ -317,6 +317,9 @@ export class AccountService {
     let done = 0;
     for (const r of rows) {
       try {
+        // Seçimden bu yana girişle açılıp yeni ilan vermiş olabilir: açık hesabın ilanı kapatılmaz
+        const [u] = await db.select({ status: users.status }).from(users).where(eq(users.id, r.id));
+        if (u?.status !== "donduruldu") continue;
         await this.closeOpenActivity(r.id, now);
         done++;
       } catch (e) {

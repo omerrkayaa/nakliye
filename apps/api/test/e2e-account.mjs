@@ -464,6 +464,24 @@ psql(`update users set status='donduruldu' where id='${Zid}'`);
 r = await api("POST", "/admin/tick", A);
 check("tur dondurulmuş hesapta kalan ilanı kapattı", r.body.frozenClosed >= 1 && psql(`select status from load_posts where id='${Zl}'`) === "iptal", JSON.stringify(r.body));
 
+console.log("\nOturum yenileme: tek kullanım, dondurmayla yarış");
+const refreshWith = (t) => api("POST", "/auth/refresh", null, { refreshToken: t });
+const R1 = await login(phone(44));
+burst = await Promise.all([refreshWith(R1.refreshToken), refreshWith(R1.refreshToken)]);
+check("aynı yenileme belirteciyle iki paralel istekten yalnız biri yeni oturum alır", burst.filter((x) => x.status === 201).length === 1 && burst.some((x) => x.status === 401), JSON.stringify(burst.map((x) => x.status)));
+let leaked = 0, errs = 0, frozeN = 0;
+// Yenileme 0–9 ms gecikmeli: kimi turda dondurmadan önce, kimi turda kilit beklerken gelir
+for (let i = 0; i < 8; i++) {
+  const p = phone(50 + i);
+  const t = await login(p);
+  const id = idOf(p);
+  const [fr, rf] = await Promise.all([api("POST", "/me/freeze", t.accessToken), sleep((i % 4) * 3).then(() => refreshWith(t.refreshToken))]);
+  if (fr.status >= 500 || rf.status >= 500) errs++;
+  if (fr.status === 200) frozeN++;
+  if (fr.status === 200 && psql(`select count(*) from refresh_tokens where user_id='${id}' and revoked_at is null`) !== "0") leaked++;
+}
+check("dondurma ile yenileme yarışında 5xx (kilitlenme) yok, dondurulan hesapta açık yenileme belirteci kalmaz", errs === 0 && leaked === 0 && frozeN === 8, `5xx ${errs}, kaçak ${leaked}, dondurulan ${frozeN}`);
+
 console.log("\nAskıya alma ile silme aynı anda");
 let both = 0, lost = 0;
 // Askı 0–15 ms gecikmeli: kimi turda silme kazanır, kimi turda askı silme isteği guard'ı geçtikten sonra gelir
