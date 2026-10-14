@@ -36,6 +36,39 @@ async function upload(token, fields, bytes, name = "belge.bin", mime = "applicat
   let json; try { json = JSON.parse(text); } catch { json = text; }
   return { status: res.status, body: json };
 }
+/**
+ * Gövdesi parça parça giden yükleme (SRC belgesi): başı hemen gider, end() ile biter, abort() ile kopar. Yükleme sürerken
+ * sunucuyu sınamak için; response gövde bitmeden de çözülebilir (sunucu erken reddederse).
+ */
+function slowUpload(token) {
+  const boundary = `----nakliye${Math.random().toString(16).slice(2)}`;
+  const enc = (t) => new TextEncoder().encode(t);
+  let ctrl;
+  const body = new ReadableStream({ start: (c) => { ctrl = c; } });
+  ctrl.enqueue(enc(`--${boundary}\r\nContent-Disposition: form-data; name="type"\r\n\r\nsrc\r\n--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="belge.pdf"\r\nContent-Type: application/pdf\r\n\r\n%PDF-1.4\n`));
+  ctrl.enqueue(new Uint8Array(64 * 1024));
+  const abort = new AbortController();
+  const response = fetch(B + "/documents", {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": `multipart/form-data; boundary=${boundary}` },
+    body,
+    duplex: "half",
+    signal: abort.signal,
+  })
+    .then(async (res) => {
+      const text = await res.text();
+      let json; try { json = JSON.parse(text); } catch { json = text; }
+      return { status: res.status, body: json };
+    })
+    .catch((e) => ({ status: 0, body: String(e) }));
+  return {
+    response,
+    end: () => { ctrl.enqueue(enc(`\r\n--${boundary}--\r\n`)); ctrl.close(); },
+    abort: () => abort.abort(),
+  };
+}
+/** Süre sınırlı bekleme: söz verilen sürede çözülmezse "beklemede" */
+const within = (promise, ms) => Promise.race([promise, sleep(ms).then(() => "beklemede")]);
 /** İmzalı yoldan dosyayı indir */
 async function fetchFile(path) {
   const res = await fetch(B + path);
@@ -249,6 +282,55 @@ for (let i = 0; i < 6; i++) {
   if (del.status === 200 && (psql(`select count(*) from documents where owner_user_id='${id}'`) !== "0" || files !== 0)) orphans++;
 }
 check("silinen hesapta belge satırı ya da dosyası kalmaz, 5xx yok", orphans === 0 && errors5xx === 0, `kalan ${orphans}, 5xx ${errors5xx}`);
+
+console.log("\nYükleme yuvası (multer'dan önce): kullanıcı başına aynı anda bir, sunucuda en çok 8; ret gövde okunmadan");
+const Y1 = await user(phone(40), ["carrier"]);
+const Y2 = await user(phone(41), ["carrier"]);
+let slow = slowUpload(Y1);
+await sleep(400);
+r = await upload(Y1, { type: "src" }, PDF);
+check("yükleme sürerken aynı kullanıcının ikincisi 429", r.status === 429 && r.body.message === "Önceki yüklemeniz sürüyor; bitince tekrar deneyin.", JSON.stringify(r.body));
+check("başka kullanıcı aynı anda yükleyebilir", (await upload(Y2, { type: "src" }, PDF)).status === 201);
+slow.end();
+r = await slow.response;
+check("yavaş yükleme bitince kaydedilir", r.status === 201, JSON.stringify(r.body).slice(0, 120));
+check("ardından yeni yükleme yapılabilir (yuva boşaldı)", (await upload(Y1, { type: "src" }, PDF)).status === 201);
+slow = slowUpload(Y1);
+await sleep(400);
+slow.abort();
+await slow.response;
+await sleep(300);
+check("yarıda kopan yükleme yuvayı bırakır", (await upload(Y1, { type: "src" }, PDF)).status === 201);
+
+const noRole = (await login(phone(42))).accessToken;
+slow = slowUpload(noRole);
+r = await within(slow.response, 3000);
+check("rolsüz hesap gövde bitmeden 403", r !== "beklemede" && r.status === 403 && r.body.message === "Belge nakliyeci ya da yük sahibi hesabıyla yüklenir", JSON.stringify(r));
+slow.abort();
+const Y3 = await user(phone(43), ["carrier"]);
+psql(`insert into documents(owner_user_id, type, file_key, content_type, size_bytes, status) select id, 'src', 'documents/test/' || g || '.pdf', 'application/pdf', 1, 'ret' from users, generate_series(1, 20) g where phone='${phone(43)}'`);
+slow = slowUpload(Y3);
+r = await within(slow.response, 3000);
+check("24 saatte 20 yüklemeden sonra gövde bitmeden 429", r !== "beklemede" && r.status === 429 && r.body.message === "Bugün çok belge yüklediniz; yarın tekrar deneyin", JSON.stringify(r));
+slow.abort();
+psql(`delete from documents where owner_user_id=(select id from users where phone='${phone(43)}') and file_key like 'documents/test/%'`);
+
+const many = [];
+for (let i = 0; i < 9; i++) many.push(await user(phone(50 + i), ["carrier"]));
+const holds = many.slice(0, 8).map((t) => slowUpload(t));
+await sleep(600);
+r = await upload(many[8], { type: "src" }, PDF);
+check("8 yükleme sürerken 9.su 503", r.status === 503 && r.body.message === "Şu an çok sayıda yükleme yapılıyor; biraz sonra tekrar deneyin.", JSON.stringify(r.body));
+holds.forEach((h) => h.end());
+const done = await Promise.all(holds.map((h) => h.response));
+check("bekleyen 8 yükleme tamamlanır", done.every((x) => x.status === 201), done.map((x) => x.status).join());
+check("sonra 9. kullanıcı yükler", (await upload(many[8], { type: "src" }, PDF)).status === 201);
+
+// Temizlik: bekleyenler yönetici kuyruğunda (eskiden yeniye, 20'lik sayfa) birikip başka takımların belgesini ilk
+// sayfadan iterdi
+const leftovers = psql(`select d.id from documents d join users u on u.id = d.owner_user_id where d.status = 'bekliyor' and u.phone like '+90549${run}%'`).split("\n").filter(Boolean);
+for (const id of leftovers) await api("POST", `/admin/documents/${id}/review`, A, { decision: "ret", rejectReason: "Test temizliği" });
+check("bu koşunun bekleyen belgesi kalmadı", psql(`select count(*) from documents d join users u on u.id = d.owner_user_id where d.status = 'bekliyor' and u.phone like '+90549${run}%'`) === "0");
 
 console.log(`\nSonuç: ${pass} geçti, ${fail} kaldı`);
 process.exitCode = fail ? 1 : 0;

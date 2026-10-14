@@ -31,6 +31,7 @@ import { AuthGuard, CurrentUser, Roles } from "../auth/auth.guard.js";
 import type { AccessPayload } from "../auth/auth.service.js";
 import { ZodPipe } from "../common/zod.pipe.js";
 import { DocumentsService, type UploadedDocumentFile } from "./documents.service.js";
+import { UploadSlotInterceptor } from "./upload-slot.interceptor.js";
 
 const uuid = new ParseUUIDPipe({ version: "4" });
 
@@ -52,10 +53,13 @@ class UploadTooLargeFilter implements ExceptionFilter {
 export class DocumentsController {
   constructor(private readonly documents: DocumentsService) {}
 
-  /** Çok parçalı form: `file` (PDF/JPEG/PNG, ≤ 10 MB) + `type` + araca bağlı türde `vehicleId`. Bellekte tutulur, diske depo yazar. */
+  /**
+   * Çok parçalı form: `file` (PDF/JPEG/PNG, ≤ 10 MB) + `type` + araca bağlı türde `vehicleId`. Bellekte tutulur, diske
+   * depo yazar. Sıra önemli: yükleme yuvası (rol, günlük sınır, aynı anda tek yükleme) multer gövdeyi okumadan önce.
+   */
   @Post()
   @UseFilters(UploadTooLargeFilter)
-  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: DOCUMENT_LIMITS.maxBytes, files: 1, fields: 4, parts: 6 } }))
+  @UseInterceptors(UploadSlotInterceptor, FileInterceptor("file", { limits: { fileSize: DOCUMENT_LIMITS.maxBytes, files: 1, fields: 4, parts: 6 } }))
   upload(
     @CurrentUser() user: AccessPayload,
     @UploadedFile() file: UploadedDocumentFile | undefined,

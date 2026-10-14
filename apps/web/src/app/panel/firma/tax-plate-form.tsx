@@ -1,26 +1,44 @@
 "use client";
 
 import { DOCUMENT_LIMITS } from "@nakliye/shared";
-import { startTransition, useActionState, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useState, type FormEvent } from "react";
 import { Field } from "@/components/field";
 import { Button } from "@/components/ui/button";
-import { uploadTaxPlateAction, type UploadState } from "./actions";
 
 const MB = DOCUMENT_LIMITS.maxBytes / 1024 / 1024;
 
-/** Vergi levhası yükleme. Büyük dosya gönderilmeden yakalanır (proxy sınırına takılıp yarım gitmesin). */
+/**
+ * Vergi levhası yükleme. Büyük dosya gönderilmeden yakalanır (proxy sınırına takılıp yarım gitmesin). Dosya sunucu
+ * eylemiyle değil ./levha rota işleyicisiyle gider (eylemlerin gövde sınırı varsayılan 1 MB'ta kalsın).
+ */
 export function TaxPlateForm({ replacing }: { replacing: boolean }) {
-  const [state, dispatch, pending] = useActionState<UploadState, FormData>(uploadTaxPlateAction, {});
-  const [tooBig, setTooBig] = useState(false);
-  const submit = (e: FormEvent<HTMLFormElement>) => {
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+  const [state, setState] = useState<{ error?: string; done?: boolean }>({});
+  const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const data = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const data = new FormData(form);
     const file = data.get("file");
-    setTooBig(file instanceof File && file.size > DOCUMENT_LIMITS.maxBytes);
-    if (file instanceof File && file.size > DOCUMENT_LIMITS.maxBytes) return;
-    startTransition(() => dispatch(data));
+    if (file instanceof File && file.size > DOCUMENT_LIMITS.maxBytes) return setState({ error: `Dosya en çok ${MB} MB olabilir` });
+    setPending(true);
+    setState({});
+    try {
+      const res = await fetch("/panel/firma/levha", { method: "POST", body: data });
+      // Oturum düştüyse API çağrısı girişe yönlendirir; fetch yönlendirmeyi izler
+      if (res.redirected) return window.location.assign(res.url);
+      const json = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (!res.ok) return setState({ error: json?.error ?? "Yüklenemedi; tekrar deneyin." });
+      form.reset();
+      setState({ done: true });
+      router.refresh();
+    } catch {
+      setState({ error: "Sunucuya ulaşılamadı; tekrar deneyin." });
+    } finally {
+      setPending(false);
+    }
   };
-  const error = tooBig ? `Dosya en çok ${MB} MB olabilir` : state.error;
   return (
     <form onSubmit={submit} className="space-y-2">
       <Field label={`${replacing ? "İncelemedekinin yerine yeni dosya" : "Vergi levhası"} (PDF, JPEG ya da PNG; en çok ${MB} MB)`} htmlFor="tax-plate">
@@ -36,12 +54,12 @@ export function TaxPlateForm({ replacing }: { replacing: boolean }) {
       <Button type="submit" disabled={pending} className="h-11">
         {pending ? "Yükleniyor…" : "Vergi levhasını yükle"}
       </Button>
-      {error && (
+      {state.error && (
         <p role="alert" className="text-sm font-medium text-destructive">
-          {error}
+          {state.error}
         </p>
       )}
-      {state.done && !pending && !error && (
+      {state.done && !pending && (
         <p role="status" className="text-sm">
           Yüklendi; yönetici incelemesinden sonra firmanız doğrulanır.
         </p>

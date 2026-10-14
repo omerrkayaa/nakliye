@@ -1,6 +1,5 @@
 "use server";
 
-import { DOCUMENT_LIMITS } from "@nakliye/shared";
 import { refresh } from "next/cache";
 import { api, ApiError } from "@/lib/api";
 
@@ -42,25 +41,4 @@ export async function saveProfileAction(_prev: ProfileState, form: FormData): Pr
   return { done: true };
 }
 
-export interface UploadState {
-  error?: string;
-  done?: boolean;
-}
-
-/** Vergi levhası yükleme (FR-05): dosya API'ye çok parçalı gider; tür API'de ilk baytlardan denetlenir. */
-export async function uploadTaxPlateAction(_prev: UploadState, form: FormData): Promise<UploadState> {
-  const file = form.get("file");
-  if (!(file instanceof File) || file.size === 0) return { error: "Dosya seçin" };
-  if (file.size > DOCUMENT_LIMITS.maxBytes) return { error: `Dosya en çok ${DOCUMENT_LIMITS.maxBytes / 1024 / 1024} MB olabilir` };
-  const body = new FormData();
-  body.append("type", "vergi_levhasi");
-  body.append("file", file, file.name);
-  try {
-    await api("/documents", { method: "POST", body });
-  } catch (e) {
-    if (e instanceof ApiError) return { error: e.message };
-    throw e;
-  }
-  refresh();
-  return { done: true };
-}
+// Vergi levhası yükleme sunucu eylemi değil: ./levha/route.ts (eylemlerin gövde sınırı varsayılanda kalsın)

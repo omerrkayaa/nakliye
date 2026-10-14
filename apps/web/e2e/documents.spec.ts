@@ -25,6 +25,15 @@ async function browserWith(browser: Browser, access: string, refresh?: string) {
 }
 const pick = (p: Page, name: string, mimeType: string, buffer: Buffer) => p.getByLabel(/Vergi levhası \(PDF|İncelemedekinin yerine/).setInputFiles({ name, mimeType, buffer });
 const latestDoc = () => psql(`select id from documents where owner_user_id='${S.id}' order by created_at desc limit 1`);
+/** Bekleyen kuyruğu eskiden yeniye, 20'lik sayfalı: başka takımların bekleyen belgeleri öndeyse belge sonraki sayfadadır */
+async function pendingPageOf(id: string) {
+  for (let n = 1; n <= 50; n++) {
+    const r = await api<{ items: { id: string }[]; hasMore: boolean }>("GET", `/admin/documents?status=bekliyor&page=${n}`, admin);
+    if (r.body.items.some((d) => d.id === id)) return n;
+    if (!r.body.hasMore) break;
+  }
+  throw new Error(`Belge kuyrukta yok: ${id}`);
+}
 
 test.beforeAll(async ({ browser }) => {
   admin = await adminToken(920);
@@ -66,6 +75,20 @@ test("vergi levhası: büyük dosya gönderilmeden, türü gizlenmiş dosya API'
   expect(Buffer.from(await res.body()).equals(PDF)).toBe(true);
 });
 
+test("levha yükleme rotası: başka siteden ya da kökensiz istek 403; sınırı aşan gövde 413; hiçbiri belge yazmaz", async () => {
+  const count = () => psql(`select count(*) from documents where owner_user_id='${S.id}'`);
+  const before = count();
+  const file = (buffer: Buffer) => ({ file: { name: "levha.pdf", mimeType: "application/pdf", buffer } });
+  let r = await page.request.post("/panel/firma/levha", { multipart: file(PDF), headers: { origin: "https://kotu.example.com" } });
+  expect(r.status()).toBe(403);
+  r = await page.request.post("/panel/firma/levha", { multipart: file(PDF) }); // tarayıcı POST'ta Origin'i hep yazar
+  expect(r.status()).toBe(403);
+  r = await page.request.post("/panel/firma/levha", { multipart: file(Buffer.alloc(10 * 1024 * 1024 + 70 * 1024)), headers: { origin: BASE } });
+  expect(r.status()).toBe(413);
+  expect((await r.json()).error).toBe("Dosya en çok 10 MB olabilir");
+  expect(count()).toBe(before);
+});
+
 test("başka kullanıcı belgeyi açamaz (BFF 404)", async ({ browser }) => {
   const O = await apiUser(phone(822), "shipper");
   const c = await browserWith(browser, O.accessToken, O.refreshToken);
@@ -82,6 +105,8 @@ test("yönetici: kuyrukta firma bilgisiyle; ret sebepsiz olmaz, sebeple reddedil
   await expect(ap.getByRole("heading", { name: "Onay bekleyen ilanlar" })).toBeVisible();
   await ap.getByRole("link", { name: "Belgeler", exact: true }).click();
   await expect(ap).toHaveURL(/\/panel\/yonetim\/belgeler$/);
+  let n = await pendingPageOf(latestDoc());
+  if (n > 1) await ap.goto(`/panel/yonetim/belgeler?sayfa=${n}`);
   let item = ap.locator(`[data-document-id="${latestDoc()}"]`);
   await expect(item).toContainText("Vergi levhası");
   await expect(item).toContainText("Levha Ticaret Ltd. Şti.");
@@ -102,7 +127,8 @@ test("yönetici: kuyrukta firma bilgisiyle; ret sebepsiz olmaz, sebeple reddedil
   await page.getByRole("button", { name: "Vergi levhasını yükle" }).click();
   await expect(page.getByTestId("tax-plate-status")).toHaveText("Vergi levhanız inceleniyor. Onaylanınca firmanız doğrulanır.");
 
-  await ap.reload();
+  n = await pendingPageOf(latestDoc());
+  await ap.goto(`/panel/yonetim/belgeler${n > 1 ? `?sayfa=${n}` : ""}`);
   item = ap.locator(`[data-document-id="${latestDoc()}"]`);
   await expect(item).toContainText("Belgeyi aç (görsel)");
   if (process.env.SHOTS) await ap.screenshot({ path: `${process.env.SHOTS}/belgeler-kuyruk.png`, fullPage: true });
