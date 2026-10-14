@@ -1,5 +1,5 @@
 // API yanıtlarının web'de kullanılan kısmı (apps/api servislerindeki view() çıktıları).
-import type { BodyType, CargoType, JobStatus, LoadStatus, NotificationType, RatingTag, ReportReason, ReportStatus, Role, UserStatus, VehicleType } from "@nakliye/shared";
+import type { BodyType, CargoType, DocumentType, JobStatus, LoadStatus, NotificationType, RatingTag, ReportReason, ReportStatus, Role, UserStatus, VehicleType } from "@nakliye/shared";
 
 export interface Place {
   district: string;
@@ -104,6 +104,39 @@ export interface JobDetail extends Job {
     received: ({ revealed: true } & RatingView) | { revealed: false } | null;
   };
   events: { type: string; at: string; by: "shipper" | "carrier" | "system" | "admin"; meta: Record<string, unknown> | null }[];
+}
+
+export type DocumentStatus = "bekliyor" | "onay" | "ret";
+
+/** GET /documents öğesi (FR-05) */
+export interface MyDocument {
+  id: string;
+  type: DocumentType;
+  vehicleId: string | null;
+  plate: string | null;
+  status: DocumentStatus;
+  rejectReason: string | null;
+  expiresAt: string | null;
+  contentType: string;
+  sizeBytes: number;
+  createdAt: string;
+  reviewedAt: string | null;
+}
+
+/** GET /admin/documents öğesi (Y1, FR-50) */
+export interface AdminDocument {
+  id: string;
+  type: DocumentType;
+  status: DocumentStatus;
+  contentType: string;
+  sizeBytes: number;
+  rejectReason: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+  owner: { id: string; name: string | null; phone: string | null; status: UserStatus };
+  company: { title: string; taxNo: string | null; taxOffice: string | null; verifiedAt: string | null } | null;
+  vehicle: { id: string; plate: string; vehicleType: VehicleType } | null;
 }
 
 export interface Page<T> {

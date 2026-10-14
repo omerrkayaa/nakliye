@@ -34,6 +34,7 @@ export function bindSession(initial: Tokens | null, listener: (t: Tokens | null,
 
 interface Options {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
+  /** JSON'a çevrilir; FormData olduğu gibi (çok parçalı, belge yükleme) gider */
   body?: unknown;
   /** false: oturumsuz uç nokta (OTP) */
   auth?: boolean;
@@ -57,10 +58,12 @@ export async function api<T>(path: string, opts: Options = {}): Promise<T> {
 }
 
 async function send(path: string, { method = "GET", body, auth = true }: Options) {
-  const headers: Record<string, string> = { "content-type": "application/json" };
+  const multipart = body instanceof FormData;
+  // Çok parçalı gövdede content-type'ı fetch sınır (boundary) ile kendi yazar
+  const headers: Record<string, string> = multipart ? {} : { "content-type": "application/json" };
   if (auth && tokens) headers.authorization = `Bearer ${tokens.accessToken}`;
   try {
-    return await fetch(API_URL + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    return await fetch(API_URL + path, { method, headers, body: body === undefined ? undefined : multipart ? body : JSON.stringify(body) });
   } catch {
     throw new ApiError(0, "Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edin.");
   }

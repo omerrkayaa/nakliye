@@ -1,5 +1,5 @@
 // API yanıtlarının mobilde kullanılan kısmı (apps/api servislerindeki view() çıktıları; web'deki types.ts'in nakliyeci tarafı).
-import type { BodyType, CapacityStatus, CargoType, JobStatus, LoadStatus, NotificationType, RatingTag, Role, VehicleType } from "@nakliye/shared";
+import type { BodyType, CapacityStatus, CargoType, DocumentType, JobStatus, LoadStatus, NotificationType, RatingTag, Role, VehicleType } from "@nakliye/shared";
 
 export interface Place {
   district: string;
@@ -58,6 +58,20 @@ export interface Load {
     ratingCount?: number;
     completedJobs?: number;
   };
+}
+
+/** GET /documents öğesi (FR-05) */
+export interface MyDocument {
+  id: string;
+  type: DocumentType;
+  vehicleId: string | null;
+  plate: string | null;
+  status: "bekliyor" | "onay" | "ret";
+  rejectReason: string | null;
+  expiresAt: string | null;
+  contentType: string;
+  sizeBytes: number;
+  createdAt: string;
 }
 
 export interface Vehicle {

@@ -10,6 +10,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { AuthService } from "../auth/auth.service.js";
 import { DB, type Db } from "../db/db.module.js";
 import { companies, userRoles, users } from "../db/schema.js";
+import { TrustService } from "../ratings/trust.service.js";
 
 const PG_UNIQUE_VIOLATION = "23505";
 
@@ -18,6 +19,7 @@ export class UsersService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly auth: AuthService,
+    private readonly trust: TrustService,
   ) {}
 
   async getMe(userId: string) {
@@ -56,6 +58,8 @@ export class UsersService {
       .values(input.roles.map((role) => ({ userId, role })))
       .onConflictDoNothing();
     const roles = await this.db.select({ role: userRoles.role }).from(userRoles).where(eq(userRoles.userId, userId));
+    // Seviye rollere bağlı (BR-10: nakliyecide ruhsat, yük sahibinde vergi levhası sayılır)
+    await this.trust.refresh(userId);
     return { roles: roles.map((r) => r.role), accessToken: await this.auth.accessTokenFor(userId) };
   }
 
@@ -89,6 +93,7 @@ export class UsersService {
       .set({ ...input, ...(identityChanged ? { verifiedAt: null } : {}) })
       .where(eq(companies.id, current.id))
       .returning();
+    if (identityChanged && current.verifiedAt) await this.trust.refresh(userId);
     return this.companyView(company!);
   }
 

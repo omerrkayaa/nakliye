@@ -5,6 +5,7 @@ import {
   BODY_TYPES,
   CARGO_TYPES,
   CONFIRMATION_ANSWERS,
+  DOCUMENT_TYPES,
   RATING_TAGS,
   REPORT_REASONS,
   VEHICLE_TYPES,
@@ -295,6 +296,20 @@ export const resolveDisputeSchema = z.object({
   note: z.string().trim().min(5, "Kararın gerekçesini en az 5 karakterle yazın").max(500),
 });
 export const adminDisputeListSchema = adminReportListSchema;
+/** FR-05 belge yükleme (çok parçalı formun metin alanları; dosya ayrı). Araca bağlı türde araç zorunlu (DOCUMENT_RULES). */
+export const uploadDocumentSchema = z.object({
+  type: z.enum(keysOf(DOCUMENT_TYPES), { message: "Belge türünü seçin" }),
+  vehicleId: z.string().uuid().optional(),
+});
+/** FR-50 yönetici kararı: ret sebebi zorunlu (sahibine gider); onayda isteğe bağlı geçerlilik sonu (sigorta vb.) */
+export const reviewDocumentSchema = z.discriminatedUnion("decision", [
+  z.object({ decision: z.literal("onay"), expiresAt: isoDaySchema.optional() }),
+  z.object({ decision: z.literal("ret"), rejectReason: z.string().trim().min(5, "Ret sebebini en az 5 karakterle yazın").max(500) }),
+]);
+export const adminDocumentListSchema = z.object({
+  status: z.enum(["bekliyor", "onay", "ret"]).default("bekliyor"),
+  page: z.coerce.number().int().min(1).default(1),
+});
 /** F7 fiyat aralığı sorgusu: kalkış ve varış ilçesi + araç tipi */
 export const priceEstimateSchema = z.object({
   from: z.coerce.number().int().positive(),
@@ -335,3 +350,6 @@ export type SuspendUserInput = z.infer<typeof suspendUserSchema>;
 export type ResolveDisputeInput = z.infer<typeof resolveDisputeSchema>;
 export type PriceEstimateInput = z.infer<typeof priceEstimateSchema>;
 export type BulkLoadInput = z.infer<typeof bulkLoadSchema>;
+export type UploadDocumentInput = z.infer<typeof uploadDocumentSchema>;
+export type ReviewDocumentInput = z.infer<typeof reviewDocumentSchema>;
+export type AdminDocumentListInput = z.infer<typeof adminDocumentListSchema>;

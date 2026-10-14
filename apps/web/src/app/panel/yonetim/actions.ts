@@ -48,3 +48,14 @@ export async function suspendUserAction(_prev: AdminFormState, form: FormData) {
 export async function unsuspendUserAction(_prev: AdminFormState, form: FormData) {
   return run(`/admin/users/${id(form)}/unsuspend`);
 }
+
+/** Y1 belge kararı (FR-50): onayda isteğe bağlı geçerlilik sonu, retde sebep zorunlu (sahibine gider) */
+export async function reviewDocumentAction(_prev: AdminFormState, form: FormData) {
+  const expiresAt = String(form.get("expiresAt") ?? "").trim();
+  return run(
+    `/admin/documents/${id(form)}/review`,
+    form.get("decision") === "ret"
+      ? { decision: "ret", rejectReason: String(form.get("rejectReason") ?? "") }
+      : { decision: "onay", expiresAt: expiresAt || undefined },
+  );
+}

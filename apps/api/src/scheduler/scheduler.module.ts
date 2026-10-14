@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { AccountModule } from "../account/account.module.js";
+import { DocumentsModule } from "../documents/documents.module.js";
 import { JobsModule } from "../jobs/jobs.module.js";
 import { LoadsModule } from "../loads/loads.module.js";
 import { MatchingModule } from "../matching/matching.module.js";
@@ -11,7 +12,7 @@ import { SchedulerService } from "./scheduler.service.js";
 
 /** Periyodik görevler (pg-boss). Yeni periyodik görev eklenince SchedulerService.tick'e bir adım eklenir. */
 @Module({
-  imports: [LoadsModule, VehiclesModule, MatchingModule, JobsModule, RatingsModule, AccountModule],
+  imports: [LoadsModule, VehiclesModule, MatchingModule, JobsModule, RatingsModule, AccountModule, DocumentsModule],
   controllers: [AdminSchedulerController],
   providers: [SchedulerService, PeriodicScheduler],
 })

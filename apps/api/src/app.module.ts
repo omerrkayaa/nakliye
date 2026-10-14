@@ -3,6 +3,8 @@ import { AccountModule } from "./account/account.module.js";
 import { AdminModule } from "./admin/admin.module.js";
 import { AuthModule } from "./auth/auth.module.js";
 import { DbModule } from "./db/db.module.js";
+import { DocumentsModule } from "./documents/documents.module.js";
+import { FilesModule } from "./files/files.module.js";
 import { HealthController } from "./health.controller.js";
 import { JobsModule } from "./jobs/jobs.module.js";
 import { LoadsModule } from "./loads/loads.module.js";
@@ -20,6 +22,7 @@ import { VehiclesModule } from "./vehicles/vehicles.module.js";
 @Module({
   imports: [
     DbModule,
+    FilesModule,
     AuthModule,
     NotificationsModule,
     UsersModule,
@@ -28,6 +31,7 @@ import { VehiclesModule } from "./vehicles/vehicles.module.js";
     LoadsModule,
     ReportsModule,
     VehiclesModule,
+    DocumentsModule,
     JobsModule,
     SchedulerModule,
     AdminModule,

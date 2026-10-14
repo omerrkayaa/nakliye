@@ -6,6 +6,7 @@ import { AuthService, SUSPENDED_MESSAGE } from "../auth/auth.service.js";
 import { trDateTime } from "../common/format.js";
 import { deletedPhoneHmac } from "../common/hash.js";
 import { DB, type Db, type Tx } from "../db/db.module.js";
+import { DocumentsService } from "../documents/documents.service.js";
 import {
   callLogs,
   capacityPosts,
@@ -62,6 +63,7 @@ export class AccountService {
     private readonly loads: LoadsService,
     private readonly capacity: CapacityService,
     private readonly offers: OffersService,
+    private readonly documents: DocumentsService,
   ) {}
 
   /**
@@ -204,11 +206,14 @@ export class AccountService {
   /** Silinmiş işaretli hesabın açık işlerini kapatır ve kişisel verilerini anonimleştirir (tekrar çalıştırılabilir). */
   private async finishDeletion(userId: string, now: Date) {
     await this.closeOpenActivity(userId, now);
+    // Belge dosyaları (ruhsat, vergi levhası fotoğrafı) satırlardan önce: dosya silinemezse (hata) tur yeniden dener
+    await this.documents.purge({ ownerUserId: userId });
     await this.db.transaction(async (tx) => {
       const [u] = await tx.select({ phone: users.phone }).from(users).where(eq(users.id, userId)).for("update");
       if (!u) return;
       if (u.phone) await tx.delete(otpCodes).where(eq(otpCodes.phone, u.phone));
-      await tx.update(users).set({ phone: null, name: DELETED_USER_NAME, suspendedAt: null, suspendReason: null }).where(eq(users.id, userId));
+      // Seviye 0: belgeler ve firma silindi; geri açılan hesap (ya da numarayı devralan) belgesiz rozet almasın
+      await tx.update(users).set({ phone: null, name: DELETED_USER_NAME, suspendedAt: null, suspendReason: null, verificationLevel: 0 }).where(eq(users.id, userId));
       await tx.delete(userRoles).where(eq(userRoles.userId, userId));
       await tx.delete(companies).where(eq(companies.ownerUserId, userId));
       await tx.delete(refreshTokens).where(eq(refreshTokens.userId, userId));

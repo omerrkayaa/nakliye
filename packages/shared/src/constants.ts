@@ -169,6 +169,7 @@ export const NOTIFICATION_TYPES = {
   job_update: "İş durumu",
   route_alert: "Rota alarmı",
   favorite_load: "Çalıştığınız yük sahibi",
+  document_review: "Belge incelemesi",
 } as const;
 export type NotificationType = keyof typeof NOTIFICATION_TYPES;
 

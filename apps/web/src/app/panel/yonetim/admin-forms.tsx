@@ -3,7 +3,7 @@
 import { startTransition, useActionState, useState, type FormEvent } from "react";
 import { Field, invalid } from "@/components/field";
 import { Button } from "@/components/ui/button";
-import { resolveDisputeAction, resolveReportAction, reviewLoadAction, suspendUserAction, unsuspendUserAction, type AdminFormState } from "./actions";
+import { resolveDisputeAction, resolveReportAction, reviewDocumentAction, reviewLoadAction, suspendUserAction, unsuspendUserAction, type AdminFormState } from "./actions";
 
 const textareaClass =
   "w-full rounded-lg border border-input bg-background px-3 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
@@ -90,6 +90,34 @@ export function DisputeForm({ id }: { id: string }) {
           Teslim geçersiz: iptal et
         </Button>
       </div>
+    </form>
+  );
+}
+
+/** Y1: belge kararı. Onay: isteğe bağlı geçerlilik sonu (sigorta, SRC…). Ret: sebep zorunlu, onay sorulur. */
+export function DocumentReviewForm({ id }: { id: string }) {
+  const [state, dispatch, pending] = useActionState(reviewDocumentAction, {});
+  const ask = (b: HTMLButtonElement | null) => (b?.value === "ret" ? "Belge reddedilsin mi? Sebep sahibine gönderilir." : null);
+  return (
+    <form onSubmit={submitWithSubmitter(dispatch, ask)} className="space-y-3">
+      <input type="hidden" name="id" value={id} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Geçerlilik sonu (isteğe bağlı)" htmlFor={`exp-${id}`} hint="Süreli belgede (sigorta, SRC) bitiş günü">
+          <input id={`exp-${id}`} name="expiresAt" type="date" className="h-11 w-full rounded-lg border border-input bg-background px-3 text-base" />
+        </Field>
+        <Field label="Ret sebebi (retde zorunlu)" htmlFor={`rej-${id}`}>
+          <textarea id={`rej-${id}`} name="rejectReason" rows={2} maxLength={500} className={textareaClass} />
+        </Field>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" name="decision" value="onay" disabled={pending} className="h-11">
+          Onayla
+        </Button>
+        <Button type="submit" name="decision" value="ret" variant="destructive" disabled={pending} className="h-11">
+          Reddet
+        </Button>
+      </div>
+      <ErrorText state={state} />
     </form>
   );
 }

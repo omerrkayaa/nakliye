@@ -3,13 +3,17 @@ import { ACTIVE_JOB_STATUSES, type CreateVehicleInput, type UpdateVehicleInput }
 import { and, asc, eq, inArray, ne } from "drizzle-orm";
 import { DB, type Db } from "../db/db.module.js";
 import { capacityPosts, jobs, offers, vehicles } from "../db/schema.js";
+import { DocumentsService } from "../documents/documents.service.js";
 
 const PG_UNIQUE_VIOLATION = "23505";
 
-/** Araçlar (FR-04, UC-02). Belgeler (ruhsat, K belgesi) dosya deposu kararından sonra eklenecek. */
+/** Araçlar (FR-04, UC-02). Araca bağlı belgeler (ruhsat, sigorta) DocumentsService'te. */
 @Injectable()
 export class VehiclesService {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly documents: DocumentsService,
+  ) {}
 
   list(userId: string) {
     return this.db
@@ -48,7 +52,8 @@ export class VehiclesService {
 
   /**
    * Aracı siler: kayıt saklanır (ilan ve iş geçmişi ona bağlı), durum "silindi" olur, plaka serbest kalır.
-   * Aktif boş araç ilanları iptal, bekleyen teklifleri geri çekilir. Aktif işteki araç silinemez.
+   * Aktif boş araç ilanları iptal, bekleyen teklifleri geri çekilir. Aktif işteki araç silinemez. Araca bağlı belgeler
+   * (dosyalarıyla) silinir, seviye yenilenir.
    */
   async remove(userId: string, id: string) {
     await this.db.transaction(async (tx) => {
@@ -74,6 +79,7 @@ export class VehiclesService {
         .set({ status: "iptal" })
         .where(and(eq(capacityPosts.vehicleId, id), eq(capacityPosts.status, "aktif")));
     });
+    await this.documents.vehicleRemoved(userId, id);
   }
 
   private async ownActive(userId: string, id: string) {

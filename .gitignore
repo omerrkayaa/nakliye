@@ -12,6 +12,8 @@ coverage/
 Thumbs.db
 infra/data/
 apps/api/scripts/.cache/
+# Belge dosyaları (yerel disk deposu, FR-05): kişisel veri, depoya girmez
+apps/api/storage/
 
 # Tez simülasyonu deneme çalıştırmaları (--tohum / --haversine); asıl sonuçlar sonuclar/ altında commit edilir
 tez/simulasyon/sonuclar/deneme-*/

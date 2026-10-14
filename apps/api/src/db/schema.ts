@@ -2,6 +2,7 @@
 import {
   BODY_TYPES,
   type CapacityStatus,
+  type DocumentType,
   type NotificationType,
   type VehicleStatus,
   CARGO_TYPES,
@@ -184,15 +185,21 @@ export const documents = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     ownerUserId: uuid("owner_user_id").notNull().references(() => users.id),
     vehicleId: uuid("vehicle_id").references(() => vehicles.id),
-    type: documentTypeEnum("type").notNull(),
+    type: documentTypeEnum("type").$type<DocumentType>().notNull(),
     fileKey: text("file_key").notNull(),
+    // FR-05: tür dosyanın ilk baytlarından (DOCUMENT_MIME_TYPES); dosya adı ve beyan edilen türe güvenilmez
+    contentType: varchar("content_type", { length: 32 }).notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
     status: reviewStatusEnum("status").notNull().default("bekliyor"),
     reviewedBy: uuid("reviewed_by").references(() => users.id),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
     rejectReason: text("reject_reason"),
     expiresAt: date("expires_at"),
+    // Süresi geçen onaylı belge için seviye yenilendi ve sahibine bildirildi (zamanlayıcı bir kez yapar)
+    expiryHandledAt: timestamp("expiry_handled_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
-  (t) => [index("documents_status_idx").on(t.status)],
+  (t) => [index("documents_status_idx").on(t.status), index("documents_owner_idx").on(t.ownerUserId)],
 );
 
 // ── İlanlar ────────────────────────────────────────────────────────

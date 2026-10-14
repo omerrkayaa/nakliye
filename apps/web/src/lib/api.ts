@@ -20,6 +20,7 @@ export class ApiError extends Error {
 
 interface Options {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  /** JSON'a çevrilir; FormData olduğu gibi (çok parçalı, belge yükleme) gider */
   body?: unknown;
   /** false: oturumsuz uç nokta (OTP, SMS teyit linki) */
   auth?: boolean;
@@ -31,7 +32,9 @@ interface Options {
  * (çerez silen) kullanılmaz, çünkü link önyüklemesi onu da çağırabilir. Yeni giriş çerezlerin üzerine yazar.
  */
 export async function api<T>(path: string, { method = "GET", body, auth = true }: Options = {}): Promise<T> {
-  const headers: Record<string, string> = { "content-type": "application/json" };
+  const multipart = body instanceof FormData;
+  // Çok parçalı gövdede content-type'ı fetch sınır (boundary) ile kendi yazar
+  const headers: Record<string, string> = multipart ? {} : { "content-type": "application/json" };
   if (auth) {
     const token = (await cookies()).get(ACCESS_COOKIE)?.value;
     if (!token) redirect(INVALID_SESSION);
@@ -40,7 +43,7 @@ export async function api<T>(path: string, { method = "GET", body, auth = true }
   const res = await fetch(API_URL + path, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : multipart ? body : JSON.stringify(body),
     cache: "no-store",
   });
   if (res.status === 401 && auth) redirect(INVALID_SESSION);

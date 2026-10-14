@@ -1,8 +1,8 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import { trustScore } from "@nakliye/shared";
+import { trDay, trustScore, verificationLevel } from "@nakliye/shared";
 import { and, count, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { DB, type Db, type Tx } from "../db/db.module.js";
-import { jobs, loadPosts, ratings, reports, users } from "../db/schema.js";
+import { companies, documents, jobs, loadPosts, ratings, reports, userRoles, users, vehicles } from "../db/schema.js";
 
 /** Yönetici şikayeti haklı bulunca verilen durum (FR-51; admin/admin.service.ts resolveReport). */
 const REPORT_UPHELD = "hakli";
@@ -41,19 +41,44 @@ export class TrustService {
     return this.db.transaction(async (tx) => {
       // Kullanıcı satırı kilitlenir: iki olay aynı anda hesaplarsa sonraki öncekinin verisini görerek yazar.
       // Kilitsiz, eski veriyle hesaplayan yavaş istek yeni skorun üstüne yazabilirdi.
-      const [u] = await tx.select({ level: users.verificationLevel }).from(users).where(eq(users.id, userId)).for("update");
+      const [u] = await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("update");
       if (!u) return null;
       const s = await this.stats(tx, userId);
+      const level = await this.level(tx, userId);
       const score = trustScore({
         avgStars: s.avgStars,
         ratingCount: s.ratingCount,
         completedJobs: s.completedJobs,
-        verificationLevel: Math.min(2, Math.max(0, u.level)) as 0 | 1 | 2,
+        verificationLevel: level,
         cancelRate: s.totalJobs > 0 ? s.cancelledJobs / s.totalJobs : 0,
         reportRate: s.upheldReports / Math.max(1, s.loadPosts + s.totalJobs),
       });
-      await tx.update(users).set({ trustScore: score }).where(eq(users.id, userId));
+      await tx.update(users).set({ trustScore: score, verificationLevel: level }).where(eq(users.id, userId));
       return score;
+    });
+  }
+
+  /**
+   * BR-10 doğrulama seviyesi (shared verificationLevel): onaylı ve süresi geçmemiş belgeler, etkin araçlar, vergi levhası
+   * onaylı firma, yük sahibi olarak tamamlanan işler. Skorla aynı anda yazılır; girdisi değişen her olay (belge kararı,
+   * firma kimliği, rol, araç silme, iş tamamlama, belge süresi) refresh çağırır.
+   */
+  private async level(tx: Tx, userId: string) {
+    const roles = await tx.select({ role: userRoles.role }).from(userRoles).where(eq(userRoles.userId, userId));
+    const approved = await tx
+      .select({ type: documents.type, vehicleId: documents.vehicleId, expiresAt: documents.expiresAt })
+      .from(documents)
+      .where(and(eq(documents.ownerUserId, userId), eq(documents.status, "onay")));
+    const active = await tx.select({ id: vehicles.id }).from(vehicles).where(and(eq(vehicles.ownerUserId, userId), eq(vehicles.status, "aktif")));
+    const [company] = await tx.select({ verifiedAt: companies.verifiedAt }).from(companies).where(eq(companies.ownerUserId, userId));
+    const [shipped] = await tx.select({ n: count() }).from(jobs).where(and(eq(jobs.shipperId, userId), eq(jobs.status, "tamamlandi")));
+    return verificationLevel({
+      roles: roles.map((r) => r.role),
+      approved,
+      activeVehicleIds: active.map((v) => v.id),
+      companyVerified: !!company?.verifiedAt,
+      completedShipperJobs: shipped?.n ?? 0,
+      today: trDay(new Date()),
     });
   }
 

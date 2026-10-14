@@ -35,6 +35,7 @@ export default function Profil() {
 
       {isCarrier && <Vehicles />}
 
+      <Button title="Belgelerim" variant="outline" icon="document-text-outline" onPress={() => router.push("/belgeler")} />
       <Button title="Hesap ve veriler" variant="outline" icon="person-circle-outline" onPress={() => router.push("/hesap")} />
 
       <Button
