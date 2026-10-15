@@ -9,8 +9,11 @@ import { documents } from "../db/schema.js";
 
 /** Sunucu genelinde aynı anda belleğe alınan yükleme (her biri ≤ 10 MB: en çok ~80 MB) */
 const MAX_CONCURRENT_UPLOADS = 8;
-/** Yanıtı hiç bitmeyen (askıda kalan) yuva bu süreden sonra boş sayılır */
-const SLOT_STALE_MS = 2 * 60_000;
+/**
+ * Bir yüklemenin en uzun süresi: gövdesi bitmeyen istek kesilir, yuva boşalır (çok yavaş gövdeyle 8 genel yuvayı
+ * tutmak; güvenlik incelemesi 2026-10-15). 10 MB 2 dakikada ~85 KB/sn ister. UPLOAD_MAX_MS ile değişir (test).
+ */
+const uploadMaxMs = () => Number(process.env.UPLOAD_MAX_MS) || 2 * 60_000;
 
 /**
  * Yükleme yuvası (belge güvenlik incelemesi bulgu 2): multer dosyayı belleğe almadan önce çalışır (UseInterceptors'ta
@@ -31,16 +34,20 @@ export class UploadSlotInterceptor implements NestInterceptor {
     if (!user.roles.some((r) => r === "carrier" || r === "shipper")) throw new ForbiddenException("Belge nakliyeci ya da yük sahibi hesabıyla yüklenir");
 
     const now = Date.now();
-    for (const [id, slot] of this.active) if (now - slot.at > SLOT_STALE_MS) this.active.delete(id);
+    // Yedek: süre sınırına rağmen boşalmamış yuva
+    for (const [id, slot] of this.active) if (now - slot.at > uploadMaxMs() + 10_000) this.active.delete(id);
     if (this.active.has(user.sub)) throw new HttpException("Önceki yüklemeniz sürüyor; bitince tekrar deneyin.", HttpStatus.TOO_MANY_REQUESTS);
     if (this.active.size >= MAX_CONCURRENT_UPLOADS) throw new HttpException("Şu an çok sayıda yükleme yapılıyor; biraz sonra tekrar deneyin.", HttpStatus.SERVICE_UNAVAILABLE);
     // Denetim ve ayırma arasında await yok: aynı kullanıcının paralel istekleri yarışamaz
     const slot = { at: now };
     this.active.set(user.sub, slot);
+    const req = http.getRequest<Request>();
+    const timer = setTimeout(() => req.destroy(), uploadMaxMs());
     const release = () => {
+      clearTimeout(timer);
       if (this.active.get(user.sub) === slot) this.active.delete(user.sub);
     };
-    // İstemci yükleme ortasında koparsa da yuva boşalır
+    // İstemci yükleme ortasında koparsa da, süre dolup istek kesilince de yuva boşalır
     http.getResponse<Response>().on("close", release);
     try {
       const [day] = await this.db

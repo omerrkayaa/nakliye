@@ -104,7 +104,7 @@ check("adminMfa 'tamam'", r.body.adminMfa === "tamam");
 r = await api("POST", "/me/roles", A, { roles: ["shipper"] });
 check("rol eklemede yönetici rolü ve ikinci adım korunur", r.status === 201 && claims(r.body.accessToken).roles.includes("admin") && claims(r.body.accessToken).roles.includes("shipper"), JSON.stringify(r.body).slice(0, 120));
 r = await api("POST", "/me/roles", preToken, { roles: ["shipper"] });
-check("ikinci adımsız oturumda rol eklemek yönetici rolü vermez", r.status === 201 && !claims(r.body.accessToken).roles.includes("admin"));
+check("etkinleştirmeyle kapanan oturumun erişim belirteci rol ucundan yeni belirteç alamaz (401)", r.status === 401 && r.body.message === "Oturum süresi doldu", JSON.stringify(r.body));
 
 console.log("\nGiriş: SMS kodu tek başına yetmez");
 let v = await smsStep(P);
@@ -211,6 +211,48 @@ r = await api("POST", "/auth/totp", null, { challenge: v.challenge, code: freshC
 check("başka kullanıcıdan taşınan şifreli anahtar açılmaz: 401, 500 değil", r.status === 401, `${r.status} ${JSON.stringify(r.body)}`);
 r = await api("POST", "/auth/totp", null, { challenge: v.challenge, code: qe.body.recoveryCodes[0] });
 check("kurtarma koduyla giriş yine olur", r.status === 201, JSON.stringify(r.body));
+
+console.log("\nErişim belirteci oturuma bağlı: kapanan oturum rol ucundan kendini yenileyemez (inceleme 2026-10-15, bulgu 1)");
+const W = phone(5);
+let w = await smsStep(W);
+check("belirteçte oturum kimliği (sid) var", typeof claims(w.accessToken).sid === "string");
+r = await api("POST", "/me/roles", w.accessToken, { roles: ["carrier"] });
+check("açık oturumda rol eklenir, yeni belirteç aynı oturuma bağlı", r.status === 201 && claims(r.body.accessToken).sid === claims(w.accessToken).sid, JSON.stringify(r.body).slice(0, 120));
+const rolled = (await api("POST", "/auth/refresh", null, { refreshToken: w.refreshToken })).body;
+r = await api("POST", "/me/roles", w.accessToken, { roles: ["shipper"] });
+check("yenilemeden önceki erişim belirteci 401, rol eklenmez", r.status === 401 && psql(`select count(*) from user_roles where user_id=(select id from users where phone='${W}') and role='shipper'`) === "0", JSON.stringify(r.body));
+r = await api("POST", "/me/roles", rolled.accessToken, { roles: ["shipper"] });
+check("yenilenen belirteçle olur", r.status === 201);
+await api("POST", "/auth/logout", null, { refreshToken: rolled.refreshToken });
+r = await api("POST", "/me/roles", rolled.accessToken, { roles: ["carrier"] });
+check("çıkıştan sonra 401 (önceden her çağrıda yeni belirteç basıyordu)", r.status === 401 && r.body.message === "Oturum süresi doldu", JSON.stringify(r.body));
+r = await api("POST", "/me/roles", A, { roles: ["carrier"] });
+const Asid = claims(A).sid;
+psql(`update refresh_tokens set revoked_at = now() where id='${Asid}'`);
+r = await api("POST", "/me/roles", A, { roles: ["carrier"] });
+check("yöneticinin kapanan oturumu: ikinci adımlı belirteç de yenilenemez", r.status === 401, JSON.stringify(r.body));
+
+console.log("\nBekleyen kurulum: 10 dk geçerli, 5 hatalı kodda atılır (inceleme 2026-10-15, bulgu 2)");
+const R = phone(6);
+const rv = await smsStep(R);
+makeAdmin(R);
+const Rid = idOf(R);
+let rs = (await api("POST", "/me/totp/setup", rv.accessToken, {})).body;
+const wrong = (i) => String((Number(totp(rs.secret)) + 2000 + i) % 1_000_000).padStart(6, "0");
+const tries = [];
+for (let i = 0; i < 5; i++) tries.push(await api("POST", "/me/totp/enable", rv.accessToken, { code: wrong(i) }));
+check("4 hatalı kod 400, 5.'si 429 'kurulumu yeniden başlatın'", tries.slice(0, 4).every((x) => x.status === 400) && tries[4].status === 429 && tries[4].body.message === "Çok fazla hatalı kod; kurulumu yeniden başlatın.", tries.map((x) => x.status).join());
+check("bekleyen anahtar atıldı", psql(`select pending_enc is null from user_totp where user_id='${Rid}'`) === "t");
+r = await api("POST", "/me/totp/enable", rv.accessToken, { code: totp(rs.secret) });
+check("atılan anahtarın doğru koduyla da etkinleşmez (409)", r.status === 409 && r.body.message === "Önce kurulumu başlatın.", JSON.stringify(r.body));
+rs = (await api("POST", "/me/totp/setup", rv.accessToken, {})).body;
+psql(`update user_totp set pending_at = now() - interval '11 minutes' where user_id='${Rid}'`);
+r = await api("POST", "/me/totp/enable", rv.accessToken, { code: totp(rs.secret) });
+check("10 dakikası dolan kurulum etkinleşmez (409)", r.status === 409 && r.body.message === "Kurulumun süresi doldu (10 dakika); yeniden başlatın.", JSON.stringify(r.body));
+rs = (await api("POST", "/me/totp/setup", rv.accessToken, {})).body;
+await api("POST", "/me/totp/enable", rv.accessToken, { code: wrong(9) });
+r = await api("POST", "/me/totp/enable", rv.accessToken, { code: totp(rs.secret) });
+check("yeni kurulum sayacı sıfırdan: hatalı koddan sonra doğru kodla etkinleşir", r.status === 201 && psql(`select pending_enc is null and pending_attempts = 0 and enabled_at is not null from user_totp where user_id='${Rid}'`) === "t", JSON.stringify(r.body).slice(0, 120));
 
 console.log("\nChallenge süresi ve zamanlayıcı");
 v = await smsStep(P);

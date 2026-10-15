@@ -22,9 +22,16 @@ import {
 /** Ardışık 5 hatalı ikinci adım kodu → 15 dk kilit (giriş, cihaz değiştirme, kurtarma kodu yenileme ortak sayar) */
 const LOCK_AFTER = 5;
 const LOCK_MS = 15 * 60_000;
+/**
+ * Kurulumda bekleyen anahtar 10 dk geçerli ve en çok 5 hatalı kod; sonra atılır, kurulum yeniden başlatılır. Etkinleştirme
+ * kilit sayacına sayılmaz (kişi kendi anahtarını kuruyor) ama sınırsız da değil: yarım bırakılmış bir kurulum, oturumu
+ * ele geçiren biri için sınırsız tahmin olmasın (güvenlik incelemesi 2026-10-15, bulgu 2).
+ */
+const PENDING_TTL_MS = 10 * 60_000;
+const PENDING_MAX_ATTEMPTS = 5;
 
 type Factor = "ok" | "wrong" | "reused" | { lockedUntil: Date };
-type Failure = Exclude<Factor, "ok"> | "expired" | "code-required" | "no-pending";
+type Failure = Exclude<Factor, "ok"> | "expired" | "code-required" | "no-pending" | "pending-expired" | "pending-exhausted";
 
 /**
  * Yönetici iki adımlı doğrulaması (NFR-04, docs/04 §8; karar 2026-10-14: Google/Microsoft Authenticator gibi
@@ -87,8 +94,8 @@ export class MfaService {
         const f = await this.secondFactor(tx, userId, code, now);
         if (f !== "ok") return f;
       }
-      const pendingEnc = sealSecret(secret, userId);
-      await tx.insert(userTotp).values({ userId, pendingEnc }).onConflictDoUpdate({ target: userTotp.userId, set: { pendingEnc } });
+      const pending = { pendingEnc: sealSecret(secret, userId), pendingAt: now, pendingAttempts: 0 };
+      await tx.insert(userTotp).values({ userId, ...pending }).onConflictDoUpdate({ target: userTotp.userId, set: pending });
       return null;
     });
     if (fail) throw this.failure(fail, now, true);
@@ -106,11 +113,20 @@ export class MfaService {
       // Kilit sırası user_totp → users → refresh_tokens (askıya alma: users → refresh_tokens; döngü yok)
       const [t] = await tx.select().from(userTotp).where(eq(userTotp.userId, userId)).for("update");
       if (!t?.pendingEnc) return { fail: "no-pending" };
+      const discard = { pendingEnc: null, pendingAt: null, pendingAttempts: 0 };
+      if (!t.pendingAt || now.getTime() - t.pendingAt.getTime() > PENDING_TTL_MS) {
+        await tx.update(userTotp).set(discard).where(eq(userTotp.userId, userId));
+        return { fail: "pending-expired" };
+      }
       const step = matchTotp(openSecret(t.pendingEnc, userId), code.replace(/\s/g, ""), -1, now.getTime());
-      if (step === null) return { fail: "wrong" };
+      if (step === null) {
+        const attempts = t.pendingAttempts + 1;
+        await tx.update(userTotp).set(attempts >= PENDING_MAX_ATTEMPTS ? discard : { pendingAttempts: attempts }).where(eq(userTotp.userId, userId));
+        return { fail: attempts >= PENDING_MAX_ATTEMPTS ? "pending-exhausted" : "wrong" };
+      }
       await tx
         .update(userTotp)
-        .set({ secretEnc: t.pendingEnc, pendingEnc: null, enabledAt: t.enabledAt ?? now, lastStep: step, failedCount: 0, lockedUntil: null })
+        .set({ secretEnc: t.pendingEnc, pendingEnc: null, pendingAt: null, pendingAttempts: 0, enabledAt: t.enabledAt ?? now, lastStep: step, failedCount: 0, lockedUntil: null })
         .where(eq(userTotp.userId, userId));
       const recoveryCodes = await this.replaceRecoveryCodes(tx, userId);
       const tokens = await this.auth.issueTokens(tx, userId, loginDenied, now);
@@ -220,6 +236,10 @@ export class MfaService {
         return new ForbiddenException("Cihaz değiştirmek için mevcut uygulamadaki kodu ya da bir kurtarma kodunu girin.");
       case "no-pending":
         return new ConflictException("Önce kurulumu başlatın.");
+      case "pending-expired":
+        return new ConflictException("Kurulumun süresi doldu (10 dakika); yeniden başlatın.");
+      case "pending-exhausted":
+        return new HttpException("Çok fazla hatalı kod; kurulumu yeniden başlatın.", HttpStatus.TOO_MANY_REQUESTS);
       default:
         return inSession ? new BadRequestException("Kod hatalı") : new UnauthorizedException("Kod hatalı");
     }

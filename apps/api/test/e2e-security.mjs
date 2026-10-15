@@ -49,7 +49,7 @@ const stopAll = () => { for (const s of servers) s.child.kill(); };
 process.on("exit", stopAll);
 
 const limits = { OTP_PHONE_DAILY_LIMIT: "10", OTP_IP_HOURLY_LIMIT: "20" };
-const A = await server(3100, { ...limits, TRUST_PROXY: "loopback", DEMO_PHONE: DEMO, DEMO_OTP });
+const A = await server(3100, { ...limits, TRUST_PROXY: "loopback", DEMO_PHONE: DEMO, DEMO_OTP, UPLOAD_MAX_MS: "1500" });
 const N = await server(3101, { OTP_PHONE_DAILY_LIMIT: "10", OTP_IP_HOURLY_LIMIT: "0", TRUST_PROXY: "false", DEMO_PHONE: "" });
 
 async function api(srv, method, path, { token, body, xff } = {}) {
@@ -170,6 +170,29 @@ try {
   await request(phone(500), ip(41));
   r = await request(phone(500), ip(41));
   check("60 sn içinde ikinci istek 429 'Yeni kod için biraz bekleyin'", r.status === 429 && r.body.message === "Yeni kod için biraz bekleyin");
+
+  console.log("\nBelge yüklemesinin süre sınırı: gövdesi bitmeyen istek kesilir, yuva boşalır (bu sunucuda 1,5 sn)");
+  const up = await login(phone(700), ip(60));
+  const carrier = (await api(A, "POST", "/me/roles", { token: up.accessToken, body: { roles: ["carrier"] } })).body.accessToken;
+  const boundary = "----nakliye-sure";
+  let ctrl;
+  const started = Date.now();
+  const slow = fetch(`http://localhost:${A.port}/api/v1/documents`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${carrier}`, "content-type": `multipart/form-data; boundary=${boundary}` },
+    body: new ReadableStream({ start: (c) => { ctrl = c; c.enqueue(new TextEncoder().encode(`--${boundary}\r\nContent-Disposition: form-data; name="type"\r\n\r\nsrc\r\n--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="b.pdf"\r\nContent-Type: application/pdf\r\n\r\n%PDF-1.4\n`)); } }),
+    duplex: "half",
+  }).then((res) => res.status, () => "kesildi");
+  const outcome = await Promise.race([slow, sleep(6000).then(() => "beklemede")]);
+  check("bitmeyen yükleme süre dolunca kesilir", outcome === "kesildi" && Date.now() - started < 6000, `${outcome} ${Date.now() - started} ms`);
+  try { ctrl.close(); } catch { /* akış zaten kapandı */ }
+  const fd = new FormData();
+  fd.append("type", "src");
+  fd.append("file", new Blob([Buffer.from("%PDF-1.4\n% deneme\n")], { type: "application/pdf" }), "b.pdf");
+  const again = await fetch(`http://localhost:${A.port}/api/v1/documents`, { method: "POST", headers: { authorization: `Bearer ${carrier}` }, body: fd });
+  check("ardından aynı kullanıcı yükleyebilir (yuva boşaldı)", again.status === 201, `${again.status}`);
+  // Temizlik: bekleyen belge kuyrukta birikmesin
+  psql(`update documents set status='ret', reject_reason='Test temizliği', reviewed_at=now() where status='bekliyor' and owner_user_id=(select id from users where phone='${phone(700)}')`);
 
   console.log("\nZamanlayıcı 2 günden eski kayıtları siler");
   const adminPhone = phone(600);

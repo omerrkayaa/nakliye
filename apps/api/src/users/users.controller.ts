@@ -32,7 +32,7 @@ export class MeController {
 
   @Post("roles")
   addRoles(@CurrentUser() user: AccessPayload, @Body(new ZodPipe(addRolesSchema)) body: AddRolesInput) {
-    return this.users.addRoles(user.sub, body, user.mfa ? new Date(user.mfa) : null);
+    return this.users.addRoles(user, body);
   }
 }
 

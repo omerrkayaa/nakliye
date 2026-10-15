@@ -86,6 +86,8 @@ export interface AccessPayload {
   roles: string[];
   /** İkinci adımın geçildiği an (epoch ms); yalnız yönetici rolü belirtece girdiyse */
   mfa?: number;
+  /** Belirteci basan oturum: refresh_tokens.id (güvenlik incelemesi 2026-10-15; bkz. assertLiveSession) */
+  sid?: string;
 }
 
 @Injectable()
@@ -288,13 +290,30 @@ export class AuthService {
    * Yönetici rolü yalnız ikinci adımı son 12 saatte geçmiş oturuma girer (NFR-04): kurulumsuz yöneticinin belirtecinde
    * rol yoktur, böylece tüm yönetici denetimleri (Roles guard, "yönetici her belgeyi görür") ikinci adım ister.
    * @param mfaAt oturumun ikinci adım anı (refresh_tokens.mfa_at; belirteçte `mfa`)
+   * @param sid belirteci basan oturumun yenileme satırı: her erişim belirteci açık bir oturuma bağlı (assertLiveSession)
    */
-  async accessTokenFor(userId: string, mfaAt: Date | null = null, db: Db | Tx = this.db): Promise<string> {
+  async accessTokenFor(userId: string, mfaAt: Date | null, db: Db | Tx, sid: string): Promise<string> {
     const rows = await db.select({ role: userRoles.role }).from(userRoles).where(eq(userRoles.userId, userId));
     const mfa = mfaFresh(mfaAt) && (await this.totpEnabled(userId, db));
     const roles = rows.map((r) => r.role).filter((r) => mfa || r !== "admin");
-    const payload: AccessPayload = { sub: userId, roles, ...(mfa ? { mfa: mfaAt!.getTime() } : {}) };
+    const payload: AccessPayload = { sub: userId, roles, sid, ...(mfa ? { mfa: mfaAt!.getTime() } : {}) };
     return this.jwt.signAsync(payload);
+  }
+
+  /**
+   * Yenileme belirteci olmadan yeni erişim belirteci basan uçlar (POST /me/roles) için: belirteci basan oturum hâlâ açık
+   * olmalı. Yoksa çıkış, cihaz değiştirme ya da yenilemeyle kapanan oturumun erişim belirteci kendini her 15 dakikada
+   * yenileyip sonsuza (yöneticide 12 saate) kadar yaşardı (güvenlik incelemesi 2026-10-15, bulgu 1). Yenilemede eski
+   * satır iptal edildiği için eski erişim belirteci de buradan geçemez.
+   */
+  async assertLiveSession(user: AccessPayload, now = new Date()): Promise<void> {
+    const [row] = user.sid
+      ? await this.db
+          .select({ id: refreshTokens.id })
+          .from(refreshTokens)
+          .where(and(eq(refreshTokens.id, user.sid), eq(refreshTokens.userId, user.sub), isNull(refreshTokens.revokedAt), gt(refreshTokens.expiresAt, now)))
+      : [];
+    if (!row) throw new UnauthorizedException("Oturum süresi doldu");
   }
 
   /** İkinci adım (TOTP) kurulu ve etkin mi */
@@ -312,14 +331,12 @@ export class AuthService {
   async issueTokens(tx: Tx, userId: string, denied: (status: string | undefined) => Error, mfaAt: Date | null = null) {
     const [u] = await tx.select({ status: users.status }).from(users).where(eq(users.id, userId)).for("share");
     if (u?.status !== "aktif") throw denied(u?.status);
-    const accessToken = await this.accessTokenFor(userId, mfaAt, tx);
     const refreshToken = randomToken();
-    await tx.insert(refreshTokens).values({
-      userId,
-      tokenHash: sha256(refreshToken),
-      expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
-      mfaAt,
-    });
+    const [session] = await tx
+      .insert(refreshTokens)
+      .values({ userId, tokenHash: sha256(refreshToken), expiresAt: new Date(Date.now() + REFRESH_TTL_MS), mfaAt })
+      .returning({ id: refreshTokens.id });
+    const accessToken = await this.accessTokenFor(userId, mfaAt, tx, session!.id);
     return { accessToken, refreshToken };
   }
 }

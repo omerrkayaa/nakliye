@@ -7,7 +7,7 @@ import {
   type UpdateMeInput,
 } from "@nakliye/shared";
 import { and, eq, isNull } from "drizzle-orm";
-import { AuthService } from "../auth/auth.service.js";
+import { AuthService, type AccessPayload } from "../auth/auth.service.js";
 import { DB, type Db } from "../db/db.module.js";
 import { companies, userRoles, users } from "../db/schema.js";
 import { TrustService } from "../ratings/trust.service.js";
@@ -62,7 +62,10 @@ export class UsersService {
   }
 
   /** Rol ekler (FR-02); var olan rol tekrar eklenirse sessizce geçilir. Güncel rollerle yeni erişim belirteci döner. */
-  async addRoles(userId: string, input: AddRolesInput, mfaAt: Date | null = null) {
+  /** Rol ekleyip yeni erişim belirteci basar: belirteci basan oturum hâlâ açık olmalı (kapanmışsa 401, rol eklenmez) */
+  async addRoles(user: AccessPayload, input: AddRolesInput) {
+    const userId = user.sub;
+    await this.auth.assertLiveSession(user);
     await this.db
       .insert(userRoles)
       .values(input.roles.map((role) => ({ userId, role })))
@@ -70,7 +73,8 @@ export class UsersService {
     const roles = await this.db.select({ role: userRoles.role }).from(userRoles).where(eq(userRoles.userId, userId));
     // Seviye rollere bağlı (BR-10: nakliyecide ruhsat, yük sahibinde vergi levhası sayılır)
     await this.trust.refresh(userId);
-    return { roles: roles.map((r) => r.role), accessToken: await this.auth.accessTokenFor(userId, mfaAt) };
+    const accessToken = await this.auth.accessTokenFor(userId, user.mfa ? new Date(user.mfa) : null, this.db, user.sid!);
+    return { roles: roles.map((r) => r.role), accessToken };
   }
 
   async createCompany(userId: string, input: CreateCompanyInput) {

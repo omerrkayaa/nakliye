@@ -175,6 +175,9 @@ export const userTotp = pgTable("user_totp", {
   userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
   secretEnc: text("secret_enc"),
   pendingEnc: text("pending_enc"),
+  /** Bekleyen anahtar 10 dk geçerli, 5 hatalı kodda atılır (güvenlik incelemesi 2026-10-15, bulgu 2) */
+  pendingAt: timestamp("pending_at", { withTimezone: true }),
+  pendingAttempts: integer("pending_attempts").notNull().default(0),
   enabledAt: timestamp("enabled_at", { withTimezone: true }),
   lastStep: bigint("last_step", { mode: "number" }).notNull().default(0),
   failedCount: integer("failed_count").notNull().default(0),
