@@ -8,6 +8,7 @@ import {
 } from "@nakliye/shared";
 import { and, count, eq, gt, gte, isNull, sql } from "drizzle-orm";
 import { DB, type Db } from "../db/db.module.js";
+import { SettingsService } from "../settings/settings.service.js";
 import { callLogs, loadPosts, reports, users } from "../db/schema.js";
 import { ConfirmationService } from "../loads/confirmation.service.js";
 
@@ -18,6 +19,7 @@ export class ReportsService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly confirmation: ConfirmationService,
+    private readonly settings: SettingsService,
   ) {}
 
   /**
@@ -58,7 +60,7 @@ export class ReportsService {
 
       const id = await this.upsert(tx, userId, input, now);
       if (input.reason !== "yuk_yok" || load.status !== "teyitli") return { id, trigger: false };
-      return { id, trigger: shouldForceReconfirm(await this.qualifiedReporters(tx, load.id, load.lastConfirmedAt)) };
+      return { id, trigger: shouldForceReconfirm(await this.qualifiedReporters(tx, load.id, load.lastConfirmedAt), await this.settings.confirmation()) };
     });
 
     // Anında teyit ayrı transaction'da: ilanı yeniden kilitler ve "teyitli" mi diye tekrar bakar (idempotent)

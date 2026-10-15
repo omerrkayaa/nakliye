@@ -11,6 +11,8 @@ const TABS = [
   ["/panel/yonetim/itirazlar", "İtirazlar"],
   ["/panel/yonetim/kullanicilar", "Kullanıcılar"],
   ["/panel/yonetim/metrikler", "Metrikler"],
+  ["/panel/yonetim/ayarlar", "Ayarlar"],
+  ["/panel/yonetim/kayitlar", "İşlem kaydı"],
   ["/panel/yonetim/guvenlik", "Güvenlik"],
 ] as const;
 

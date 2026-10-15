@@ -169,6 +169,20 @@
       "when": 1792057562594,
       "tag": "0023_totp_pending_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792062525798,
+      "tag": "0024_admin_audit_log",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792063282858,
+      "tag": "0025_settings",
+      "breakpoints": true
     }
   ]
 }

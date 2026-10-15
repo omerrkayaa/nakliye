@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Inject,
@@ -18,6 +19,7 @@ import {
   maskPhone,
   needsModeration,
   nextReminderAt,
+  type ConfirmationParams,
   trDay,
   trDayStart,
   typesCarriedBy,
@@ -33,6 +35,8 @@ import { and, asc, count, countDistinct, desc, eq, gte, inArray, isNull, lte, ne
 import { alias } from "drizzle-orm/pg-core";
 import { randomBytes } from "node:crypto";
 import { DB, type Db, type Tx } from "../db/db.module.js";
+import { AuditService } from "../audit/audit.service.js";
+import { SettingsService } from "../settings/settings.service.js";
 import { callLogs, capacityPosts, companies, districts, jobEvents, jobs, loadConfirmations, loadPosts, matches, offers, provinces, users } from "../db/schema.js";
 import { MatchingService } from "../matching/matching.service.js";
 import { TrustService } from "../ratings/trust.service.js";
@@ -56,6 +60,8 @@ export class LoadsService {
     @Inject(DB) private readonly db: Db,
     private readonly matching: MatchingService,
     private readonly trust: TrustService,
+    private readonly audit: AuditService,
+    private readonly settings: SettingsService,
   ) {}
 
   // ── Okuma ──────────────────────────────────────────────────────────
@@ -221,7 +227,7 @@ export class LoadsService {
       status: (moderate ? "moderasyonda" : "teyitli") as LoadStatus,
       moderation: moderate ? ("bekliyor" as const) : null,
       lastConfirmedAt: now,
-      nextReminderAt: nextReminderAt(now, trDayStart(input.loadFrom)),
+      nextReminderAt: nextReminderAt(now, trDayStart(input.loadFrom), await this.settings.confirmation()),
     };
 
     // shareId çakışması çok düşük olasılık; olursa yeni kimlikle tekrar dene
@@ -278,7 +284,7 @@ export class LoadsService {
         ...fields,
         note: fields.note ?? null,
         // Yayındaki ilan düzenlenince eşleşmeler yeni bilgilerle yeniden aranır (moderasyondaki onayda aranacak)
-        ...(reconfirm ? { ...this.confirmedFields(merged.loadFrom, now), matchedAt: null } : {}),
+        ...(reconfirm ? { ...this.confirmedFields(merged.loadFrom, now, await this.settings.confirmation()), matchedAt: null } : {}),
       });
       if (reconfirm) await this.answerOpenQuestion(tx, load.id, "gecerli", now);
     });
@@ -309,7 +315,7 @@ export class LoadsService {
     await this.db.transaction(async (tx) => {
       await this.transition(tx, load, to, {
         reminderSentAt: null,
-        ...(to === "teyitli" ? this.confirmedFields(load.loadFrom, now) : {}),
+        ...(to === "teyitli" ? this.confirmedFields(load.loadFrom, now, await this.settings.confirmation()) : {}),
         ...(rematch ? { matchedAt: null } : {}),
       });
       await this.answerOpenQuestion(tx, load.id, answer, now, channel);
@@ -425,17 +431,24 @@ export class LoadsService {
     return this.page(rows, page, (r) => ({ ...this.view(r, true), shipperPhone: r.shipperPhone }));
   }
 
-  async review(id: string, decision: "onay" | "ret", now = new Date()) {
+  async review(adminId: string, id: string, decision: "onay" | "ret", now = new Date()) {
     const [load] = await this.db.select().from(loadPosts).where(eq(loadPosts.id, id));
     if (!load) throw new NotFoundException("İlan bulunamadı");
+    // Çıkar çatışması: yönetici kendi ilanını moderasyondan geçiremez
+    if (load.shipperId === adminId) throw new ForbiddenException("Kendi ilanınız hakkında karar veremezsiniz; başka bir yönetici incelemeli.");
     if (load.status !== "moderasyonda") throw this.statusConflict(load.status, "moderasyonda değil");
+    const entry = { adminId, action: decision === "onay" ? ("ilan_onay" as const) : ("ilan_ret" as const), targetType: "load" as const, targetId: id, subjectUserId: load.shipperId };
 
     if (decision === "ret") {
-      await this.transition(this.db, load, "iptal", { moderation: "ret" });
+      await this.db.transaction(async (tx) => {
+        await this.transition(tx, load, "iptal", { moderation: "ret" });
+        await this.audit.record(entry, tx);
+      });
     } else {
       await this.db.transaction(async (tx) => {
+        await this.audit.record(entry, tx);
         // Yayına çıktığı an BR-01: son teyit = şimdi
-        await this.transition(tx, load, "teyitli", { moderation: "onay", ...this.confirmedFields(load.loadFrom, now) });
+        await this.transition(tx, load, "teyitli", { moderation: "onay", ...this.confirmedFields(load.loadFrom, now, await this.settings.confirmation()) });
         // Onay gecikip yükleme tarihi geçtiyse: onaylı sayılır (BR-11 muafiyetine yazılır) ama yayında kalmaz
         if (load.loadTo < trDay(now)) await this.transition(tx, { ...load, status: "teyitli" }, "suresi_doldu", {});
       });
@@ -514,8 +527,8 @@ export class LoadsService {
     return load;
   }
 
-  private confirmedFields(loadFrom: string, now: Date) {
-    return { lastConfirmedAt: now, reminderSentAt: null, nextReminderAt: nextReminderAt(now, trDayStart(loadFrom)) };
+  private confirmedFields(loadFrom: string, now: Date, p: ConfirmationParams) {
+    return { lastConfirmedAt: now, reminderSentAt: null, nextReminderAt: nextReminderAt(now, trDayStart(loadFrom), p) };
   }
 
   /**

@@ -3,6 +3,7 @@ import { corridorEstimate, roadEstimate, trDay, VEHICLE_SIZE_ORDER, VISIBLE_LOAD
 import { and, count, eq, gte, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { DB, type Db } from "./db/db.module.js";
+import { SettingsService } from "./settings/settings.service.js";
 import { districts, loadPosts } from "./db/schema.js";
 import { RoutesService } from "./routes.service.js";
 
@@ -19,6 +20,7 @@ export class PublicRoutesController {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly routes: RoutesService,
+    private readonly settings: SettingsService,
   ) {}
 
   @Get(":from/:to")
@@ -58,7 +60,8 @@ export class PublicRoutesController {
       `);
       straight = Number(s.rows[0]?.km ?? 0);
     }
-    const estimate = (t: (typeof VEHICLE_SIZE_ORDER)[number]) => (road !== null ? roadEstimate(road, t) : corridorEstimate(straight, t));
+    const p = await this.settings.price();
+    const estimate = (t: (typeof VEHICLE_SIZE_ORDER)[number]) => (road !== null ? roadEstimate(road, t, p) : corridorEstimate(straight, t, p));
     const types = [...VEHICLE_SIZE_ORDER].reverse(); // büyükten küçüğe: tır önce
     return {
       from: { id: origin.id, name: origin.name },

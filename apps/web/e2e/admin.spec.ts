@@ -85,9 +85,11 @@ test("yönetici olmayan bölümü göremez, menüde bağlantı yok", async ({ br
 
 test("telefon genişliğinde yönetici sayfaları yatay taşmaz (menüde Yönetim varken)", async () => {
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const path of ["/panel/yonetim/moderasyon", "/panel/yonetim/sikayetler", "/panel/yonetim/itirazlar", "/panel/yonetim/kullanicilar", "/panel/yonetim/metrikler"]) {
+  const pages = ["moderasyon", "belgeler", "sikayetler", "itirazlar", "kullanicilar", "metrikler", "ayarlar", "kayitlar", "guvenlik"];
+  for (const path of pages.map((p) => `/panel/yonetim/${p}`)) {
     await page.goto(path);
     await expect(page.getByRole("link", { name: "Yönetim" })).toBeVisible();
+    await expect(page.getByText("Yükleniyor…")).toHaveCount(0); // içerik geldikten sonra ölç (ayar formları geniş)
     await expect(page.getByRole("button", { name: "Çıkış" })).toBeInViewport();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), path).toBe(true);
   }
@@ -126,6 +128,56 @@ test("moderasyon: onayla → yayında; reddet → onay sorulur, iptal", async ()
   await expect(row2).toHaveCount(0);
   expect(dialogs.at(-1)).toContain("İlan reddedilsin mi?");
   expect((await api("GET", `/loads/${L2}`, S.accessToken)).body.status).toBe("iptal");
+});
+
+test("ayarlar (FR-54): fiyat katsayısı kaydedilir, önizleme değişir; hatalı ağırlık alan hatası verir; varsayılana dönülür", async () => {
+  try {
+    await page.goto("/panel/yonetim");
+    // İçerik akarken tıklanan sekme geçişi kaybolabiliyor (documents.spec'teki not): önce sayfa gelsin
+    await expect(page.getByRole("heading", { name: "Onay bekleyen ilanlar" })).toBeVisible();
+    await page.getByRole("link", { name: "Ayarlar" }).click();
+    await expect(page).toHaveURL(/\/panel\/yonetim\/ayarlar$/);
+    const price = page.locator('[data-setting="price"]');
+    await expect(page.getByTestId("setting-status-price")).toHaveText("Varsayılan değerler kullanılıyor.");
+    const tirRow = () => page.getByTestId("price-preview").locator("li").first();
+    const tirBefore = (await tirRow().textContent()) ?? "";
+    await price.getByLabel("Motorin fiyatı (₺/L)").fill("120");
+    await price.getByRole("button", { name: "Kaydet" }).click();
+    await expect(price.getByRole("status")).toHaveText("Kaydedildi.");
+    await expect(page.getByTestId("setting-status-price")).toContainText("Son değişiklik: Test Yönetici");
+    await expect(tirRow()).not.toHaveText(tirBefore);
+    await expect(price.getByLabel("Motorin fiyatı (₺/L)")).toHaveValue("120");
+    // Formdaki diğer değerler (ör. "3000", "1,15") geri okunurken bozulmamalı: kayıttaki fark yalnız motorin
+    expect(psql(`select note from admin_audit_log where action='ayar_degisikligi' order by created_at desc limit 1`)).toBe("Fiyat aralığı: Motorin fiyatı (₺/L): 60 → 120");
+    await expect(price.getByLabel("Şoför (₺/gün)").first()).toHaveValue("3000");
+
+    const matching = page.locator('[data-setting="matching"]');
+    await matching.getByLabel("Ağırlık: güven skoru").fill("0,9");
+    await matching.getByRole("button", { name: "Kaydet" }).click();
+    await expect(matching.getByRole("alert")).toHaveText("Ağırlıkların toplamı 1 olmalı");
+    await expect(page.getByTestId("setting-status-matching")).toHaveText("Varsayılan değerler kullanılıyor.");
+
+    await price.getByRole("button", { name: "Varsayılana döndür" }).click(); // onay diyaloğu beforeAll'da kabul ediliyor
+    await expect(page.getByTestId("setting-status-price")).toHaveText("Varsayılan değerler kullanılıyor.");
+    await expect(tirRow()).toHaveText(tirBefore);
+    expect(dialogs.at(-1)).toContain("varsayılana dönsün mü?");
+  } finally {
+    // Ayarlar küresel: başka testlere sızmasın
+    for (const k of ["price", "matching", "confirmation"]) await api("POST", `/admin/settings/${k}/reset`, adminAccess);
+  }
+});
+
+test("işlem kaydı (NFR-05): moderasyon kararları yöneticinin adıyla, etkilenen kişi ve zamanla", async () => {
+  await page.getByRole("link", { name: "İşlem kaydı" }).click();
+  await expect(page).toHaveURL(/\/panel\/yonetim\/kayitlar$/);
+  const list = page.getByTestId("audit-list");
+  // Başka takımların işlemleri araya girebilir: satırı ilanın kısa kimliğiyle bul
+  const rejected = list.locator("li").filter({ hasText: L2.slice(0, 8) });
+  await expect(rejected).toContainText("Test Yönetici");
+  await expect(rejected).toContainText("İlanı reddetti");
+  await expect(rejected).toContainText("Etkilenen: Moderasyon Deneme");
+  await expect(list.locator("li").filter({ hasText: L1.slice(0, 8) })).toContainText("İlanı onayladı");
+  expect(await rejected.locator("time").getAttribute("datetime")).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 });
 
 test("şikayet: kuyrukta hedef ve sahibi görünür; haklı kararı notla sonuçlanır", async () => {

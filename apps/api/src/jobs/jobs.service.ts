@@ -28,6 +28,7 @@ import { randomUUID } from "node:crypto";
 import { sha256, sixDigitCode } from "../common/hash.js";
 import { SmsService } from "../common/sms.service.js";
 import { DB, type Db, type Tx } from "../db/db.module.js";
+import { AuditService } from "../audit/audit.service.js";
 import { capacityPosts, companies, districts, jobEvents, jobs, loadPosts, offers, provinces, users, vehicles } from "../db/schema.js";
 import { LoadsService } from "../loads/loads.service.js";
 import { NotificationsService } from "../notifications/notifications.service.js";
@@ -66,6 +67,7 @@ export class JobsService {
     private readonly sms: SmsService,
     private readonly trust: TrustService,
     private readonly ratings: RatingsService,
+    private readonly audit: AuditService,
   ) {}
 
   /**
@@ -328,9 +330,19 @@ export class JobsService {
   async resolveDispute(adminId: string, jobId: string, input: ResolveDisputeInput, now = new Date()) {
     const [job] = await this.db.select().from(jobs).where(eq(jobs.id, jobId));
     if (!job) throw new NotFoundException("İş bulunamadı");
+    // Çıkar çatışması: yönetici taraf olduğu taşımanın itirazına karar veremez
+    if (job.shipperId === adminId || job.carrierId === adminId) throw new ForbiddenException("Taraf olduğunuz bir taşımanın itirazı hakkında karar veremezsiniz; başka bir yönetici incelemeli.");
     const set: Partial<typeof jobs.$inferInsert> =
       input.outcome === "tamamlandi" ? { completedAt: now } : { cancelReason: `Yönetici kararı: ${input.note}`, cancelledBy: job.carrierId };
-    await this.db.transaction((tx) => this.transition(tx, job, input.outcome, adminId, "admin", set, { note: input.note }));
+    const action = input.outcome === "tamamlandi" ? ("itiraz_tamamlandi" as const) : ("itiraz_iptal" as const);
+    await this.db.transaction(async (tx) => {
+      await this.transition(tx, job, input.outcome, adminId, "admin", set, { note: input.note });
+      // İki taraf da etkilenir: her biri kendi veri dökümünde görsün
+      await this.audit.record(
+        [job.shipperId, job.carrierId].map((subjectUserId) => ({ adminId, action, targetType: "job" as const, targetId: job.id, subjectUserId, note: input.note })),
+        tx,
+      );
+    });
     await this.trust.refresh(job.shipperId, job.carrierId);
     if (input.outcome === "tamamlandi") {
       await this.tell(job, "shipper", `İtirazınız sonuçlandı: teslim geçerli sayıldı, iş tamamlandı. Gerekçe: ${input.note}`);

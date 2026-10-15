@@ -13,4 +13,5 @@ export * from "./rules/share.js";
 export * from "./rules/trust.js";
 export * from "./rules/price.js";
 export * from "./rules/return-plan.js";
+export * from "./rules/settings.js";
 export * from "./zod-tr.js";

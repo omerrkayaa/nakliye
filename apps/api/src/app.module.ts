@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { AccountModule } from "./account/account.module.js";
 import { AdminModule } from "./admin/admin.module.js";
+import { AuditModule } from "./audit/audit.service.js";
 import { AuthModule } from "./auth/auth.module.js";
 import { DbModule } from "./db/db.module.js";
 import { DocumentsModule } from "./documents/documents.module.js";
@@ -17,12 +18,16 @@ import { MatchingModule } from "./matching/matching.module.js";
 import { NotificationsModule } from "./notifications/notifications.module.js";
 import { ReportsModule } from "./reports/reports.module.js";
 import { SchedulerModule } from "./scheduler/scheduler.module.js";
+import { AdminSettingsController } from "./settings/settings.controller.js";
+import { SettingsModule } from "./settings/settings.service.js";
 import { UsersModule } from "./users/users.module.js";
 import { VehiclesModule } from "./vehicles/vehicles.module.js";
 
 @Module({
   imports: [
     DbModule,
+    AuditModule,
+    SettingsModule,
     RoutesModule,
     FilesModule,
     AuthModule,
@@ -39,6 +44,6 @@ import { VehiclesModule } from "./vehicles/vehicles.module.js";
     SchedulerModule,
     AdminModule,
   ],
-  controllers: [HealthController, LocationsController, PriceController, PublicRoutesController],
+  controllers: [HealthController, LocationsController, PriceController, PublicRoutesController, AdminSettingsController],
 })
 export class AppModule {}

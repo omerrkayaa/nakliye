@@ -1,5 +1,5 @@
 // API yanıtlarının web'de kullanılan kısmı (apps/api servislerindeki view() çıktıları).
-import type { BodyType, CargoType, DocumentType, JobStatus, LoadStatus, NotificationType, RatingTag, ReportReason, ReportStatus, Role, UserStatus, VehicleType } from "@nakliye/shared";
+import type { AuditAction, AuditTarget, BodyType, SettingKey, CargoType, DocumentType, JobStatus, LoadStatus, NotificationType, RatingTag, ReportReason, ReportStatus, Role, UserStatus, VehicleType } from "@nakliye/shared";
 
 export interface Place {
   district: string;
@@ -15,6 +15,24 @@ export interface Me {
   company: { title: string; taxNo: string | null; taxOffice: string | null; address: string | null; verified: boolean } | null;
   /** Yönetim bölümü (NFR-04): "tamam" = oturum ikinci adımı geçti, "kurulum" = uygulama kurulmamış, "giris" = yeniden giriş gerekli */
   adminMfa: "tamam" | "kurulum" | "giris" | null;
+}
+
+/** GET /admin/audit — yönetici işlem kaydı (NFR-05) */
+export interface AuditItem {
+  id: string;
+  action: AuditAction;
+  targetType: AuditTarget;
+  targetId: string;
+  note: string | null;
+  createdAt: string;
+  admin: { id: string; name: string | null; phone: string | null };
+  subject: { id: string; name: string | null; status: string } | null;
+}
+
+/** GET /admin/settings — FR-54 parametre yönetimi */
+export interface AdminSettings {
+  settings: Record<SettingKey, { label: string; value: unknown; defaults: unknown; isDefault: boolean; updatedAt: string | null; updatedBy: string | null }>;
+  pricePreview: { vehicleType: VehicleType; min: number; max: number }[];
 }
 
 /** GET /me/totp */

@@ -14,6 +14,7 @@ import {
 import { and, asc, count, desc, eq, gte, isNull, lt, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { randomUUID } from "node:crypto";
+import { AuditService } from "../audit/audit.service.js";
 import type { AccessPayload } from "../auth/auth.service.js";
 import { DB, type Db, type Tx } from "../db/db.module.js";
 import { companies, documents, userRoles, users, vehicles } from "../db/schema.js";
@@ -51,6 +52,7 @@ export class DocumentsService {
     @Inject(FILE_STORAGE) private readonly storage: FileStorage,
     private readonly trust: TrustService,
     private readonly notifications: NotificationsService,
+    private readonly audit: AuditService,
   ) {}
 
   /**
@@ -162,7 +164,8 @@ export class DocumentsService {
     const [d] = await this.db.select({ ownerUserId: documents.ownerUserId, fileKey: documents.fileKey }).from(documents).where(eq(documents.id, id));
     const isAdmin = user.roles.includes("admin");
     if (!d || (d.ownerUserId !== user.sub && !isAdmin)) throw new NotFoundException("Belge bulunamadı");
-    if (d.ownerUserId !== user.sub) this.logger.log(`Yönetici ${user.sub} belge ${id} dosyasını açtı`);
+    // NFR-05: başkasının belgesini (yönetici) açmak kalıcı kayda geçer; sahibi veri dökümünde görür
+    if (d.ownerUserId !== user.sub) await this.audit.record({ adminId: user.sub, action: "belge_goruntuleme", targetType: "document", targetId: id, subjectUserId: d.ownerUserId });
     return signFileUrl(d.fileKey, now);
   }
 
@@ -218,6 +221,9 @@ export class DocumentsService {
    */
   async review(adminId: string, id: string, input: ReviewDocumentInput, now = new Date()) {
     if (input.decision === "onay" && input.expiresAt && input.expiresAt < trDay(now)) throw new BadRequestException("Geçerlilik sonu geçmiş bir gün olamaz");
+    // Çıkar çatışması: yönetici kendi belgesine karar veremez (seviyesini kendisi yükseltemesin)
+    const [mine] = await this.db.select({ id: documents.id }).from(documents).where(and(eq(documents.id, id), eq(documents.ownerUserId, adminId)));
+    if (mine) throw new ForbiddenException("Kendi belgeniz hakkında karar veremezsiniz; başka bir yönetici incelemeli.");
     const decided = await this.db.transaction(async (tx) => {
       const [d] = await tx
         .update(documents)
@@ -256,6 +262,10 @@ export class DocumentsService {
           .returning({ fileKey: documents.fileKey });
         oldKeys = old.map((o) => o.fileKey);
       }
+      await this.audit.record(
+        { adminId, action: d.status === "onay" ? "belge_onay" : "belge_ret", targetType: "document", targetId: d.id, subjectUserId: d.ownerUserId, note: d.rejectReason },
+        tx,
+      );
       return { doc: d, oldKeys };
     });
     for (const k of decided.oldKeys) await this.removeFile(k);

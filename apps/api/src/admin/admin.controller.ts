@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, UseGuards } from "@nestjs/common";
 import {
   adminDisputeListSchema,
+  pageSchema,
   adminReportListSchema,
   resolveDisputeSchema,
   resolveReportSchema,
@@ -11,6 +12,7 @@ import {
   type SuspendUserInput,
 } from "@nakliye/shared";
 import { z } from "zod";
+import { AuditService } from "../audit/audit.service.js";
 import { AuthGuard, CurrentUser, Roles } from "../auth/auth.guard.js";
 import type { AccessPayload } from "../auth/auth.service.js";
 import { ZodPipe } from "../common/zod.pipe.js";
@@ -92,7 +94,20 @@ export class AdminUsersController {
 
   @Post(":id/unsuspend")
   @HttpCode(200)
-  unsuspend(@Param("id", uuid) id: string) {
-    return this.admin.unsuspend(id);
+  unsuspend(@CurrentUser() user: AccessPayload, @Param("id", uuid) id: string) {
+    return this.admin.unsuspend(user.sub, id);
+  }
+}
+
+/** NFR-05 yönetici işlem kaydı: kim, ne zaman, hangi kayıt üzerinde ne yaptı (yeniden eskiye) */
+@Controller("admin/audit")
+@UseGuards(AuthGuard)
+@Roles("admin")
+export class AdminAuditController {
+  constructor(private readonly audit: AuditService) {}
+
+  @Get()
+  list(@Query(new ZodPipe(pageSchema)) q: { page: number }) {
+    return this.audit.list(q.page);
   }
 }

@@ -3,6 +3,7 @@ import {
   confirmationSmsText,
   DEFAULT_CONFIRMATION_PARAMS,
   evaluateLoadStatus,
+  type ConfirmationParams,
   trDay,
   trDayEnd,
   trDayStart,
@@ -14,6 +15,7 @@ import { randomToken, sha256 } from "../common/hash.js";
 import { NotificationsService } from "../notifications/notifications.service.js";
 import { SmsService } from "../common/sms.service.js";
 import { DB, type Db } from "../db/db.module.js";
+import { SettingsService } from "../settings/settings.service.js";
 import { districts, loadConfirmations, loadPosts, provinces, users } from "../db/schema.js";
 
 const BATCH = 500;
@@ -42,15 +44,19 @@ export interface ConfirmationTickStats {
 @Injectable()
 export class ConfirmationService {
   private readonly logger = new Logger(ConfirmationService.name);
-  private readonly p = DEFAULT_CONFIRMATION_PARAMS;
+  /** Geçerli teyit parametreleri (FR-54 ayarı); her turun başında okunur */
+  private p: ConfirmationParams = DEFAULT_CONFIRMATION_PARAMS;
 
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly notifications: NotificationsService,
     private readonly sms: SmsService,
+    private readonly settings: SettingsService,
   ) {}
 
   async tick(now = new Date()): Promise<ConfirmationTickStats> {
+    // Tur boyunca aynı parametreler; aynı anda çalışan anında teyit de aynı değeri okur (ayar değişince en geç 15 sn)
+    this.p = await this.settings.confirmation();
     // Sıra önemli: önce düşür (cevapsızlar), sonra yeni soruları sor, en son SMS yedeği
     const statusChanged = await this.updateStatuses(now);
     const reminded = await this.sendReminders(now);
@@ -226,6 +232,7 @@ export class ConfirmationService {
    * "teyit bekliyor"a girildiği an başlar (normal akışta da 4 saat cevapsızlıktan sonra başlıyor).
    */
   async forceReconfirm(loadId: string, now = new Date()): Promise<boolean> {
+    this.p = await this.settings.confirmation();
     const asked = await this.db.transaction(async (tx) => {
       const [l] = await tx.select().from(loadPosts).where(eq(loadPosts.id, loadId)).for("update");
       if (!l || l.status !== "teyitli") return null;

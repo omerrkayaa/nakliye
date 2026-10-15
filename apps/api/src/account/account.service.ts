@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Inject, Injectable, Logger, Not
 import { ACCOUNT_DELETION, DELETED_USER_NAME, isQualifiedReporter, OPEN_JOB_STATUSES, VISIBLE_LOAD_STATUSES } from "@nakliye/shared";
 import { and, asc, count, eq, exists, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { AuditService } from "../audit/audit.service.js";
 import { AuthService, SUSPENDED_MESSAGE } from "../auth/auth.service.js";
 import { trDateTime } from "../common/format.js";
 import { deletedPhoneHmac } from "../common/hash.js";
@@ -67,6 +68,7 @@ export class AccountService {
     private readonly capacity: CapacityService,
     private readonly offers: OffersService,
     private readonly documents: DocumentsService,
+    private readonly audit: AuditService,
   ) {}
 
   /**
@@ -221,6 +223,8 @@ export class AccountService {
       await tx.delete(companies).where(eq(companies.ownerUserId, userId));
       await tx.delete(refreshTokens).where(eq(refreshTokens.userId, userId));
       await tx.delete(mfaChallenges).where(eq(mfaChallenges.userId, userId));
+      // Yönetici işlem kaydı kalır (hesap verebilirlik), kişisel bilgi içerebilecek gerekçe metni silinir
+      await this.audit.anonymizeSubject(userId, tx);
       await tx.delete(totpRecoveryCodes).where(eq(totpRecoveryCodes.userId, userId));
       await tx.delete(userTotp).where(eq(userTotp.userId, userId));
       await tx.delete(devices).where(eq(devices.userId, userId));
@@ -514,7 +518,7 @@ export class AccountService {
     return {
       format: "nakliye-kisisel-veri/1",
       generatedAt: now.toISOString(),
-      note: "Hesabınıza ait kişisel veriler (KVKK md. 11). Karşı tarafların telefon numaraları, giriş kodları ve şifreli özetler dahil değildir. Henüz görünür olmayan (kör) puanlar dahil edilmez.",
+      note: "Hesabınıza ait kişisel veriler (KVKK md. 11). Karşı tarafların telefon numaraları, giriş kodları ve şifreli özetler dahil değildir. Henüz görünür olmayan (kör) puanlar dahil edilmez. Hakkınızdaki yönetici işlemleri (belge açma, kararlar) adminActions'ta.",
       account: {
         id: u.id,
         phone: u.phone,
@@ -573,6 +577,8 @@ export class AccountService {
         .where(eq(notifications.userId, userId))
         .orderBy(asc(notifications.createdAt)),
       favoriteCarriers: favorites,
+      // NFR-05: hakkınızdaki yönetici işlemleri (belge açma, kararlar, askı); işlemi yapan yöneticinin kimliği dahil değil
+      adminActions: await this.audit.forSubject(userId),
     };
   }
 }

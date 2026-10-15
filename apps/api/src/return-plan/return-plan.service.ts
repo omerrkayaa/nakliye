@@ -1,7 +1,6 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import {
   ACTIVE_JOB_STATUSES,
-  DEFAULT_MATCH_PARAMS as P,
   RETURN_PLAN_PARAMS as R,
   ROAD_FACTOR,
   VISIBLE_LOAD_STATUSES,
@@ -22,6 +21,7 @@ import {
 import { and, eq, gte, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { DB, type Db } from "../db/db.module.js";
+import { SettingsService } from "../settings/settings.service.js";
 import { districts, jobs, loadPosts, provinces, routeAlerts, users, vehicles } from "../db/schema.js";
 import { LoadsService } from "../loads/loads.service.js";
 import { RoutesService } from "../routes.service.js";
@@ -54,6 +54,7 @@ export class ReturnPlanService {
     @Inject(DB) private readonly db: Db,
     private readonly loads: LoadsService,
     private readonly routes: RoutesService,
+    private readonly settings: SettingsService,
   ) {}
 
   async plan(carrierId: string, jobId: string, now = new Date()) {
@@ -97,6 +98,8 @@ export class ReturnPlanService {
     const vehicle = { type: row.vehicle.vehicleType as VehicleType, bodyType: row.vehicle.bodyType as BodyType, capacityTon: row.vehicle.capacityTon };
     const cap = returnCapacity({ origin: latLng(home), dest: latLng(there), vehicle }, window);
 
+    // Eşleştirmeyle aynı ayar (FR-54): SQL ön süzgeci ve kural aynı yarıçapı kullansın
+    const P = await this.settings.matching();
     const line = sql`ST_SetSRID(ST_GeomFromGeoJSON(${JSON.stringify({ type: "LineString", coordinates: back.line.map((p) => [p.lng, p.lat]) })}), 4326)::geography`;
     const within = (col: unknown, target: unknown, km: number) => sql`ST_DWithin((${col})::geography, ${target}, ${km * 1000})`;
     const candidates = await this.db
@@ -125,7 +128,7 @@ export class ReturnPlanService {
     const routeIds: { id: string; score: number; route: { originDevKm: number; destDevKm: number; coverage: number } }[] = [];
     for (const c of candidates) {
       const load = this.loadForMatch(c.load);
-      const m = matchLoadWithCapacity(load, cap, c.trust);
+      const m = matchLoadWithCapacity(load, cap, c.trust, P);
       if (m.candidate) {
         returnIds.push({ id: c.load.id, match: { score: m.score, originKm: m.originKm, destKm: m.destKm } });
         continue;

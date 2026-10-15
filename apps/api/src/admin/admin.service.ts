@@ -1,9 +1,10 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type { AdminReportListInput, ResolveReportInput } from "@nakliye/shared";
 import { and, count, desc, eq, ilike, inArray, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { AccountService } from "../account/account.service.js";
 import { DB, type Db } from "../db/db.module.js";
+import { AuditService } from "../audit/audit.service.js";
 import { districts, loadPosts, provinces, refreshTokens, reports, userRoles, users } from "../db/schema.js";
 import { TrustService } from "../ratings/trust.service.js";
 
@@ -23,6 +24,7 @@ export class AdminService {
     @Inject(DB) private readonly db: Db,
     private readonly trust: TrustService,
     private readonly account: AccountService,
+    private readonly audit: AuditService,
   ) {}
 
   // ── Şikayetler (Y3) ───────────────────────────────────────────────
@@ -102,24 +104,32 @@ export class AdminService {
    * hesabını sildiyse notu (serbest metin, kişisel bilgi içerebilir) karar için tutulmuştu, artık silinir (FR-07).
    */
   async resolveReport(adminId: string, id: string, input: ResolveReportInput, now = new Date()) {
+    const [report] = await this.db.select({ reporterId: reports.reporterId, targetType: reports.targetType, targetId: reports.targetId }).from(reports).where(eq(reports.id, id));
+    if (!report) throw new NotFoundException("Şikayet bulunamadı");
+    // Şikayet edilenin hesabı: kullanıcı şikayetinde kendisi, ilan şikayetinde ilanın sahibi
+    const ownerId =
+      report.targetType === "user"
+        ? report.targetId
+        : (await this.db.select({ shipperId: loadPosts.shipperId }).from(loadPosts).where(eq(loadPosts.id, report.targetId)))[0]?.shipperId;
+    // Çıkar çatışması: yönetici kendi açtığı ya da kendisi hakkındaki şikayete karar veremez
+    if (report.reporterId === adminId || ownerId === adminId) throw new ForbiddenException("Taraf olduğunuz bir şikayet hakkında karar veremezsiniz; başka bir yönetici incelemeli.");
     const reporterDeleted = sql`exists (select 1 from ${users} where ${users.id} = ${reports.reporterId} and ${users.status} = 'silindi')`;
-    const [row] = await this.db
-      .update(reports)
-      .set({ status: input.decision, resolution: input.note ?? null, resolvedAt: now, resolvedBy: adminId, note: sql`case when ${reporterDeleted} then null else ${reports.note} end` })
-      .where(and(eq(reports.id, id), eq(reports.status, "acik")))
-      .returning({ targetType: reports.targetType, targetId: reports.targetId });
-    if (!row) {
-      const [exists] = await this.db.select({ id: reports.id }).from(reports).where(eq(reports.id, id));
-      if (!exists) throw new NotFoundException("Şikayet bulunamadı");
-      throw new ConflictException("Şikayet zaten sonuçlandırılmış");
-    }
-    if (input.decision === "hakli") {
-      const ownerId =
-        row.targetType === "user"
-          ? row.targetId
-          : (await this.db.select({ shipperId: loadPosts.shipperId }).from(loadPosts).where(eq(loadPosts.id, row.targetId)))[0]?.shipperId;
-      if (ownerId) await this.trust.refresh(ownerId);
-    }
+    const row = await this.db.transaction(async (tx) => {
+      const [r] = await tx
+        .update(reports)
+        .set({ status: input.decision, resolution: input.note ?? null, resolvedAt: now, resolvedBy: adminId, note: sql`case when ${reporterDeleted} then null else ${reports.note} end` })
+        .where(and(eq(reports.id, id), eq(reports.status, "acik")))
+        .returning({ id: reports.id });
+      if (r) {
+        await this.audit.record(
+          { adminId, action: input.decision === "hakli" ? "sikayet_hakli" : "sikayet_haksiz", targetType: "report", targetId: id, subjectUserId: ownerId ?? null, note: input.note },
+          tx,
+        );
+      }
+      return r;
+    });
+    if (!row) throw new ConflictException("Şikayet zaten sonuçlandırılmış");
+    if (input.decision === "hakli" && ownerId) await this.trust.refresh(ownerId);
     return { id, status: input.decision };
   }
 
@@ -163,6 +173,7 @@ export class AdminService {
       throw new ConflictException(u.status === "silindi" ? "Hesap silinmiş" : "Hesap zaten askıda");
     }
     await this.db.update(refreshTokens).set({ revokedAt: now }).where(and(eq(refreshTokens.userId, userId), sql`${refreshTokens.revokedAt} is null`));
+    await this.audit.record({ adminId, action: "askiya_alma", targetType: "user", targetId: userId, subjectUserId: userId, note: reason });
 
     // İlanlar ve boş araç ilanları iptal, bekleyen teklifler geri çekilir; kapanan ilanlara gelen teklifler sonuçlanmadı
     const closed = await this.account.closeOpenActivity(userId, now);
@@ -170,7 +181,7 @@ export class AdminService {
   }
 
   /** Askıyı kaldır. Kapanan ilanlar geri açılmaz (yayın tarihi ve teyit bilgisi eskidi). */
-  async unsuspend(userId: string) {
+  async unsuspend(adminId: string, userId: string) {
     const [row] = await this.db
       .update(users)
       .set({ status: "aktif", suspendedAt: null, suspendReason: null })
@@ -180,6 +191,7 @@ export class AdminService {
       await this.user(userId);
       throw new ConflictException("Hesap askıda değil");
     }
+    await this.audit.record({ adminId, action: "askiyi_kaldirma", targetType: "user", targetId: userId, subjectUserId: userId });
     return { user: this.userView(await this.user(userId)) };
   }
 

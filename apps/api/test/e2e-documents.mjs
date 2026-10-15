@@ -144,7 +144,7 @@ check("süre uzatılınca 403 (imza süreyi de kapsar)", (await fetchFile(url1.r
 check("imzasız 403", (await fetchFile(url1.split("?")[0])).status === 403);
 check("yol geçişi denemesi reddedilir", [403, 404].includes((await fetchFile(`/files/documents/..%2F..%2F${Cid}/x.png?exp=9999999999&sig=x`)).status));
 check("başkası bağlantı alamaz 404", (await api("GET", `/documents/${D1}/url`, O)).status === 404);
-check("yönetici bağlantı alır, açma loglanır", (await api("GET", `/documents/${D1}/url`, A)).status === 200 && log().includes(`belge ${D1} dosyasını açtı`));
+check("yönetici bağlantı alır, açma işlem kaydına geçer (NFR-05)", (await api("GET", `/documents/${D1}/url`, A)).status === 200 && psql(`select count(*) from admin_audit_log where target_id='${D1}' and action='belge_goruntuleme' and subject_user_id='${Cid}'`) === "1");
 
 r = await upload(C, { type: "ruhsat", vehicleId: V1 }, JPG, "ruhsat2.jpg");
 const D1b = r.body.id;

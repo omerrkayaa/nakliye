@@ -173,5 +173,25 @@ export const NOTIFICATION_TYPES = {
 } as const;
 export type NotificationType = keyof typeof NOTIFICATION_TYPES;
 
+/** Yönetici işlem kaydı (NFR-05): işlem → panelde ve veri dökümünde görünen ad */
+export const AUDIT_ACTIONS = {
+  belge_goruntuleme: "Belgeyi açtı",
+  belge_onay: "Belgeyi onayladı",
+  belge_ret: "Belgeyi reddetti",
+  ilan_onay: "İlanı onayladı",
+  ilan_ret: "İlanı reddetti",
+  sikayet_hakli: "Şikayeti haklı buldu",
+  sikayet_haksiz: "Şikayeti haksız buldu",
+  itiraz_tamamlandi: "İtirazda teslimi geçerli saydı",
+  itiraz_iptal: "İtirazda işi iptal etti",
+  askiya_alma: "Hesabı askıya aldı",
+  askiyi_kaldirma: "Askıyı kaldırdı",
+  ayar_degisikligi: "Ayarı değiştirdi",
+  ayar_sifirlama: "Ayarı varsayılana döndürdü",
+} as const;
+export type AuditAction = keyof typeof AUDIT_ACTIONS;
+export const AUDIT_TARGETS = { document: "Belge", load: "İlan", report: "Şikayet", job: "Taşıma", user: "Hesap", setting: "Ayar" } as const;
+export type AuditTarget = keyof typeof AUDIT_TARGETS;
+
 /** BR-22 saatlik sınırına giren tipler */
 export const MATCH_NOTIFICATION_TYPES: readonly NotificationType[] = ["match_for_carrier", "match_for_shipper", "route_alert"];

@@ -1,6 +1,5 @@
 import { ConflictException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import {
-  DEFAULT_MATCH_PARAMS,
   isVerifiedBadge,
   maskPhone,
   MATCH_NOTIFICATION_TYPES,
@@ -21,10 +20,10 @@ import { and, eq, gte, inArray, isNotNull, isNull, lte, ne, or, sql } from "driz
 import { alias } from "drizzle-orm/pg-core";
 import { AlertsService } from "../alerts/alerts.service.js";
 import { DB, type Db, type Tx } from "../db/db.module.js";
+import { SettingsService } from "../settings/settings.service.js";
 import { capacityPosts, companies, districts, favoriteCarriers, loadPosts, matches, notifications, provinces, users, vehicles } from "../db/schema.js";
 import { NotificationsService, type NotifyBuilder, type NotifyInput, type NotifyLimit } from "../notifications/notifications.service.js";
 
-const P = DEFAULT_MATCH_PARAMS;
 /**
  * SQL ön süzgecinde yarıçapa eklenen pay. PostGIS (sferoid) ile shared haversine (küre) sınırda birkaç yüz metre
  * farklı ölçebilir; pay sayesinde SQL gerçek bir adayı kaçırmaz, kesin kararı shared matchLoadWithCapacity verir.
@@ -55,8 +54,8 @@ const isCandidate = <T extends { m: MatchResult }>(c: T): c is T & { m: Candidat
  * Tarih aralıkları ±tolerans ile kesişiyor mu (iki uç dahil; daterange varsayılanı '[)' son günü dışlardı).
  * Hepsi ::date'e çevrilir: değer sütun değil parametreyse Postgres "$1 - 1"i tamsayı sanıyor.
  */
-const datesOverlap = (cFrom: unknown, cTo: unknown, lFrom: unknown, lTo: unknown) =>
-  sql`daterange((${cFrom})::date - ${P.dateToleranceDays}::int, (${cTo})::date + ${P.dateToleranceDays}::int, '[]') && daterange((${lFrom})::date, (${lTo})::date, '[]')`;
+const datesOverlap = (cFrom: unknown, cTo: unknown, lFrom: unknown, lTo: unknown, toleranceDays: number) =>
+  sql`daterange((${cFrom})::date - ${toleranceDays}::int, (${cTo})::date + ${toleranceDays}::int, '[]') && daterange((${lFrom})::date, (${lTo})::date, '[]')`;
 const dayText = (d: string) =>
   new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${d}T00:00:00Z`));
 
@@ -73,6 +72,7 @@ export class MatchingService {
     @Inject(DB) private readonly db: Db,
     private readonly notifications: NotificationsService,
     private readonly alerts: AlertsService,
+    private readonly settings: SettingsService,
   ) {}
 
   /** İsteği bekletmeden eşleştirmeyi başlatır; hata olursa zamanlayıcı süpürmesi yakalar (matched_at boş kalır). */
@@ -281,6 +281,8 @@ export class MatchingService {
   // ── Aday bulma (docs/04 §4) ────────────────────────────────────────
 
   private async candidatesForLoad(load: LoadRow, now: Date) {
+    // FR-54: yarıçap, tarih toleransı ve ağırlıklar ayardan; SQL ön süzgeci ile kesin kural aynı değeri kullanır
+    const P = await this.settings.matching();
     const rows = await this.db
       .select({
         cap: capacityPosts,
@@ -307,7 +309,7 @@ export class MatchingService {
           inArray(vehicles.vehicleType, typesThatCarry(load.vehicleType as VehicleType)), // büyük araç küçük yükü taşır
           load.bodyType ? eq(vehicles.bodyType, load.bodyType) : undefined,
           gte(vehicles.capacityTon, load.weightTon),
-          datesOverlap(capacityPosts.availableFrom, capacityPosts.availableTo, load.loadFrom, load.loadTo),
+          datesOverlap(capacityPosts.availableFrom, capacityPosts.availableTo, load.loadFrom, load.loadTo, P.dateToleranceDays),
           sql`ST_DWithin(${capacityPosts.originGeom}::geography, ${geog(load.originGeom)}, ${(P.originRadiusKm + PREFILTER_MARGIN_KM) * 1000})`,
           sql`(${capacityPosts.destGeom} is null or ST_DWithin(${capacityPosts.destGeom}::geography, ${geog(load.destGeom)}, ${(P.destRadiusKm + PREFILTER_MARGIN_KM) * 1000}))`,
         ),
@@ -329,6 +331,7 @@ export class MatchingService {
   }
 
   private async candidatesForCapacity(cap: CapRow, vehicle: VehicleRow, statuses: readonly LoadStatus[], now: Date) {
+    const P = await this.settings.matching();
     const rows = await this.db
       .select({
         load: loadPosts,
@@ -352,7 +355,7 @@ export class MatchingService {
           inArray(loadPosts.vehicleType, typesCarriedBy(vehicle.vehicleType as VehicleType)),
           or(isNull(loadPosts.bodyType), eq(loadPosts.bodyType, vehicle.bodyType)),
           lte(loadPosts.weightTon, vehicle.capacityTon),
-          datesOverlap(cap.availableFrom, cap.availableTo, loadPosts.loadFrom, loadPosts.loadTo),
+          datesOverlap(cap.availableFrom, cap.availableTo, loadPosts.loadFrom, loadPosts.loadTo, P.dateToleranceDays),
           sql`ST_DWithin(${loadPosts.originGeom}::geography, ${geog(cap.originGeom)}, ${(P.originRadiusKm + PREFILTER_MARGIN_KM) * 1000})`,
           cap.destGeom
             ? sql`ST_DWithin(${loadPosts.destGeom}::geography, ${geog(cap.destGeom)}, ${(P.destRadiusKm + PREFILTER_MARGIN_KM) * 1000})`

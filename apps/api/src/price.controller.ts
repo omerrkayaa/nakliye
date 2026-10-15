@@ -5,6 +5,7 @@ import { AuthGuard } from "./auth/auth.guard.js";
 import { ZodPipe } from "./common/zod.pipe.js";
 import { DB, type Db } from "./db/db.module.js";
 import { RoutesService } from "./routes.service.js";
+import { SettingsService } from "./settings/settings.service.js";
 
 /**
  * F7 koridor fiyat aralığı (FR-25, docs/04 §7): ilçe merkezleri arası karayolu mesafesi (OSRM, önbellekli) ile araç
@@ -16,6 +17,7 @@ export class PriceController {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly routes: RoutesService,
+    private readonly settings: SettingsService,
   ) {}
 
   @Get()
@@ -27,7 +29,8 @@ export class PriceController {
     const row = r.rows[0];
     if (!row) throw new NotFoundException("İlçe bulunamadı");
     const road = await this.routes.roadKm(q.from, q.to);
-    if (road !== null) return { ...roadEstimate(road, q.vehicleType), source: "karayolu" as const, approximate: true };
-    return { ...corridorEstimate(Number(row.km), q.vehicleType), source: "kus_ucusu" as const, approximate: true };
+    const p = await this.settings.price(); // FR-54: yönetici panelindeki katsayılar
+    if (road !== null) return { ...roadEstimate(road, q.vehicleType, p), source: "karayolu" as const, approximate: true };
+    return { ...corridorEstimate(Number(row.km), q.vehicleType, p), source: "kus_ucusu" as const, approximate: true };
   }
 }

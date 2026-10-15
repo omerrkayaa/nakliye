@@ -120,7 +120,7 @@ export class AdminLoadsController {
 
   @Post(":id/review")
   @HttpCode(200)
-  review(@Param("id", uuid) id: string, @Body(new ZodPipe(reviewLoadSchema)) body: ReviewLoadInput) {
-    return this.loads.review(id, body.decision);
+  review(@CurrentUser() user: AccessPayload, @Param("id", uuid) id: string, @Body(new ZodPipe(reviewLoadSchema)) body: ReviewLoadInput) {
+    return this.loads.review(user.sub, id, body.decision);
   }
 }

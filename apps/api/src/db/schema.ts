@@ -1,5 +1,7 @@
 // Veri modeli — docs/04 §3
 import {
+  type AuditAction,
+  type AuditTarget,
   BODY_TYPES,
   type CapacityStatus,
   type DocumentType,
@@ -510,6 +512,32 @@ export const reports = pgTable(
     index("reports_target_idx").on(t.targetType, t.targetId),
     index("reports_reporter_time_idx").on(t.reporterId, t.createdAt),
   ],
+);
+
+// FR-54 parametre yönetimi (settings/settings.service.ts): anahtar başına tam, doğrulanmış nesne; yoksa shared varsayılanı
+export const settings = pgTable("settings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  key: varchar("key", { length: 24 }).notNull().unique(),
+  value: jsonb("value").notNull(),
+  updatedBy: uuid("updated_by").references(() => users.id),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// NFR-05 yönetici işlem kaydı (audit/audit.service.ts): karar ve belge açma; kişi kendi dökümünde görür
+export const adminAuditLog = pgTable(
+  "admin_audit_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    adminId: uuid("admin_id").notNull().references(() => users.id),
+    action: varchar("action", { length: 24 }).$type<AuditAction>().notNull(),
+    targetType: varchar("target_type", { length: 12 }).$type<AuditTarget>().notNull(),
+    targetId: uuid("target_id").notNull(),
+    subjectUserId: uuid("subject_user_id").references(() => users.id),
+    // Ret sebebi, askı gerekçesi, itiraz kararı gibi serbest metin; kişinin hesabı silinince boşaltılır
+    note: text("note"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("admin_audit_created_idx").on(t.createdAt), index("admin_audit_subject_idx").on(t.subjectUserId, t.createdAt)],
 );
 
 // BR-40: "Ara" ile numara açıldığında bir satır (kötüye kullanım ölçümü, BR-05 tanıklığı, eşleşme isabeti metriği)
