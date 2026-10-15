@@ -118,5 +118,7 @@ await api("POST", `/jobs/${J}/complete`, S);
 r = await api("GET", `/return-plan/${J}`, C);
 check("tamamlanan işte 409", r.status === 409 && /süren işlerde/.test(r.body.message), JSON.stringify(r.body));
 
+// Temizlik: aynı güzergâhta her koşu 4 ilan bırakıyordu; birikince (öneri listesi ilk 20) sonraki koşuların ilanını itiyordu
+psql(`update load_posts set status='iptal' where status in ('teyitli','teyit_bekliyor','moderasyonda') and shipper_id in (select id from users where phone like '+90538${run}%')`);
 console.log(`\nSonuç: ${pass} geçti, ${fail} kaldı`);
 process.exitCode = fail ? 1 : 0;

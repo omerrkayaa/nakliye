@@ -298,6 +298,10 @@ export const loadPosts = pgTable(
   (t) => [
     index("load_posts_origin_geom_idx").using("gist", t.originGeom),
     index("load_posts_dest_geom_idx").using("gist", t.destGeom),
+    // Metre cinsinden sorgular (yakınımdakiler, eşleştirme, dönüş planı) sütunu ::geography'ye çevirir; geometry indeksi
+    // o ifadeye uymaz. İfade indeksi hem kullanılır hem de PostgreSQL ifade için istatistik toplar (NFR-01).
+    index("load_posts_origin_geog_idx").using("gist", sql`(${t.originGeom}::geography)`),
+    index("load_posts_dest_geog_idx").using("gist", sql`(${t.destGeom}::geography)`),
     index("load_posts_status_date_idx").on(t.status, t.loadFrom),
     index("load_posts_shipper_idx").on(t.shipperId),
     index("load_posts_reminder_idx").on(t.nextReminderAt).where(sql`status = 'teyitli'`),
@@ -343,6 +347,9 @@ export const capacityPosts = pgTable(
   },
   (t) => [
     index("capacity_origin_geom_idx").using("gist", t.originGeom),
+    // Eşleştirmenin metre cinsinden ön süzgeci (::geography) için; bkz. load_posts_origin_geog_idx
+    index("capacity_origin_geog_idx").using("gist", sql`(${t.originGeom}::geography)`),
+    index("capacity_dest_geog_idx").using("gist", sql`(${t.destGeom}::geography)`),
     index("capacity_status_date_idx").on(t.status, t.availableFrom),
     index("capacity_vehicle_idx").on(t.vehicleId),
   ],
@@ -512,6 +519,31 @@ export const reports = pgTable(
     index("reports_target_idx").on(t.targetType, t.targetId),
     index("reports_reporter_time_idx").on(t.reporterId, t.createdAt),
   ],
+);
+
+// NFR-09 istek istatistiği (common/api-stats.service.ts): saat × yöntem × rota kalıbı başına sayılar ve süre dilimleri
+// (ms: ≤50, ≤100, ≤200, ≤300, ≤500, ≤1000, ≤3000, >3000). İstek başına satır yok; 90 günden eskiler silinir.
+export const apiRequestStats = pgTable(
+  "api_request_stats",
+  {
+    hour: timestamp("hour", { withTimezone: true }).notNull(),
+    method: varchar("method", { length: 8 }).notNull(),
+    route: varchar("route", { length: 160 }).notNull(),
+    requests: integer("requests").notNull().default(0),
+    status4xx: integer("status_4xx").notNull().default(0),
+    status5xx: integer("status_5xx").notNull().default(0),
+    totalMs: bigint("total_ms", { mode: "number" }).notNull().default(0),
+    maxMs: integer("max_ms").notNull().default(0),
+    b50: integer("b50").notNull().default(0),
+    b100: integer("b100").notNull().default(0),
+    b200: integer("b200").notNull().default(0),
+    b300: integer("b300").notNull().default(0),
+    b500: integer("b500").notNull().default(0),
+    b1000: integer("b1000").notNull().default(0),
+    b3000: integer("b3000").notNull().default(0),
+    bInf: integer("b_inf").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.hour, t.method, t.route] })],
 );
 
 // FR-54 parametre yönetimi (settings/settings.service.ts): anahtar başına tam, doğrulanmış nesne; yoksa shared varsayılanı

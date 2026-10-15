@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { AccountModule } from "./account/account.module.js";
 import { AdminModule } from "./admin/admin.module.js";
 import { AuditModule } from "./audit/audit.service.js";
+import { ApiStatsModule } from "./common/api-stats.service.js";
 import { AuthModule } from "./auth/auth.module.js";
 import { DbModule } from "./db/db.module.js";
 import { DocumentsModule } from "./documents/documents.module.js";
@@ -27,6 +28,7 @@ import { VehiclesModule } from "./vehicles/vehicles.module.js";
   imports: [
     DbModule,
     AuditModule,
+    ApiStatsModule,
     SettingsModule,
     RoutesModule,
     FilesModule,

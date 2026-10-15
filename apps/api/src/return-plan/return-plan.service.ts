@@ -124,22 +124,24 @@ export class ReturnPlanService {
       )
       .limit(MAX_CANDIDATES);
 
-    const returnIds: { id: string; match: { score: number; originKm: number; destKm: number | null } }[] = [];
-    const routeIds: { id: string; score: number; route: { originDevKm: number; destDevKm: number; coverage: number } }[] = [];
+    const returnIds: { id: string; at: number; match: { score: number; originKm: number; destKm: number | null } }[] = [];
+    const routeIds: { id: string; at: number; score: number; route: { originDevKm: number; destDevKm: number; coverage: number } }[] = [];
     for (const c of candidates) {
       const load = this.loadForMatch(c.load);
       const m = matchLoadWithCapacity(load, cap, c.trust, P);
       if (m.candidate) {
-        returnIds.push({ id: c.load.id, match: { score: m.score, originKm: m.originKm, destKm: m.destKm } });
+        returnIds.push({ id: c.load.id, at: c.load.lastConfirmedAt.getTime(), match: { score: m.score, originKm: m.originKm, destKm: m.destKm } });
         continue;
       }
       // Dönüş yükü değilse (ör. kalkışı varış noktasından uzak) rota üstü mü: araç ve tarih yine uymalı
       if (fitRejectReason(load, cap)) continue;
       const r = onRouteMatch(load, back.line);
-      if (r.candidate) routeIds.push({ id: c.load.id, score: r.score, route: { originDevKm: r.originDevKm, destDevKm: r.destDevKm, coverage: r.coverage } });
+      if (r.candidate) routeIds.push({ id: c.load.id, at: c.load.lastConfirmedAt.getTime(), score: r.score, route: { originDevKm: r.originDevKm, destDevKm: r.destDevKm, coverage: r.coverage } });
     }
-    returnIds.sort((a, b) => b.match.score - a.match.score);
-    routeIds.sort((a, b) => b.score - a.score);
+    // Eşit puanda en yeni teyit önce, sonra kimlik: ilk 20 kesilirken sıra tarama sırasına (indekse) bağlı kalmasın
+    const tie = (a: { at: number; id: string }, b: { at: number; id: string }) => b.at - a.at || a.id.localeCompare(b.id);
+    returnIds.sort((a, b) => b.match.score - a.match.score || tie(a, b));
+    routeIds.sort((a, b) => b.score - a.score || tie(a, b));
     const ret = returnIds.slice(0, MAX_SUGGESTIONS);
     const onRoute = routeIds.slice(0, MAX_SUGGESTIONS);
     const cards = new Map((await this.loads.cards([...ret, ...onRoute].map((x) => x.id))).map((c) => [c.id, c]));

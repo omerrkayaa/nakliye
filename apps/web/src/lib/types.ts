@@ -252,7 +252,25 @@ export interface ShipperSummary {
 }
 
 /** Yönetici: tez metrikleri (GET /admin/metrics, Y5) */
+/** NFR-09 istek istatistiği özeti (GET /admin/metrics → api) */
+export interface ApiHealth {
+  hours: number;
+  requests: number;
+  status4xx: number;
+  status5xx: number;
+  errorRate: number | null;
+  clientErrorRate: number | null;
+  meanMs: number | null;
+  /** Süre dilimlerinden yaklaşık (dilimin üst sınırı); null: istek yok ya da > 3000 ms */
+  p95Ms: number | null;
+  maxMs: number;
+  topErrors: ({ method: string; route: string } & Omit<ApiHealth, "hours" | "topErrors" | "slowest">)[];
+  slowest: ({ method: string; route: string } & Omit<ApiHealth, "hours" | "topErrors" | "slowest">)[];
+}
+
 export interface AdminMetrics {
+  api: { last24h: ApiHealth; last7d: ApiHealth };
+  notifications: { windowDays: number; created: number; read: number; readRate: number | null };
   weeklyClosed: { week: string; closed: number }[];
   dailyLoads: { day: string; loads: number }[];
   live: { visible: number; fresh: number; freshness: number | null };

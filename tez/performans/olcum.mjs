@@ -222,6 +222,8 @@ try {
 }
 const outDir = join(ROOT, "tez", "performans", "sonuclar");
 mkdirSync(outDir, { recursive: true });
-const file = join(outDir, `olcum-${result.olcumTarihi.slice(0, 10)}.json`);
+// Aynı gün ikinci ölçüm öncekinin üzerine yazmasın
+let file = join(outDir, `olcum-${result.olcumTarihi.slice(0, 10)}.json`);
+for (let i = 2; existsSync(file); i++) file = join(outDir, `olcum-${result.olcumTarihi.slice(0, 10)}-${i}.json`);
 writeFileSync(file, JSON.stringify(result, null, 2));
 console.log(`NFR-01: liste p95 en kötü ${result.nfr01.listeP95EnKotu} ms (hedef < 300) · eşleşme bildirimi en kötü ${result.nfr01.eslesmeEnKotuMs} ms (hedef < 60.000)\nSonuç: ${file}`);

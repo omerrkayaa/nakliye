@@ -311,5 +311,11 @@ test("metrikler: bu hafta kapanan yük API ile aynı; haftalık ve günlük graf
   // Sütun odaklanınca ipucu görünür
   await weekly.getByRole("listitem").last().focus();
   await expect(weekly.getByRole("tooltip").last()).toBeVisible();
+  // NFR-09 API sağlığı: hata oranı kutuları ve bildirim okunma oranı; rota tablosu başlıklarıyla
+  const health = page.getByTestId("api-health");
+  await expect(health).toContainText("API hata oranı (5xx, 24 saat)");
+  await expect(health).toContainText("API hata oranı (5xx, 7 gün)");
+  await expect(health).toContainText("Bildirim okunma oranı");
+  await expect(page.getByRole("table").filter({ hasText: "hata veren ve en yavaş rotalar" }).getByRole("columnheader", { name: "p95" })).toBeVisible();
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/metrikler.png`, fullPage: true });
 });

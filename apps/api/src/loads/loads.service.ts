@@ -69,8 +69,11 @@ export class LoadsService {
   /** Yük arama (FR-20, FR-21): yalnız görünür ilanlar; teyitli önce, sonra en yakın / en taze teyit. */
   async search(q: LoadSearchInput, now = new Date()) {
     const where: SQL[] = [inArray(loadPosts.status, [...VISIBLE_LOAD_STATUSES]), gte(loadPosts.loadTo, trDay(now))];
-    if (q.fromProvinceId) where.push(eq(op.id, q.fromProvinceId));
-    if (q.toProvinceId) where.push(eq(dp.id, q.toProvinceId));
+    // İl süzgeci birleştirme yerine ilçe alt sorgusuyla: 1. adım yalnız ilan tablosunda çalışsın (aşağıya bkz.)
+    const inProvince = (col: typeof loadPosts.originDistrictId | typeof loadPosts.destDistrictId, provinceId: number) =>
+      inArray(col, this.db.select({ id: districts.id }).from(districts).where(eq(districts.provinceId, provinceId)));
+    if (q.fromProvinceId) where.push(inProvince(loadPosts.originDistrictId, q.fromProvinceId));
+    if (q.toProvinceId) where.push(inProvince(loadPosts.destDistrictId, q.toProvinceId));
     if (q.date) where.push(lte(loadPosts.loadFrom, q.date), gte(loadPosts.loadTo, q.date));
     // Filtredeki tip nakliyecinin aracıdır: o aracın taşıyabileceği (aynı ya da daha küçük tip isteyen) ilanlar
     if (q.vehicleType) where.push(inArray(loadPosts.vehicleType, typesCarriedBy(q.vehicleType)));
@@ -85,15 +88,26 @@ export class LoadsService {
       where.push(sql`ST_DWithin(${loadPosts.originGeom}::geography, ${here}, ${q.radiusKm * 1000})`);
     }
 
-    const rows = await this.selectLoads(distance)
+    // NFR-01: iki adım. 1) Süzme, sıralama ve sayfa yalnız ilan tablosunda (konum ifade indeksiyle); 2) ilçe, il, yük
+    // sahibi ve firma yalnız sayfadaki ilanlar için birleştirilir. Tek sorguda planlayıcı mesafe süzgecinin seçiciliğini
+    // 1 satır sanıp 2.000 ilan × tüm kullanıcılar iç içe döngü kuruyordu (10.000 ilanda yakınımdakiler p95 3,4 sn → bkz.
+    // tez/performans). Son ölçüt kimlik: eşit sıralı ilanlarda sayfalar kararlı.
+    const ranked = await this.db
+      .select({ id: loadPosts.id })
+      .from(loadPosts)
       .where(and(...where))
       .orderBy(
         sql`case when ${loadPosts.status} = 'teyitli' then 0 else 1 end`,
         ...(distance ? [asc(distance)] : []),
         desc(loadPosts.lastConfirmedAt),
+        asc(loadPosts.id),
       )
       .limit(PAGE_SIZE + 1)
       .offset((q.page - 1) * PAGE_SIZE);
+    const position = new Map(ranked.map((r, i) => [r.id, i]));
+    const rows = ranked.length
+      ? (await this.selectLoads(distance).where(inArray(loadPosts.id, [...position.keys()]))).sort((a, b) => position.get(a.load.id)! - position.get(b.load.id)!)
+      : [];
 
     // A6 kart: yük sahibinin puanı ve tamamlanan işi (güven sinyali; docs/02 ilke "her kartta güven sinyali")
     const rep = await this.trust.reputationMany(rows.slice(0, PAGE_SIZE).map((r) => r.load.shipperId));

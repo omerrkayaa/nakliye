@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { AccountService } from "../account/account.service.js";
 import { AuthService } from "../auth/auth.service.js";
 import { MfaService } from "../auth/mfa.service.js";
+import { ApiStatsService } from "../common/api-stats.service.js";
 import { DocumentsService } from "../documents/documents.service.js";
 import { JobsService } from "../jobs/jobs.service.js";
 import { OffersService } from "../jobs/offers.service.js";
@@ -39,6 +40,8 @@ export interface TickStats {
   otpRequestsPurged: number;
   /** Süresi dolan ikinci adım bekleyen girişler */
   mfaChallengesPurged: number;
+  /** 90 günden eski istek istatistiği saatleri (NFR-09) */
+  apiStatsPurged: number;
 }
 
 /** Periyodik görevlerin tek turu. Her adım tekrar çalıştırılabilir (idempotent). */
@@ -55,6 +58,7 @@ export class SchedulerService {
     private readonly documents: DocumentsService,
     private readonly auth: AuthService,
     private readonly mfa: MfaService,
+    private readonly apiStats: ApiStatsService,
   ) {}
 
   async tick(now = new Date()): Promise<TickStats> {
@@ -71,6 +75,7 @@ export class SchedulerService {
     const documentsExpired = await this.documents.processExpired(now);
     const otpRequestsPurged = await this.auth.purgeOtpRequests(now);
     const mfaChallengesPurged = await this.mfa.purgeChallenges(now);
-    return { ...confirmation, capacityExpired, matchSwept, offersClosed, jobsCompleted, ratingsRevealed, deletionsFinished, deletedLinksExpired, frozenClosed, documentsExpired, otpRequestsPurged, mfaChallengesPurged };
+    const apiStatsPurged = await this.apiStats.purge(now);
+    return { ...confirmation, capacityExpired, matchSwept, offersClosed, jobsCompleted, ratingsRevealed, deletionsFinished, deletedLinksExpired, frozenClosed, documentsExpired, otpRequestsPurged, mfaChallengesPurged, apiStatsPurged };
   }
 }

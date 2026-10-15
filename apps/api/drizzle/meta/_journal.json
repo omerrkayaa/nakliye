@@ -183,6 +183,20 @@
       "when": 1792063282858,
       "tag": "0025_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792076649808,
+      "tag": "0026_geography_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1792077081369,
+      "tag": "0027_api_request_stats",
+      "breakpoints": true
     }
   ]
 }

@@ -31,6 +31,9 @@ export const phoneSchema = z
   .refine((s) => /^5\d{9}$/.test(s), "Geçerli bir cep telefonu numarası girin")
   .transform((s) => `+90${s}`);
 
+/** Sayfa numarası: üst sınırsız değer OFFSET'te bigint'i taşırıp 500 veriyordu (2026-10-15); 10.000 × 20 = 200.000 kayıt */
+const pageField = z.coerce.number().int().min(1).max(10_000, "Sayfa en çok 10.000 olabilir").default(1);
+
 export const isoDaySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tarih YYYY-AA-GG olmalı");
 
 export const otpRequestSchema = z.object({ phone: phoneSchema });
@@ -173,7 +176,7 @@ export const closeLoadSchema = z.object({ reason: z.enum(["arac_bulundu", "iptal
 /** BR-11: yönetici moderasyon kararı. */
 export const reviewLoadSchema = z.object({ decision: z.enum(["onay", "ret"]) });
 
-export const pageSchema = z.object({ page: z.coerce.number().int().min(1).default(1) });
+export const pageSchema = z.object({ page: pageField });
 
 export const createCapacitySchema = z
   .object({
@@ -219,7 +222,7 @@ export const loadSearchSchema = z.object({
     .refine((p) => Math.abs(p.lat) <= 90 && Math.abs(p.lng) <= 180, "Geçersiz konum")
     .optional(),
   radiusKm: z.coerce.number().min(5).max(200).default(50),
-  page: z.coerce.number().int().min(1).default(1),
+  page: pageField,
 });
 
 export const confirmLoadSchema = z.object({ answer: z.enum(CONFIRMATION_ANSWERS) });
@@ -241,7 +244,7 @@ export const disputeJobSchema = reasonSchema;
 export const jobListSchema = z.object({
   /** active: sürenler (teslim edildi dahil), past: tamamlanan/iptal/itirazlı */
   scope: z.enum(["active", "past"]).default("active"),
-  page: z.coerce.number().int().min(1).default(1),
+  page: pageField,
 });
 
 export const deliverJobSchema = z.object({ code: z.string().regex(/^\d{6}$/) });
@@ -294,7 +297,7 @@ export const resolveReportSchema = z.object({
 });
 export const adminReportListSchema = z.object({
   status: z.enum(["acik", "kapali"]).default("acik"),
-  page: z.coerce.number().int().min(1).default(1),
+  page: pageField,
 });
 /** Yönetici itiraz kararı (BR-32 sonrası): teslim geçerli → tamamlandı, geçersiz → iptal. Not zorunlu (iki tarafa gider). */
 export const resolveDisputeSchema = z.object({
@@ -314,7 +317,7 @@ export const reviewDocumentSchema = z.discriminatedUnion("decision", [
 ]);
 export const adminDocumentListSchema = z.object({
   status: z.enum(["bekliyor", "onay", "ret"]).default("bekliyor"),
-  page: z.coerce.number().int().min(1).default(1),
+  page: pageField,
 });
 /** F7 fiyat aralığı sorgusu: kalkış ve varış ilçesi + araç tipi */
 export const priceEstimateSchema = z.object({

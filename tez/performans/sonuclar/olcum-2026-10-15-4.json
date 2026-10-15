@@ -1,0 +1,124 @@
+{
+  "olcumTarihi": "2026-10-15T15:58:52.186Z",
+  "yedek": "nakliye-2026-10-15T15-56-06Z",
+  "ortam": {
+    "cpu": "12th Gen Intel(R) Core(TM) i7-12700H",
+    "cekirdek": 20,
+    "belllekGB": 32,
+    "node": "v24.18.0",
+    "es": 10,
+    "istek": 300
+  },
+  "aktifIlan": {
+    "teyitli": "9029",
+    "teyit_bekliyor": "971"
+  },
+  "listeleme": [
+    {
+      "name": "Filtresiz ilk sayfa",
+      "n": 300,
+      "errors": 0,
+      "p50": 50.9,
+      "p95": 66,
+      "p99": 148,
+      "max": 154.4,
+      "mean": 52.9,
+      "rps": 187
+    },
+    {
+      "name": "Kalkış ili (İzmir)",
+      "n": 300,
+      "errors": 0,
+      "p50": 56.1,
+      "p95": 68.6,
+      "p99": 84.8,
+      "max": 87.3,
+      "mean": 56.3,
+      "rps": 176
+    },
+    {
+      "name": "Varış ili + araç tipi (İstanbul, tır)",
+      "n": 300,
+      "errors": 0,
+      "p50": 52,
+      "p95": 65.8,
+      "p99": 81.1,
+      "max": 84.6,
+      "mean": 53.4,
+      "rps": 185
+    },
+    {
+      "name": "Yükleme günü",
+      "n": 300,
+      "errors": 0,
+      "p50": 15.6,
+      "p95": 24.4,
+      "p99": 30.7,
+      "max": 33.3,
+      "mean": 16.8,
+      "rps": 587
+    },
+    {
+      "name": "Yakınımdakiler (İzmir Konak, 50 km)",
+      "n": 300,
+      "errors": 0,
+      "p50": 71.3,
+      "p95": 123.2,
+      "p99": 204.7,
+      "max": 221.5,
+      "mean": 79.4,
+      "rps": 125
+    },
+    {
+      "name": "Derin sayfa (5. sayfa)",
+      "n": 300,
+      "errors": 0,
+      "p50": 47.6,
+      "p95": 60.4,
+      "p99": 73.7,
+      "max": 77.6,
+      "mean": 49.1,
+      "rps": 202
+    },
+    {
+      "name": "Karma (her istekte farklı süzgeç)",
+      "n": 300,
+      "errors": 0,
+      "p50": 52.6,
+      "p95": 66.1,
+      "p99": 73.3,
+      "max": 74.8,
+      "mean": 49.5,
+      "rps": 199
+    }
+  ],
+  "eslesmeBildirimiMs": [
+    355,
+    324,
+    332,
+    248,
+    359,
+    396,
+    343,
+    335,
+    369,
+    377,
+    234,
+    199,
+    197,
+    219,
+    246,
+    219,
+    316,
+    348,
+    332,
+    365
+  ],
+  "nfr01": {
+    "listeP95Hedef": 300,
+    "listeP95EnKotu": 123.2,
+    "eslesmeHedefMs": 60000,
+    "eslesmeEnKotuMs": 396
+  },
+  "sureSn": 40
+}

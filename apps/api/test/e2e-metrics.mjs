@@ -125,5 +125,29 @@ check("gösterge: bu ay tamamlanan 1, süren 0", g.jobs.completed === 1 && g.job
 check("tamamlanan iş bu haftaya +1", lastOf(m5.weeklyClosed, "closed") === lastOf(m4.weeklyClosed, "closed") + 1, `${lastOf(m4.weeklyClosed, "closed")} → ${lastOf(m5.weeklyClosed, "closed")}`);
 
 psql(`update capacity_posts set status='iptal' where id='${K}'`);
+
+console.log("\nNFR-09 API sağlığı: istekler rota kalıbıyla saatlik toplanır; 4xx ve 5xx ayrı");
+const h0 = (await metrics()).api.last24h;
+const fakeId = "00000000-0000-4000-8000-000000000000";
+for (let i = 0; i < 25; i++) await api("GET", `/loads/${fakeId}`, C); // olmayan ilan: 404
+for (let i = 0; i < 5; i++) await api("GET", "/loads?page=0", C); // geçersiz sayfa: 400
+const big = await api("GET", "/loads?page=100000000000000000000", C);
+check("çok büyük sayfa numarası 400 (önceden veritabanında taşıp 500 veriyordu)", big.status === 400 && big.body.errors?.[0]?.message === "Sayfa en çok 10.000 olabilir", JSON.stringify(big.body));
+const m6 = await metrics();
+const h1 = m6.api.last24h;
+check("istek sayısı arttı (en az 31 istek)", h1.requests >= h0.requests + 31, `${h0.requests} → ${h1.requests}`);
+check("4xx en az 31 arttı, 5xx artmadı", h1.status4xx >= h0.status4xx + 31 && h1.status5xx === h0.status5xx, `4xx ${h0.status4xx} → ${h1.status4xx}, 5xx ${h0.status5xx} → ${h1.status5xx}`);
+// (Önceden "en yavaşlar listesinde" diye bakıyordu: tam turda ilk 5'i başka rotalar doldurunca kalıyordu)
+check("rota kalıbıyla (kimlik değil) toplandı", psql(`select count(*) from api_request_stats where route like '%${fakeId}%'`) === "0" && Number(psql(`select coalesce(sum(status_4xx), 0) from api_request_stats where method='GET' and route='/loads/:id' and hour = date_trunc('hour', now())`)) >= 25);
+check("oranlar ve yaklaşık p95 tutarlı", h1.errorRate !== null && h1.errorRate <= 1 && h1.clientErrorRate > 0 && (h1.p95Ms === null || [50, 100, 200, 300, 500, 1000, 3000].includes(h1.p95Ms)) && h1.maxMs >= 0, JSON.stringify(h1).slice(0, 200));
+check("DB'de saat × yöntem × rota satırı (istek başına değil)", Number(psql(`select requests from api_request_stats where method='GET' and route='/loads/:id' and hour = date_trunc('hour', now())`)) >= 25);
+check("bildirim okunma oranı alanları", typeof m6.notifications.created === "number" && m6.notifications.read <= m6.notifications.created && m6.notifications.windowDays === 30, JSON.stringify(m6.notifications));
+for (let i = 0; i < 15; i++) await api("GET", "/health");
+const h2 = (await metrics()).api.last24h;
+// Arada sayılan yalnız önceki metrik isteğinin kendisi (yanıttan sonra kaydedilir); sağlık sayılsaydı fark ≥ 16
+check("sağlık ucu istatistiğe katılmaz", h2.requests - h1.requests < 10, `${h1.requests} → ${h2.requests}`);
+const odd = await fetch(B + "/loads", { method: "MKCALENDAR" });
+const h3 = (await metrics()).api.last24h;
+check("bilinmeyen HTTP yöntemi (MKCALENDAR, sütundan uzun) toplu yazımı düşürmez", odd.status === 404 && h3.requests > h2.requests && Number(psql(`select coalesce(sum(requests), 0) from api_request_stats where method='DİĞER' and hour = date_trunc('hour', now())`)) >= 1, `${odd.status} · ${h2.requests} → ${h3.requests}`);
 console.log(`\nSonuç: ${pass} geçti, ${fail} kaldı`);
 process.exitCode = fail ? 1 : 0;

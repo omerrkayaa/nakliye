@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { api } from "@/lib/api";
-import type { AdminMetrics } from "@/lib/types";
+import type { AdminMetrics, ApiHealth } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Metrikler" };
 
@@ -50,6 +50,8 @@ async function Metrics() {
         />
       </div>
 
+      <ApiHealthSection a={m.api} notifications={m.notifications} />
+
       <Columns
         title="Haftalık kapanan yük"
         subtitle="Son 8 hafta, pazartesi başlangıçlı"
@@ -63,6 +65,70 @@ async function Metrics() {
         points={m.dailyLoads.map((d) => ({ key: d.day, label: short(d.day), value: d.loads }))}
       />
     </div>
+  );
+}
+
+const ms = (v: number | null) => (v === null ? "> 3 sn" : `≤ ${v.toLocaleString("tr-TR")} ms`);
+const rate = (r: number | null) => (r === null ? "—" : `%${(r * 100).toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`);
+
+/** NFR-09: API hata oranı (5xx), istemci hataları (4xx), yaklaşık p95; bildirim okunma oranı (push teslimi FCM gelince) */
+function ApiHealthSection({ a, notifications }: { a: AdminMetrics["api"]; notifications: AdminMetrics["notifications"] }) {
+  const tile = (h: ApiHealth, label: string) => (
+    <Tile
+      label={`API hata oranı (5xx, ${label})`}
+      value={rate(h.errorRate)}
+      note={`${h.requests.toLocaleString("tr-TR")} istek · ${h.status5xx} sunucu hatası · 4xx ${rate(h.clientErrorRate)} · p95 ${h.requests ? ms(h.p95Ms) : "—"}`}
+    />
+  );
+  const rows = [...a.last7d.topErrors, ...a.last7d.slowest.filter((s) => !a.last7d.topErrors.some((e) => e.method === s.method && e.route === s.route))];
+  return (
+    <section className="space-y-3" aria-labelledby="api-saglik">
+      <div>
+        <h2 id="api-saglik" className="text-lg font-semibold">
+          API sağlığı
+        </h2>
+        <p className="text-sm text-muted-foreground">Her isteğin rotası, durum kodu ve süresi saatlik toplanır. 4xx çoğunlukla olağandır (süresi dolan oturum, olmayan kayıt); asıl ölçüt 5xx.</p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3" data-testid="api-health">
+        {tile(a.last24h, "24 saat")}
+        {tile(a.last7d, "7 gün")}
+        <Tile
+          label="Bildirim okunma oranı"
+          value={pct(notifications.readRate)}
+          note={`${notifications.read} / ${notifications.created} uygulama içi bildirim · son ${notifications.windowDays} gün (push teslimi FCM ile ölçülecek)`}
+        />
+      </div>
+      {rows.length > 0 && (
+        // Dar ekranda yatay kayar; klavyeyle de kaydırılabilsin diye odaklanabilir bölge (WCAG 2.1.1)
+        <div className="overflow-x-auto rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none" tabIndex={0} role="region" aria-label="Rota tablosu">
+          <table className="w-full min-w-[32rem] text-sm">
+            <caption className="mb-2 text-left text-muted-foreground">Son 7 gün: hata veren ve en yavaş rotalar (en az 20 istek)</caption>
+            <thead>
+              <tr className="border-b text-left">
+                <th scope="col" className="py-2 pr-4 font-medium">Rota</th>
+                <th scope="col" className="py-2 pr-4 text-right font-medium">İstek</th>
+                <th scope="col" className="py-2 pr-4 text-right font-medium">5xx</th>
+                <th scope="col" className="py-2 pr-4 text-right font-medium">4xx</th>
+                <th scope="col" className="py-2 text-right font-medium">p95</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={`${r.method} ${r.route}`} className="border-b last:border-0">
+                  <td className="py-2 pr-4 font-mono text-xs">
+                    {r.method} {r.route}
+                  </td>
+                  <td className="py-2 pr-4 text-right tabular-nums">{r.requests.toLocaleString("tr-TR")}</td>
+                  <td className="py-2 pr-4 text-right tabular-nums">{r.status5xx}</td>
+                  <td className="py-2 pr-4 text-right tabular-nums">{r.status4xx}</td>
+                  <td className="py-2 text-right tabular-nums">{ms(r.p95Ms)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 

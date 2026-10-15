@@ -1,6 +1,8 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
+import type { NextFunction, Request, Response } from "express";
+import { ApiStatsService } from "./common/api-stats.service.js";
 import { AppModule } from "./app.module.js";
 
 async function bootstrap() {
@@ -24,6 +26,13 @@ async function bootstrap() {
   const trust = process.env.TRUST_PROXY ?? "loopback";
   app.set("trust proxy", trust === "false" ? false : trust === "true" ? true : /^\d+$/.test(trust) ? Number(trust) : trust);
   app.setGlobalPrefix("api/v1");
+  // NFR-09: her isteğin rota kalıbı, durum kodu ve süresi (yanıt bitince; Express eşleşen rotayı req.route'a yazar)
+  const stats = app.get(ApiStatsService);
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const started = performance.now();
+    res.on("finish", () => stats.record(req.method, (req.route as { path?: string } | undefined)?.path, res.statusCode, performance.now() - started));
+    next();
+  });
   // Kapanışta zamanlayıcı (pg-boss) düzgün dursun
   app.enableShutdownHooks();
   app.enableCors({ origin: process.env.WEB_ORIGIN?.split(",") ?? true });

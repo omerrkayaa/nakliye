@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { sql } from "drizzle-orm";
+import { ApiStatsService } from "../common/api-stats.service.js";
 import { DB, type Db } from "../db/db.module.js";
 
 const TZ = "Europe/Istanbul";
@@ -19,7 +20,10 @@ const ratio = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 1000) / 10
  */
 @Injectable()
 export class MetricsService {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly apiStats: ApiStatsService,
+  ) {}
 
   async metrics() {
     const weekly = await this.db.execute<{ week: string; closed: number }>(sql`
@@ -76,7 +80,15 @@ export class MetricsService {
       `)
     ).rows;
 
+    // NFR-09 bildirim teslimi: gerçek push (FCM) yokken teslim ölçülemez; uygulama içi bildirimin okunma oranı vekil ölçüt
+    const [notif] = (
+      await this.db.execute<{ created: number; read: number }>(sql`
+        select count(*)::int as created, count(read_at)::int as read from notifications where created_at >= now() - make_interval(days => ${WINDOW_DAYS})
+      `)
+    ).rows;
     return {
+      api: { last24h: await this.apiStats.summary(24), last7d: await this.apiStats.summary(24 * 7) },
+      notifications: { windowDays: WINDOW_DAYS, created: notif!.created, read: notif!.read, readRate: ratio(notif!.read, notif!.created) },
       weeklyClosed: weekly.rows,
       dailyLoads: daily.rows,
       live: { visible: live!.visible, fresh: live!.fresh, freshness: ratio(live!.fresh, live!.visible) },
