@@ -13,7 +13,9 @@
     "db:seed": "node scripts/seed-locations.mts",
     "data:locations": "node scripts/fetch-locations.mts",
     "test:e2e": "node test/run-all.mjs api.log",
-    "db:seed-demo": "node scripts/seed-demo.mts"
+    "db:seed-demo": "node scripts/seed-demo.mts",
+    "db:backup": "node scripts/backup.mjs",
+    "db:backup:check": "node scripts/backup.mjs --check"
   },
   "dependencies": {
     "@nakliye/shared": "*",

@@ -14,6 +14,8 @@ infra/data/
 apps/api/scripts/.cache/
 # Belge dosyaları (yerel disk deposu, FR-05): kişisel veri, depoya girmez
 apps/api/storage/
+# NFR-08 yedekleri (npm run db:backup): kişisel veri içerir, depoya girmez
+backups/
 
 # Tez simülasyonu deneme çalıştırmaları (--tohum / --haversine); asıl sonuçlar sonuclar/ altında commit edilir
 tez/simulasyon/sonuclar/deneme-*/
