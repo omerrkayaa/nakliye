@@ -14,6 +14,18 @@ const summary = async () => (await api<RouteSummary>("GET", "/public/routes/9/34
 const money = new Intl.NumberFormat("tr-TR");
 const activeText = (n: number) => (n > 0 ? `Şu an yayında ${n} ilan` : "Şu an yayında ilan yok");
 
+/** Önizleme görseli: og:image adresi 1200×630 PNG döner (PNG imzası ve IHDR'deki ölçü) */
+async function expectOgImage(p: import("@playwright/test").Page) {
+  const src = await p.locator('meta[property="og:image"]').getAttribute("content");
+  expect(src).toBeTruthy();
+  const img = await p.request.get(src!);
+  expect(img.status()).toBe(200);
+  expect(img.headers()["content-type"]).toBe("image/png");
+  const b = Buffer.from(await img.body());
+  expect(b.subarray(1, 4).toString()).toBe("PNG");
+  expect([b.readUInt32BE(16), b.readUInt32BE(20)]).toEqual([1200, 630]);
+}
+
 test("güzergâh sayfası: başlık, önizleme etiketleri, ilan sayısı ve fiyat tablosu API ile aynı", async ({ page }) => {
   const s = await summary();
   const res = await page.goto("/nakliye/aydin-istanbul");
@@ -23,6 +35,7 @@ test("güzergâh sayfası: başlık, önizleme etiketleri, ilan sayısı ve fiya
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "http://localhost:3001/nakliye/aydin-istanbul");
   await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", /Aydın → İstanbul yük taşıma/);
   await expect(page.locator('meta[name="robots"]')).toHaveCount(0); // arama motoruna açık (paylaşım sayfasının aksine)
+  await expectOgImage(page);
   await expect(page.getByTestId("active-loads")).toHaveText(activeText(s.activeLoads));
 
   const rows = page.getByTestId("price-table").locator("tbody tr");
@@ -75,7 +88,8 @@ test("ilan sayısı istek anında: yayına çıkan ilan sayfada görünür, kapa
 });
 
 test("listede olmayan güzergâh 404", async ({ page }) => {
-  for (const path of ["/nakliye/aydin-antalya", "/nakliye/aydin-aydin", "/nakliye/aydin"]) {
+  // Görsel alt yolu yalnız listedeki güzergâhta (proxy); başka alt yol da 404
+  for (const path of ["/nakliye/aydin-antalya", "/nakliye/aydin-aydin", "/nakliye/aydin", "/nakliye/aydin-antalya/opengraph-image", "/nakliye/aydin-istanbul/baska"]) {
     const res = await page.goto(path);
     expect(res?.status(), path).toBe(404);
   }

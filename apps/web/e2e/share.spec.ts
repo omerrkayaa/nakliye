@@ -5,6 +5,18 @@ import { adminToken, api, apiUser, createLoad, phone } from "./helpers";
 
 const BASE = "http://localhost:3001";
 
+/** Önizleme görseli: og:image adresi 1200×630 PNG döner (PNG imzası ve IHDR'deki ölçü) */
+async function expectOgImage(p: import("@playwright/test").Page) {
+  const src = await p.locator('meta[property="og:image"]').getAttribute("content");
+  expect(src).toBeTruthy();
+  const img = await p.request.get(src!);
+  expect(img.status()).toBe(200);
+  expect(img.headers()["content-type"]).toBe("image/png");
+  const b = Buffer.from(await img.body());
+  expect(b.subarray(1, 4).toString()).toBe("PNG");
+  expect([b.readUInt32BE(16), b.readUInt32BE(20)]).toEqual([1200, 630]);
+}
+
 test("girişsiz paylaşım sayfası: ilan bilgisi, önizleme kartı, numara yok; panelde WhatsApp ve kopyala", async ({ browser }) => {
   const admin = await adminToken(904);
   const S = await apiUser(phone(401), "shipper", "Paylaşan Firma");
@@ -24,6 +36,7 @@ test("girişsiz paylaşım sayfası: ilan bilgisi, önizleme kartı, numara yok;
   await expect(p.locator('meta[property="og:title"]')).toHaveAttribute("content", "Menteşe, Muğla → Muratpaşa, Antalya");
   await expect(p.locator('meta[property="og:description"]')).toHaveAttribute("content", /yükleme · 7 ton Palet · Kamyon · 12\.500 ₺$/);
   await expect(p.locator('meta[property="og:url"]')).toHaveAttribute("content", url);
+  await expectOgImage(p);
   await expect(p.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
   await p.setViewportSize({ width: 390, height: 844 });
   expect(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

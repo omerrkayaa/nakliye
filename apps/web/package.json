@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
+    "@fontsource/inter": "^5.2.8",
     "@nakliye/shared": "*",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",

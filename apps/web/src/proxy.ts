@@ -16,7 +16,10 @@ export async function proxy(req: NextRequest) {
   // başladığı için 200 (+ noindex) döndürür ve her rastgele adresi önbelleğe yazar; olmayan bir yola yeniden
   // yazınca Next'in 404 sayfası 404 durumuyla gelir.
   if (req.nextUrl.pathname.startsWith("/nakliye/")) {
-    return routePage(req.nextUrl.pathname.slice("/nakliye/".length)) ? NextResponse.next() : NextResponse.rewrite(new URL("/404", req.url));
+    // Sayfa ya da önizleme görseli (/nakliye/<güzergâh>/opengraph-image)
+    const [slug, ...sub] = req.nextUrl.pathname.slice("/nakliye/".length).split("/");
+    const known = routePage(slug!) && (sub.length === 0 || (sub.length === 1 && sub[0] === "opengraph-image"));
+    return known ? NextResponse.next() : NextResponse.rewrite(new URL("/404", req.url));
   }
   const access = req.cookies.get(ACCESS_COOKIE)?.value;
   const refresh = req.cookies.get(REFRESH_COOKIE)?.value;
