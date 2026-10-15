@@ -73,7 +73,7 @@ export default function KvkkPage() {
           üçüncü kişileri bilme, eksik ya da yanlış işlenmişse düzeltilmesini, silinmesini ya da yok edilmesini isteme, itiraz etme ve zarara
           uğradıysanız giderilmesini talep etme haklarına sahipsiniz. Verilerinizi panelde Hesap sayfasından (mobil uygulamada Profil’den)
           indirebilir, hesabınızı silebilirsiniz. Diğer başvurularınızı{" "}
-          <a href="/iletisim" className="text-primary underline-offset-4 hover:underline">
+          <a href="/iletisim" className="text-primary underline underline-offset-4">
             iletişim sayfasındaki
           </a>{" "}
           kanallardan iletebilirsiniz.

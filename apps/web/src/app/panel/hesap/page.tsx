@@ -20,7 +20,7 @@ export default function AccountPage() {
         <h1 className="text-2xl font-bold">Hesap ve veriler</h1>
         <p className="text-muted-foreground">
           Kişisel verileriniz üzerindeki haklarınız için{" "}
-          <Link href="/kvkk" className="text-primary underline-offset-4 hover:underline">
+          <Link href="/kvkk" className="text-primary underline underline-offset-4">
             aydınlatma metnine
           </Link>{" "}
           bakın.
@@ -61,7 +61,7 @@ export default function AccountPage() {
         </h2>
         <p className="text-sm">
           Yalnız ara vermek istiyorsanız{" "}
-          <a href="#dondur" className="text-primary underline-offset-4 hover:underline">
+          <a href="#dondur" className="text-primary underline underline-offset-4">
             hesabınızı dondurun
           </a>
           .

@@ -120,7 +120,7 @@ export default function IlanimDetay() {
           ) : (
             // API ucuzdan pahalıya sıralı döner (P5 ile aynı)
             offers.data.items.map((o) => (
-              <Card key={o.id} style={o.status === "beklemede" ? undefined : { opacity: 0.7 }}>
+              <Card key={o.id} style={o.status === "beklemede" ? undefined : { backgroundColor: C.idleBg }}>
                 <Text style={{ fontSize: 22, fontWeight: "800", color: C.text }}>{tl(o.price)}</Text>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
                   <Text style={[s.text, { fontWeight: "600" }]}>{o.carrier.displayName ?? "Nakliyeci"}</Text>

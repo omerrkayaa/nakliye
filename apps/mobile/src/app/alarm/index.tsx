@@ -63,7 +63,7 @@ export default function Alarmlar() {
         </View>
       }
       renderItem={({ item: a }) => (
-        <Card style={a.active ? undefined : { opacity: 0.7 }}>
+        <Card style={a.active ? undefined : { backgroundColor: C.idleBg }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <View style={{ flex: 1, gap: 4 }}>
               <Text style={[s.text, { fontWeight: "700" }]}>{routeText(a)}</Text>

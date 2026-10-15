@@ -75,7 +75,7 @@ export default function Donus() {
       }
       renderItem={({ item: c }) => (
         <Pressable accessibilityRole="button" accessibilityLabel={`Boş araç: ${capacityRoute(c)}`} onPress={() => router.push(`/bos-arac/${c.id}`)}>
-          <Card style={c.status !== "aktif" ? { opacity: 0.7 } : undefined}>
+          <Card style={c.status !== "aktif" ? { backgroundColor: C.idleBg } : undefined}>
             <Text style={[s.text, { fontWeight: "700" }]}>{capacityRoute(c)}</Text>
             <Muted>
               {dayRange(c.availableFrom, c.availableTo)} · {c.vehicle.plate}

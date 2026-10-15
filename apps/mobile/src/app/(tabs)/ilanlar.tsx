@@ -51,7 +51,7 @@ export default function Ilanlar() {
               {dayRange(l.loadFrom, l.loadTo)} · {l.weightTon} ton
             </Muted>
             <LoadStatusBadge load={l} />
-            {l.pendingOffers > 0 && <Text style={{ fontSize: 16, fontWeight: "700", color: C.accent }}>{l.pendingOffers} teklif bekliyor</Text>}
+            {l.pendingOffers > 0 && <Text style={{ fontSize: 16, fontWeight: "700", color: C.accentText }}>{l.pendingOffers} teklif bekliyor</Text>}
           </Pressable>
           {VISIBLE_LOAD_STATUSES.includes(l.status) && <Button title="Hâlâ geçerli" icon="checkmark" variant="outline" busy={busyId === l.id} onPress={() => stillValid(l)} />}
         </Card>

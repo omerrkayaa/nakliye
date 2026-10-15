@@ -45,7 +45,7 @@ async function Queue({ searchParams }: Pick<PageProps<"/panel/yonetim/moderasyon
             {l.note && <p className="text-sm text-muted-foreground">Not: {l.note}</p>}
             <p className="text-sm">
               {l.shipper.displayName ?? "Adsız"} ·{" "}
-              <Link href={`/panel/yonetim/kullanicilar?q=${encodeURIComponent(phoneText(l.shipperPhone))}`} className="text-primary underline-offset-4 hover:underline">
+              <Link href={`/panel/yonetim/kullanicilar?q=${encodeURIComponent(phoneText(l.shipperPhone))}`} className="text-primary underline underline-offset-4">
                 {phoneText(l.shipperPhone)}
               </Link>
             </p>

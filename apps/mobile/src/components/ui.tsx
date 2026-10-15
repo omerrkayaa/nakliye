@@ -23,7 +23,7 @@ export function Button({
   style?: ViewStyle;
 }) {
   const bg = { primary: C.primary, accent: C.accent, call: C.call, outline: C.card, danger: C.card }[variant];
-  const fg = { primary: C.primaryText, accent: "#FFFFFF", call: "#FFFFFF", outline: C.primary, danger: C.danger }[variant];
+  const fg = { primary: C.primaryText, accent: C.accentOn, call: "#FFFFFF", outline: C.primary, danger: C.danger }[variant];
   const off = disabled || busy;
   return (
     <Pressable

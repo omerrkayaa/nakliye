@@ -8,7 +8,7 @@ import { dayText } from "@/lib/format";
 import { C } from "@/lib/theme";
 import type { JobDetail, RatingView } from "@/lib/types";
 
-const Stars = ({ n }: { n: number }) => <Text style={{ color: C.accent, fontSize: 18 }}>{"★".repeat(n) + "☆".repeat(5 - n)}</Text>;
+const Stars = ({ n }: { n: number }) => <Text style={{ color: C.accentText, fontSize: 18 }}>{"★".repeat(n) + "☆".repeat(5 - n)}</Text>;
 
 function RatingLine({ title, r }: { title: string; r: RatingView }) {
   return (
@@ -70,7 +70,7 @@ export function RatingSection({ job, onRated }: { job: JobDetail; onRated: () =>
                   onPress={() => setStars(n)}
                   style={{ width: 48, height: 48, alignItems: "center", justifyContent: "center" }}
                 >
-                  <Ionicons name={n <= stars ? "star" : "star-outline"} size={34} color={n <= stars ? C.accent : C.muted} />
+                  <Ionicons name={n <= stars ? "star" : "star-outline"} size={34} color={n <= stars ? C.accentText : C.muted} />
                 </Pressable>
               ))}
             </View>

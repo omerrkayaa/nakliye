@@ -20,7 +20,7 @@ export function NotificationBell() {
         <View
           style={{ position: "absolute", top: 6, right: 4, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: C.accent, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 }}
         >
-          <Text style={{ color: "#FFFFFF", fontSize: 11, fontWeight: "700" }}>{unread > 99 ? "99+" : unread}</Text>
+          <Text style={{ color: C.accentOn, fontSize: 11, fontWeight: "700" }}>{unread > 99 ? "99+" : unread}</Text>
         </View>
       )}
     </Pressable>
