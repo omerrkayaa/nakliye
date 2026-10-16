@@ -8,7 +8,7 @@ import { Picker } from "@/components/picker";
 import { Badge, Button, Chip, Status } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { readFeed, saveFeed } from "@/lib/feed-cache";
+import { readFeed, readRoute, saveFeed, saveRoute } from "@/lib/feed-cache";
 import { ago } from "@/lib/format";
 import { useProvinces } from "@/lib/provinces";
 import { C } from "@/lib/theme";
@@ -29,6 +29,8 @@ function Yukler() {
   const [from, setFrom] = useState<number | null>(null);
   const [to, setTo] = useState<number | null>(null);
   const [vehicle, setVehicle] = useState<VehicleType | null>(null);
+  // Son seçilen rota cihazdan okunana kadar liste istenmez (önce filtresiz sonra filtreli iki istek ve titreme olmasın)
+  const [routeReady, setRouteReady] = useState(false);
   const [items, setItems] = useState<Load[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -51,13 +53,13 @@ function Yukler() {
         setPage(p);
         setHasMore(res.hasMore);
         setStaleAt(null);
-        if (p === 1 && !from && !to && !vehicle) void saveFeed(res.items);
+        if (p === 1) void saveFeed({ from, to, vehicle }, res.items);
       } catch (e) {
         setError(e instanceof ApiError ? e.message : "Yükler alınamadı");
         if (p === 1) {
           // İlk sayfa gelmediyse eldeki liste bu filtreye ait değil: göstermeye devam etme.
-          // Bağlantı yoksa filtresiz görünümde son kayıtlı liste gösterilir (filtreliyken kayıt filtreye uymaz).
-          const cached = e instanceof ApiError && e.status === 0 && !from && !to && !vehicle ? await readFeed() : null;
+          // Bağlantı yoksa son kayıtlı liste yalnız aynı filtreyle alındıysa gösterilir (hatırlanan rotada da çalışsın).
+          const cached = e instanceof ApiError && e.status === 0 ? await readFeed({ from, to, vehicle }) : null;
           setItems(cached?.items ?? []);
           setHasMore(false);
           setStaleAt(cached?.at ?? null);
@@ -69,11 +71,23 @@ function Yukler() {
     [from, to, vehicle],
   );
 
+  // Son seçilen Nereden/Nereye (NFR-07: aynı güzergâhta çalışan şoför rotayı her açılışta yeniden seçmesin)
+  useEffect(() => {
+    void readRoute().then((r) => {
+      setFrom(r.from);
+      setTo(r.to);
+      setRouteReady(true);
+    });
+  }, []);
+  useEffect(() => {
+    if (routeReady) void saveRoute({ from, to });
+  }, [routeReady, from, to]);
+
   // Filtre değişince ilk sayfayı çek (istek dış sistemle eşitleme; yükleniyor durumu burada açılır)
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void load(1);
-  }, [load]);
+    if (routeReady) void load(1);
+  }, [load, routeReady]);
 
   const canCall = me?.roles.includes("carrier");
 

@@ -1,6 +1,6 @@
 {
   "platform": "mobil",
-  "at": "2026-10-16T11:28:48.159Z",
+  "at": "2026-10-16T11:53:33.131Z",
   "klm": {
     "K": 0.28,
     "Kslow": 1.2,
@@ -15,9 +15,9 @@
   "keys": 0,
   "steps": 2,
   "homes": 0,
-  "systemSec": 0.2,
-  "typicalSec": 6.8,
-  "slowSec": 6.8,
+  "systemSec": 0.3,
+  "typicalSec": 6.9,
+  "slowSec": 6.9,
   "path": [
     "Kartı aç",
     "Detayda Ara",

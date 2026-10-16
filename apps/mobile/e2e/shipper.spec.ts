@@ -21,7 +21,8 @@ test("yük sahibi: giriş → ilan → teyit → teklif kabul → teslim → pua
     await vis(page, "SMS kodu gönder").click();
     await page.getByLabel("SMS kodu").locator("visible=true").fill(await otpFor(me));
     await vis(page, "Giriş yap").click();
-    await vis(page, "Nakliyeciyim (aracım var)").click(); // varsayılan seçili: kaldır
+    // Hiçbir rol önceden seçili değil: seçim yapılana kadar Devam pasif
+    await expect(btn(page, "Devam")).toBeDisabled();
     await vis(page, "Yük sahibiyim (yük veriyorum)").click();
     await vis(page, "Devam").click();
     await expect(vis(page, /^Henüz ilanınız yok/)).toBeVisible({ timeout: 20_000 });

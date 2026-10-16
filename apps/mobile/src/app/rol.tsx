@@ -5,10 +5,11 @@ import { Button, Card, Chip, ErrorText, Muted, s } from "@/components/ui";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
-/** A3 — Rol seçimi: nakliyeci ve/veya yük sahibi */
+/** A3 — Rol seçimi: nakliyeci ve/veya yük sahibi. Hiçbiri önceden seçili değil: yük sahibi nakliyeci seçimini kaldırmak
+ * zorunda kalıyordu, fark etmezse iki rolle devam ediyordu (NFR-07 ölçümü). */
 export default function Rol() {
   const { addRoles } = useAuth();
-  const [roles, setRoles] = useState<Role[]>(["carrier"]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 

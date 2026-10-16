@@ -142,6 +142,7 @@ export default function Giris() {
                 <Field
                   label="Doğrulama uygulamasındaki kod"
                   placeholder="6 haneli kod"
+                  autoFocus
                   autoComplete="one-time-code"
                   textContentType="oneTimeCode"
                   autoCapitalize="characters"
@@ -169,6 +170,7 @@ export default function Giris() {
                 <Field
                   label="SMS kodu"
                   placeholder="______"
+                  autoFocus
                   keyboardType="number-pad"
                   autoComplete="sms-otp"
                   textContentType="oneTimeCode"

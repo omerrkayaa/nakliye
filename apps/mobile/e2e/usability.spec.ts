@@ -46,7 +46,6 @@ test("ilk ilan: yeni yük sahibi uygulamayı açtıktan sonra ilanını gönderi
   await u.type(code, await otpFor(me));
   await u.tap(vis(page, "Giriş yap"));
   u.step("Rol: yük sahibi");
-  await u.tap(vis(page, "Nakliyeciyim (aracım var)")); // varsayılan seçili: kaldırılır
   await u.tap(vis(page, "Yük sahibiyim (yük veriyorum)"));
   await u.tap(vis(page, "Devam"));
   u.step("İlan ver");
@@ -105,6 +104,17 @@ test("aramadan aramaya: nakliyeci yük akışından yük sahibini arar (< 3 doku
   u.outsideTap("Telefonun arama ekranında ara");
   const route = u.result("Kalkış ili seçip karttan arama");
 
+  // b2) Uygulama yeniden açılınca son rota hatırlanır: yük akışı o rotayla gelir
+  await page.reload();
+  await expect(btn(page, "Nereden: Aydın")).toBeVisible({ timeout: 20_000 });
+  await expect(vis(page, /, Aydın$/).first()).toBeVisible();
+  u = new Ops(false);
+  u.step("Kartta Ara");
+  await u.tap(vis(page, "Ara", true).first());
+  await called(3);
+  u.outsideTap("Telefonun arama ekranında ara");
+  const remembered = u.result("Hatırlanan rotayla (uygulama yeniden açılınca) karttan arama");
+
   // c) Kartı açıp yük detayından
   u = new Ops(false);
   u.step("Kartı aç");
@@ -112,12 +122,14 @@ test("aramadan aramaya: nakliyeci yük akışından yük sahibini arar (< 3 doku
   await expect(vis(page, "Yük sahibi", true)).toBeVisible();
   u.step("Detayda Ara");
   await u.tap(vis(page, "Ara", true));
-  await called(3);
+  await called(4);
   u.outsideTap("Telefonun arama ekranında ara");
   const detail = u.result("Yük detayından arama");
 
   report("mobil", "arama-akistan", feed);
   report("mobil", "arama-rotayla", route);
+  report("mobil", "arama-hatirlanan-rotayla", remembered);
   report("mobil", "arama-detaydan", detail);
   expect(feed.taps + feed.outsideTaps).toBeLessThan(3);
+  expect(remembered.taps + remembered.outsideTaps).toBeLessThan(3);
 });

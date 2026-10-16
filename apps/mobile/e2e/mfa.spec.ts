@@ -25,7 +25,8 @@ test("yönetici: SMS kodu → uygulama kodu (yanlış kod hatası) → giriş", 
   await expect(vis(page, "Kod hatalı")).toBeVisible();
   await totpInput.fill(totp(secret));
   await vis(page, "Doğrula", true).click();
-  // Yalnız yönetici rolü var: rol seçimi (nakliyeci varsayılan) → sekmeler
+  // Yalnız yönetici rolü var: rol seçimi (nakliyeci) → sekmeler
+  await vis(page, "Nakliyeciyim (aracım var)").click();
   await vis(page, "Devam").click();
   await expect(page.getByRole("tab", { name: /Profil/ })).toBeVisible({ timeout: 20_000 });
   // Kasıtlı yanlış kodun 401 yanıtını tarayıcı konsola yazar; başka hata olmamalı

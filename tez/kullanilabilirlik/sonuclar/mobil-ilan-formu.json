@@ -1,6 +1,6 @@
 {
   "platform": "mobil",
-  "at": "2026-10-16T11:28:44.953Z",
+  "at": "2026-10-16T11:53:28.957Z",
   "klm": {
     "K": 0.28,
     "Kslow": 1.2,
@@ -15,9 +15,9 @@
   "keys": 14,
   "steps": 8,
   "homes": 0,
-  "systemSec": 3.4,
-  "typicalSec": 33.7,
-  "slowSec": 46.6,
+  "systemSec": 3.3,
+  "typicalSec": 33.6,
+  "slowSec": 46.5,
   "path": [
     "Kalkış ili",
     "Kalkış ilçesi",

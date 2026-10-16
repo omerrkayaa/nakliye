@@ -225,6 +225,40 @@ test("çevrimdışı: son kayıtlı yük listesi ve uyarı", async ({ page, cont
   await expect(vis(page, /^Çevrimdışısınız/)).toHaveCount(0);
 });
 
+test("son rota hatırlanır: yeniden açılışta süzülü akış, çevrimdışıyken o rotanın listesi; Her yer seçilince unutulur", async ({ page, context }) => {
+  const errors = collectErrors(page);
+  await demoLogin(page);
+  await btn(page, "Nereden: Her yer").click();
+  await page.getByLabel("Nereden ara").locator("visible=true").fill("ayd");
+  await btn(page, "Aydın", true).click();
+  await expect(vis(page, /, Aydın$/).first()).toBeVisible();
+  const cards = await vis(page, /^Teyitli ·/).count();
+
+  // Uygulama yeniden açılınca rota yerinde ve liste o rotayla gelir
+  await page.reload();
+  await expect(btn(page, "Nereden: Aydın")).toBeVisible({ timeout: 20_000 });
+  await expect(btn(page, "Nereye: Her yer")).toBeVisible();
+  await expect(vis(page, /, Aydın$/).first()).toBeVisible();
+  expect(await vis(page, /^Teyitli ·/).count()).toBe(cards);
+
+  // Çevrimdışı: hatırlanan rotanın son listesi gösterilir (başka süzgeçte gösterilmez)
+  await context.setOffline(true);
+  await vis(page, "Tır", true).first().click();
+  await expect(vis(page, /^Çevrimdışısınız/)).toHaveCount(0);
+  await vis(page, "Tır", true).first().click();
+  await expect(vis(page, /^Çevrimdışısınız · son güncelleme/)).toBeVisible();
+  expect(await vis(page, /^Teyitli ·/).count()).toBe(cards);
+  await context.setOffline(false);
+
+  // "Her yer" seçilince rota unutulur
+  await btn(page, "Nereden: Aydın").click();
+  await btn(page, "Her yer", true).click();
+  await expect(btn(page, "Nereden: Her yer")).toBeVisible();
+  await page.reload();
+  await expect(btn(page, "Nereden: Her yer")).toBeVisible({ timeout: 20_000 });
+  expect(errors.filter((e) => !e.includes("ERR_INTERNET_DISCONNECTED"))).toEqual([]);
+});
+
 test("ilan şikayeti: sebep zorunlu, açıklamayla gönderilir, yönetici kuyruğuna düşer", async ({ page }) => {
   const errors = collectErrors(page);
   await demoLogin(page);

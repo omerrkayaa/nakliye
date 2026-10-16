@@ -1,6 +1,6 @@
 {
   "platform": "mobil",
-  "at": "2026-10-16T11:28:48.158Z",
+  "at": "2026-10-16T11:53:33.128Z",
   "klm": {
     "K": 0.28,
     "Kslow": 1.2,
@@ -15,9 +15,9 @@
   "keys": 2,
   "steps": 2,
   "homes": 0,
-  "systemSec": 1,
-  "typicalSec": 9.5,
-  "slowSec": 11.3,
+  "systemSec": 0.9,
+  "typicalSec": 9.3,
+  "slowSec": 11.2,
   "path": [
     "Nereden",
     "Kartta Ara",

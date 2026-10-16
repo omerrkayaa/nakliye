@@ -13,7 +13,7 @@ const deletionCode = async (p: string) => {
   throw new Error(`Silme kodu bulunamadı: ${p}`);
 };
 
-/** Arayüzden OTP girişi; rolü olmayan kullanıcı nakliyeci (varsayılan) seçer */
+/** Arayüzden OTP girişi; rolü olmayan kullanıcı nakliyeci seçer */
 async function uiLogin(page: Page, p: string, chooseRole: boolean) {
   await page.goto("/");
   await page.getByLabel("Cep telefonu").locator("visible=true").fill(`0${p.slice(3)}`);
@@ -22,7 +22,10 @@ async function uiLogin(page: Page, p: string, chooseRole: boolean) {
   await expect(codeInput).toBeVisible(); // yeni kod gönderildi (günlükte API girişinin eski kodu da var)
   await codeInput.fill(await otpFor(p));
   await vis(page, "Giriş yap").click();
-  if (chooseRole) await vis(page, "Devam").click();
+  if (chooseRole) {
+    await vis(page, "Nakliyeciyim (aracım var)").click();
+    await vis(page, "Devam").click();
+  }
   await expect(page.getByRole("tab", { name: /Profil/ })).toBeVisible({ timeout: 20_000 });
 }
 
