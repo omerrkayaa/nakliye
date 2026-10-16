@@ -1,6 +1,7 @@
 // NFR-06 erişilebilirlik: WCAG 2.0/2.1/2.2 A ve AA kurallarıyla otomatik tarama (axe-core). Herkese açık sayfalar,
-// giriş adımları, yük sahibi paneli ve yönetim bölümü; masaüstü ve telefon genişliği. Otomatik tarama WCAG'in yalnız
-// bir kısmını yakalar (renk kontrastı, etiket, ad, rol, hedef boyutu…); klavye ve ekran okuyucu denemesi ayrıca gerekir.
+// giriş adımları, yük sahibi paneli ve yönetim bölümü; masaüstü ve telefon genişliği (telefonda yatay taşma da, NFR-03).
+// Otomatik tarama WCAG'in yalnız bir kısmını yakalar (renk kontrastı, etiket, ad, rol, hedef boyutu…); klavye ve ekran
+// okuyucu denemesi ayrıca gerekir.
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { adminToken, api, apiLogin, apiUser, createLoad, localPhone, phone, psql, adminSession } from "./helpers";
@@ -31,6 +32,9 @@ async function scanPaths(page: Page, paths: string[]) {
     for (const p of paths) {
       await page.goto(p);
       all.push(...(await scan(page, `${p} @${width}`)));
+      // NFR-03 "mobilde de çalışır" (WCAG 1.4.10 yeniden akış): telefon genişliğinde yatay kaydırma olmamalı
+      const sw = await page.evaluate(() => document.documentElement.scrollWidth);
+      if (width < 1000 && sw > width) all.push({ path: `${p} @${width}`, id: "yatay-tasma", impact: "serious", help: `Sayfa ${sw} px genişliğinde, yatay kayıyor`, count: 1, targets: [] });
     }
   }
   return all;

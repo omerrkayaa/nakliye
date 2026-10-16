@@ -17,7 +17,7 @@ async function expectOgImage(p: import("@playwright/test").Page) {
   expect([b.readUInt32BE(16), b.readUInt32BE(20)]).toEqual([1200, 630]);
 }
 
-test("girişsiz paylaşım sayfası: ilan bilgisi, önizleme kartı, numara yok; panelde WhatsApp ve kopyala", async ({ browser }) => {
+test("girişsiz paylaşım sayfası: ilan bilgisi, önizleme kartı, numara yok; panelde WhatsApp ve kopyala", async ({ browser, browserName }) => {
   const admin = await adminToken(904);
   const S = await apiUser(phone(401), "shipper", "Paylaşan Firma");
   const id = await createLoad(S.accessToken, admin);
@@ -42,7 +42,14 @@ test("girişsiz paylaşım sayfası: ilan bilgisi, önizleme kartı, numara yok;
   expect(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   // Panel: WhatsApp bağlantısı paylaşım metnini taşır, kopyala bağlantıyı panoya yazar
-  const ctx = await browser.newContext({ baseURL: BASE, permissions: ["clipboard-read", "clipboard-write"] });
+  // Pano izinleri yalnız Chromium'da (Chrome, Edge) var; Firefox'ta Playwright panoyu okuyamıyor. Her tarayıcıda yazma
+  // çağrısı sarılır ve tarayıcı kabul ettiyse (söz yerine getirildiyse) metin kaydedilir; Chromium'da pano ayrıca okunur.
+  const chromium = browserName === "chromium";
+  const ctx = await browser.newContext({ baseURL: BASE, permissions: chromium ? ["clipboard-read", "clipboard-write"] : [] });
+  await ctx.addInitScript(() => {
+    const write = navigator.clipboard.writeText.bind(navigator.clipboard);
+    navigator.clipboard.writeText = (t: string) => write(t).then(() => void ((window as unknown as { __copied: string }).__copied = t));
+  });
   await ctx.addCookies([
     { name: "nk_at", value: S.accessToken, url: BASE, httpOnly: true },
     { name: "nk_rt", value: S.refreshToken, url: BASE, httpOnly: true },
@@ -54,7 +61,8 @@ test("girişsiz paylaşım sayfası: ilan bilgisi, önizleme kartı, numara yok;
   await expect(wa).toHaveAttribute("rel", /noopener/);
   await panel.getByRole("button", { name: "Bağlantıyı kopyala" }).click();
   await expect(panel.getByRole("button", { name: "Kopyalandı" })).toBeVisible();
-  expect(await panel.evaluate(() => navigator.clipboard.readText())).toBe(url);
+  expect(await panel.evaluate(() => (window as unknown as { __copied?: string }).__copied)).toBe(url);
+  if (chromium) expect(await panel.evaluate(() => navigator.clipboard.readText())).toBe(url);
 
   // Kapanan ilan: paylaşım sayfası "yayında değil" der; panelde paylaşım düğmesi kalmaz
   expect((await api("POST", `/loads/${id}/close`, S.accessToken, { reason: "arac_bulundu" })).status).toBe(200);
