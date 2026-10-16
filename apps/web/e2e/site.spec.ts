@@ -1,6 +1,6 @@
 // Herkese açık site: W1 tanıtım ve W4 yasal sayfalar (girişsiz).
 import { expect, test } from "@playwright/test";
-import { API, localPhone, otpFor, phone } from "./helpers";
+import { adminToken, API, api, apiUser, createLoad, localPhone, otpFor, phone, psql } from "./helpers";
 
 test.use({ baseURL: "http://localhost:3001" });
 
@@ -54,6 +54,35 @@ test("rota formu: 81 il API ile aynı ve alfabetik; girişsiz gönderim girişte
   await page.goto("/panel/ilanlar/yeni?nereden=99&nereye=abc");
   await expect(page.getByLabel("Kalkış ili", { exact: true })).toHaveValue("");
   await expect(page.getByLabel("Varış ili", { exact: true })).toHaveValue("");
+});
+
+test("canlı yük akışı: istek anında, en son teyit edilen önde; numara, fiyat ve ilan bağlantısı yok", async ({ page }) => {
+  const A = await adminToken(908);
+  const S = (await apiUser(phone(981), "shipper")).accessToken;
+  const id = await createLoad(S, A); // Menteşe → Muratpaşa, palet 7 ton, kamyon, sabit 12.500 ₺
+  psql(`update load_posts set last_confirmed_at = now() + interval '1 minute' where id='${id}'`); // en son teyit edilen olsun
+  const total = (await api<{ activeLoads: number }>("GET", "/public/feed")).body.activeLoads!;
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: `Şu an yayında ${total} ilan`, exact: true })).toBeVisible();
+  const feed = page.getByTestId("feed");
+  await expect(feed.getByRole("listitem")).toHaveCount(Math.min(6, total));
+  const first = feed.getByRole("listitem").first();
+  await expect(first).toContainText("Menteşe, Muğla → Muratpaşa, Antalya");
+  await expect(first).toContainText("Palet · 7 ton · Kamyon");
+  await expect(first).toContainText("Teyitli");
+  await expect(first).toContainText("Son teyit az önce");
+  await expect(feed).not.toContainText("12.500");
+  await expect(feed.getByRole("link")).toHaveCount(0);
+  // Telefonda ilk üçü
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(feed.getByRole("listitem")).toHaveCount(Math.min(3, total));
+  await page.setViewportSize({ width: 1280, height: 720 });
+
+  // Sayfa önbellekten gelmiyor: ilan kapanınca sayı düşer
+  await api("POST", `/loads/${id}/close`, S, { reason: "iptal" });
+  await page.reload();
+  await expect(page.getByRole("heading", { name: `Şu an yayında ${total - 1} ilan`, exact: true })).toBeVisible();
 });
 
 test("SSS: başlıktan açılır, cevaplar kapalı başlar ve tıklayınca açılır", async ({ page }) => {

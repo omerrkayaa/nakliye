@@ -1,5 +1,5 @@
-// W2 güzergâh sayfası verisi: GET /public/routes/:from/:to (girişsiz) uçtan uca test.
-// Yalıtım: +90548… numaraları; açtığı Aydın → İstanbul ilanları sonda iptal. İlan sayısı önce/sonra farkıyla
+// W2 güzergâh sayfası verisi: GET /public/routes/:from/:to ve tanıtımdaki canlı yük akışı GET /public/feed (girişsiz) uçtan uca test.
+// Yalıtım: +90548… numaraları; açtığı ilanlar sonda iptal. İlan sayısı önce/sonra farkıyla
 // sınanır (DB'de demo ve başka ilanlar da var). Ön koşul: e2e-confirmation.mjs ile aynı. node test/e2e-routes.mjs api.log
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -85,6 +85,33 @@ check("teyit bekleyen ilan da sayılır (yük akışı gibi)", (await count(AYDI
 r = await route(AYDIN, ISTANBUL);
 check("numara ve ilan kimliği dönmez", !r.text.includes(phone(1)) && !r.text.includes(phone(1).slice(3)) && !r.text.includes(l1.id) && !r.text.includes(l1.shareId));
 check("ilan kapatılınca düşer", (await api("POST", `/loads/${l1.id}/close`, S, { reason: "iptal" })).status < 300 && (await count(AYDIN, ISTANBUL)) === before);
+
+console.log("\nCanlı yük akışı (tanıtım)");
+const feed = () => api("GET", "/public/feed");
+r = await feed();
+const total0 = r.body.activeLoads;
+check("girişsiz 200, toplam sayı ve en çok 6 ilan", r.status === 200 && Number.isInteger(total0) && Array.isArray(r.body.loads) && r.body.loads.length <= 6, r.text.slice(0, 200));
+const l2 = (await api("POST", "/loads", S, {
+  originDistrictId: district("Aydın", "Söke"), destDistrictId: district("İzmir", "Torbalı"), loadFrom: trDay(1), loadTo: trDay(3),
+  cargoType: "palet", weightTon: 7.5, vehicleType: "kamyon", bodyType: null, priceType: "sabit", price: 9876, note: "akış-notu-gizli",
+})).body;
+check("moderasyondaki ilan akışta yok", l2.status === "moderasyonda" && (await feed()).body.activeLoads === total0, l2.status);
+await api("POST", `/admin/loads/${l2.id}/review`, A, { decision: "onay" });
+psql(`update load_posts set last_confirmed_at = now() + interval '1 minute' where id='${l2.id}'`); // en son teyit edilen olsun
+r = await feed();
+const top = r.body.loads?.[0] ?? {};
+check("yayına çıkan ilan sayılır (+1) ve en son teyit edilen önde", r.body.activeLoads === total0 + 1 && top.origin?.district === "Söke" && top.dest?.district === "Torbalı", JSON.stringify(top));
+check("güzergâh, yük ve durum alanları", top.origin?.province === "Aydın" && top.dest?.province === "İzmir" && top.cargoType === "palet" && top.weightTon === 7.5 &&
+  top.vehicleType === "kamyon" && top.loadFrom === trDay(1) && top.loadTo === trDay(3) && top.status === "teyitli" && !Number.isNaN(Date.parse(top.lastConfirmedAt)), JSON.stringify(top));
+check("yalnız izin verilen alanlar (fiyat, not, kimlik yok)", Object.keys(top).sort().join() === "cargoType,dest,lastConfirmedAt,loadFrom,loadTo,origin,status,vehicleType,weightTon", Object.keys(top).join());
+check("numara, ilan/paylaşım kimliği, fiyat ve not yanıtta yok", !r.text.includes(phone(1).slice(3)) && !r.text.includes(l2.id) && !r.text.includes(l2.shareId) && !r.text.includes("9876") && !r.text.includes("akış-notu-gizli"));
+psql(`update load_posts set status='teyit_bekliyor' where id='${l2.id}'`);
+r = await feed();
+check("teyit bekleyen ilan da görünür", r.body.activeLoads === total0 + 1 && r.body.loads[0]?.status === "teyit_bekliyor", JSON.stringify(r.body.loads[0]));
+psql(`update load_posts set load_from = '${trDay(-2)}', load_to = '${trDay(-1)}', status='teyitli' where id='${l2.id}'`);
+check("yükleme günü geçmiş ilan görünmez", (await feed()).body.activeLoads === total0);
+psql(`update load_posts set load_from = '${trDay(1)}', load_to = '${trDay(3)}' where id='${l2.id}'`);
+check("ilan kapatılınca düşer", (await api("POST", `/loads/${l2.id}/close`, S, { reason: "iptal" })).status < 300 && (await feed()).body.activeLoads === total0);
 
 console.log("\nHatalar");
 r = await route(AYDIN, AYDIN);

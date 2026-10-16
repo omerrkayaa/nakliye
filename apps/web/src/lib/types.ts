@@ -334,3 +334,9 @@ export interface RouteSummary {
   /** Büyükten küçüğe araç tipi */
   estimates: { vehicleType: VehicleType; min: number; max: number }[];
 }
+
+/** Tanıtımdaki canlı yük akışı (GET /public/feed): anonim; numara, ad, kimlik, fiyat ve not yok */
+export interface PublicFeed {
+  activeLoads: number;
+  loads: { origin: Place; dest: Place; loadFrom: string; loadTo: string; cargoType: CargoType; weightTon: number; vehicleType: VehicleType; status: LoadStatus; lastConfirmedAt: string }[];
+}

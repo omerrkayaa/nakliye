@@ -38,7 +38,7 @@ const FAQ: [string, string][] = [
   ],
   [
     "Fiyatı nasıl belirlerim?",
-    "İlana fiyat yazabilir ya da teklif usulünü seçebilirsiniz. İlan formu güzergâh ve araç tipine göre yakıt, otoyol, şoför ve aşınma maliyetinden bir fiyat aralığı önerir; bu aralık tahmindir, bağlayıcı değildir.",
+    "İlana fiyat yazabilir ya da teklif usulünü seçebilirsiniz. İlan formu güzergâh ve araç tipine göre yakıt, şoför ve araç giderinden bir fiyat aralığı önerir; otoyol ve köprü ücretleri dahil değildir. Bu aralık tahmindir, bağlayıcı değildir.",
   ],
   [
     "Hangi cihazlarda kullanabilirim?",

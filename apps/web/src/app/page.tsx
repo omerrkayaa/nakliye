@@ -3,6 +3,7 @@ import { ArrowRight, BadgeCheck, BellRing, FileSpreadsheet, KeyRound, RefreshCcw
 import type { LucideIcon } from "lucide-react";
 import { Faq } from "@/components/faq";
 import { HeroMap } from "@/components/hero-map/hero-map";
+import { LiveFeed } from "@/components/live-feed";
 import { RouteForm } from "@/components/route-form";
 import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { PROVINCES, ROUTE_PAGES } from "@/lib/route-pages";
@@ -27,7 +28,7 @@ const CARRIER_STEPS = [
   ["Boş dönüşü bildirin", "Aracınız nerede boşalıyor? Uyan yük çıkınca bildirim gelir."],
 ];
 
-/** W1 tanıtım sayfası (docs/02 §5a): değer önerisi, farklar, nasıl çalışır, rozetlerin anlamı (W3 özeti), SSS. */
+/** W1 tanıtım sayfası (docs/02 §5a): değer önerisi, farklar, nasıl çalışır, rozetlerin anlamı (W3 özeti), canlı yük akışı, SSS. */
 export default function Home() {
   return (
     <>
@@ -55,6 +56,8 @@ export default function Home() {
           </div>
           <HeroMap />
         </section>
+
+        <LiveFeed />
 
         <section aria-labelledby="farklar" className="border-y bg-muted/30">
           <div className="mx-auto max-w-5xl space-y-8 px-4 py-14">
