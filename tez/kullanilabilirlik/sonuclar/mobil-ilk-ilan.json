@@ -1,0 +1,35 @@
+{
+  "platform": "mobil",
+  "at": "2026-10-16T11:28:44.952Z",
+  "klm": {
+    "K": 0.28,
+    "Kslow": 1.2,
+    "P": 1.1,
+    "BB": 0.2,
+    "H": 0.4,
+    "M": 1.35
+  },
+  "flow": "İlk ilan (yeni hesap): uygulamayı açmaktan ilanın gönderilmesine",
+  "taps": 20,
+  "outsideTaps": 0,
+  "keys": 31,
+  "steps": 12,
+  "homes": 0,
+  "systemSec": 4.1,
+  "typicalSec": 55,
+  "slowSec": 83.5,
+  "path": [
+    "Telefon numarası",
+    "SMS kodu",
+    "Rol: yük sahibi",
+    "İlan ver",
+    "Kalkış ili",
+    "Kalkış ilçesi",
+    "Varış ili",
+    "Varış ilçesi",
+    "Yük cinsi",
+    "Ağırlık",
+    "Araç tipi",
+    "Yayınla"
+  ]
+}

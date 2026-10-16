@@ -1,0 +1,26 @@
+{
+  "platform": "mobil",
+  "at": "2026-10-16T11:28:48.158Z",
+  "klm": {
+    "K": 0.28,
+    "Kslow": 1.2,
+    "P": 1.1,
+    "BB": 0.2,
+    "H": 0.4,
+    "M": 1.35
+  },
+  "flow": "Kalkış ili seçip karttan arama",
+  "taps": 3,
+  "outsideTaps": 1,
+  "keys": 2,
+  "steps": 2,
+  "homes": 0,
+  "systemSec": 1,
+  "typicalSec": 9.5,
+  "slowSec": 11.3,
+  "path": [
+    "Nereden",
+    "Kartta Ara",
+    "Telefonun arama ekranında ara"
+  ]
+}

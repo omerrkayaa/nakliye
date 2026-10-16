@@ -1,0 +1,31 @@
+{
+  "platform": "mobil",
+  "at": "2026-10-16T11:28:44.953Z",
+  "klm": {
+    "K": 0.28,
+    "Kslow": 1.2,
+    "P": 1.1,
+    "BB": 0.2,
+    "H": 0.4,
+    "M": 1.35
+  },
+  "flow": "İlan formu: formun açılmasından gönderilmesine",
+  "taps": 12,
+  "outsideTaps": 0,
+  "keys": 14,
+  "steps": 8,
+  "homes": 0,
+  "systemSec": 3.4,
+  "typicalSec": 33.7,
+  "slowSec": 46.6,
+  "path": [
+    "Kalkış ili",
+    "Kalkış ilçesi",
+    "Varış ili",
+    "Varış ilçesi",
+    "Yük cinsi",
+    "Ağırlık",
+    "Araç tipi",
+    "Yayınla"
+  ]
+}
