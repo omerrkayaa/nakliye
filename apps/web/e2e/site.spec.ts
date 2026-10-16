@@ -17,6 +17,23 @@ test("tanıtım sayfası: değer önerisi, panele giriş, nasıl çalışır ve 
   await expect(page.getByRole("link", { name: "KVKK aydınlatma metnini" })).toHaveAttribute("href", "/kvkk");
 });
 
+test("SSS: başlıktan açılır, cevaplar kapalı başlar ve tıklayınca açılır", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("navigation", { name: "Site" }).getByRole("link", { name: "SSS" }).click();
+  await expect(page).toHaveURL(/#sss$/);
+  const faq = page.locator("#sss");
+  await expect(faq.getByRole("heading", { name: "Sık sorulan sorular" })).toBeVisible();
+  await expect(faq.locator("summary")).toHaveCount(11);
+  const answer = faq.getByText("bir kişi 24 saatte en çok 30 ilanın numarasını açabilir");
+  await expect(answer).toBeHidden();
+  await faq.getByText("Numaram kimlere görünür?").click();
+  await expect(answer).toBeVisible();
+  // Klavyeyle de açılır
+  await faq.getByText("Teslim kodu nedir?").focus();
+  await page.keyboard.press("Enter");
+  await expect(faq.getByText("48 saat içinde itiraz edebilirsiniz")).toBeVisible();
+});
+
 test("yasal sayfalar: alt bilgiden açılır, taslak uyarısı var", async ({ page }) => {
   await page.goto("/");
   for (const [link, heading] of [

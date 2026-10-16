@@ -17,6 +17,9 @@ export function SiteHeader() {
           <Link href="/#guven" className="hidden underline-offset-4 hover:underline sm:inline">
             Güven
           </Link>
+          <Link href="/#sss" className="hidden underline-offset-4 hover:underline sm:inline">
+            SSS
+          </Link>
           <Link href="/panel" className="font-medium text-primary underline-offset-4 hover:underline">
             Giriş
           </Link>
