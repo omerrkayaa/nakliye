@@ -44,7 +44,7 @@ export async function proxy(req: NextRequest) {
 
 function toLogin(req: NextRequest) {
   const url = new URL("/giris", req.url);
-  url.searchParams.set("sonra", req.nextUrl.pathname);
+  url.searchParams.set("sonra", req.nextUrl.pathname + req.nextUrl.search); // sorgu da korunur (ör. tanıtımdaki rota formu)
   return NextResponse.redirect(url, 303);
 }
 

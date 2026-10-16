@@ -17,8 +17,8 @@ export interface LoginState {
 
 const failure = (e: unknown) => (e instanceof ApiError ? e.message : "Sunucuya ulaşılamadı; tekrar deneyin.");
 
-/** Yalnız panel içine dönüş (açık yönlendirmeye karşı) */
-const safeNext = (v: FormDataEntryValue | null) => (typeof v === "string" && /^\/panel(\/[\w\-/]*)?$/.test(v) ? v : "/panel");
+/** Yalnız panel içine dönüş, basit sorgu dizesiyle (açık yönlendirmeye karşı) */
+const safeNext = (v: FormDataEntryValue | null) => (typeof v === "string" && /^\/panel(\/[\w\-/]*)?(\?[\w\-=&%.]*)?$/.test(v) ? v : "/panel");
 
 /** Belirteçler httpOnly çereze; hesap girişle yeniden açıldıysa (FR-08 dondurma, FR-07 süresi içinde dönüş) gösterge bir kez not gösterir */
 async function signIn(tokens: Tokens, form: FormData, reopened = tokens.reopened): Promise<never> {

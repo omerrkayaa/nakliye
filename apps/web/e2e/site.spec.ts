@@ -1,5 +1,6 @@
 // Herkese açık site: W1 tanıtım ve W4 yasal sayfalar (girişsiz).
 import { expect, test } from "@playwright/test";
+import { API, localPhone, otpFor, phone } from "./helpers";
 
 test.use({ baseURL: "http://localhost:3001" });
 
@@ -7,6 +8,7 @@ test("tanıtım sayfası: değer önerisi, panele giriş, nasıl çalışır ve 
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Gördüğün her yük gerçek ve şu an geçerli.");
   await expect(page.getByRole("link", { name: "Yük sahibiyim, panele gir" })).toHaveAttribute("href", "/panel");
+  await expect(page.getByRole("form", { name: "Yük ilanı ver" })).toBeVisible();
   await expect(page.getByText("Nakliyeci uygulaması (Android) yakında")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Nasıl çalışır" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Kartlardaki işaretler ne anlama geliyor?" })).toBeVisible();
@@ -15,6 +17,43 @@ test("tanıtım sayfası: değer önerisi, panele giriş, nasıl çalışır ve 
   await expect(page).toHaveURL(/\/giris\?sonra=%2Fpanel$/);
   await expect(page.getByRole("link", { name: "kullanım şartlarını" })).toHaveAttribute("href", "/kullanim-sartlari");
   await expect(page.getByRole("link", { name: "KVKK aydınlatma metnini" })).toHaveAttribute("href", "/kvkk");
+});
+
+test("rota formu: 81 il API ile aynı ve alfabetik; girişsiz gönderim girişten sonra ilan formunu illerle açar", async ({ page }) => {
+  const provinces = (await (await fetch(`${API}/locations`)).json()) as { id: number; name: string }[];
+  await page.goto("/");
+  const form = page.getByRole("form", { name: "Yük ilanı ver" });
+  const from = form.getByLabel("Nereden");
+  const options = await from.locator("option:not([disabled])").evaluateAll((os) => os.map((o) => [Number((o as HTMLOptionElement).value), o.textContent ?? ""] as const));
+  expect([...options].sort((a, b) => a[0] - b[0])).toEqual(provinces.map((p) => [p.id, p.name]));
+  expect(options.map(([, n]) => n)).toEqual(provinces.map((p) => p.name).sort((a, b) => a.localeCompare(b, "tr")));
+
+  // İl seçilmeden gönderilmez (tarayıcı doğrulaması)
+  await form.getByRole("button", { name: "İlan ver" }).click();
+  await expect(page).toHaveURL(/:3001\/$/);
+  await from.selectOption({ label: "Aydın" });
+  await form.getByLabel("Nereye").selectOption({ label: "İstanbul" });
+  await form.getByRole("button", { name: "İlan ver" }).click();
+  await expect(page).toHaveURL(/\/giris\?sonra=%2Fpanel%2Filanlar%2Fyeni%3Fnereden%3D9%26nereye%3D34$/);
+
+  // Yeni hesap: giriş → yük sahibi rolü → ilan formunda iller seçili, ilçe kullanıcıda
+  const me = phone(980);
+  await page.getByLabel("Cep telefonu").fill(localPhone(me));
+  await page.getByRole("button", { name: "SMS kodu gönder" }).click();
+  await page.getByLabel(/numarasına gelen kod/).fill(await otpFor(me));
+  await page.getByRole("button", { name: "Giriş yap" }).click();
+  await expect(page).toHaveURL(/\/panel\/ilanlar\/yeni\?nereden=9&nereye=34$/);
+  await page.getByRole("button", { name: "Yük sahibi olarak devam et" }).click();
+  await expect(page.getByLabel("Kalkış ili", { exact: true })).toHaveValue("9");
+  await expect(page.getByLabel("Varış ili", { exact: true })).toHaveValue("34");
+  await expect(page.getByLabel("Kalkış ilçesi", { exact: true })).toHaveValue("");
+  await expect(page.getByLabel("Kalkış ilçesi", { exact: true })).toBeEnabled();
+  await page.getByLabel("Kalkış ilçesi", { exact: true }).selectOption({ label: "Nazilli" });
+
+  // Listede olmayan il yok sayılır
+  await page.goto("/panel/ilanlar/yeni?nereden=99&nereye=abc");
+  await expect(page.getByLabel("Kalkış ili", { exact: true })).toHaveValue("");
+  await expect(page.getByLabel("Varış ili", { exact: true })).toHaveValue("");
 });
 
 test("SSS: başlıktan açılır, cevaplar kapalı başlar ve tıklayınca açılır", async ({ page }) => {

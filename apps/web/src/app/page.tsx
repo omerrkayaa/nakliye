@@ -3,8 +3,8 @@ import { ArrowRight, BadgeCheck, BellRing, FileSpreadsheet, KeyRound, RefreshCcw
 import type { LucideIcon } from "lucide-react";
 import { Faq } from "@/components/faq";
 import { HeroMap } from "@/components/hero-map/hero-map";
+import { RouteForm } from "@/components/route-form";
 import { SiteFooter, SiteHeader } from "@/components/site-chrome";
-import { buttonVariants } from "@/components/ui/button";
 import { PROVINCES, ROUTE_PAGES } from "@/lib/route-pages";
 
 const FEATURES: [LucideIcon, string, string][] = [
@@ -41,13 +41,16 @@ export default function Home() {
                 Yük sahibiyle nakliyeciyi buluşturan, bayat ilanı listeden düşüren platform. Aydın – İzmir – Manisa – İstanbul hattında başlıyoruz.
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <Link href="/panel" className={buttonVariants({ size: "lg", className: "h-12 px-6 text-base" })}>
-                Yük sahibiyim, panele gir <ArrowRight aria-hidden />
-              </Link>
-              <span className="inline-flex h-12 items-center gap-2 rounded-lg border px-4 text-sm text-muted-foreground">
-                <Smartphone className="size-5" aria-hidden /> Nakliyeci uygulaması (Android) yakında
-              </span>
+            <div className="space-y-4">
+              <RouteForm />
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                <Link href="/panel" className="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline">
+                  Yük sahibiyim, panele gir <ArrowRight className="size-4" aria-hidden />
+                </Link>
+                <span className="inline-flex items-center gap-2 text-muted-foreground">
+                  <Smartphone className="size-4" aria-hidden /> Nakliyeci uygulaması (Android) yakında
+                </span>
+              </div>
             </div>
           </div>
           <HeroMap />

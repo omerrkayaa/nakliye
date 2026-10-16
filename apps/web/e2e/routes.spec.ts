@@ -58,9 +58,9 @@ test("güzergâh sayfası: başlık, önizleme etiketleri, ilan sayısı ve fiya
   expect(names.slice(8).every((n) => n.endsWith(" – İstanbul nakliye"))).toBe(true);
   expect(names).toContain("Aydın – Ankara nakliye");
   expect(names).toContain("Mersin – İstanbul nakliye");
-  // Girişsiz "Yük ilanı ver" → giriş, sonra ilan formuna döner
+  // Girişsiz "Yük ilanı ver" → giriş, sonra ilan formuna güzergâhın illeriyle döner (Aydın 9 → İstanbul 34)
   await page.getByRole("link", { name: "Yük ilanı ver" }).click();
-  await expect(page).toHaveURL(/\/giris\?sonra=%2Fpanel%2Filanlar%2Fyeni$/);
+  await expect(page).toHaveURL(/\/giris\?sonra=%2Fpanel%2Filanlar%2Fyeni%3Fnereden%3D9%26nereye%3D34$/);
 });
 
 test("ilan sayısı istek anında: yayına çıkan ilan sayfada görünür, kapanınca düşer", async ({ page }) => {

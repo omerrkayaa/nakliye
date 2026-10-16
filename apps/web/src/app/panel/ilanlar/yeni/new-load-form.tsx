@@ -33,7 +33,7 @@ function PlacePicker({
   onDistrict: (districtId: string) => void;
 }) {
   const [province, setProvince] = useState(initial ? String(initial.provinceId) : "");
-  const [district, setDistrict] = useState(initial ? String(initial.districtId) : "");
+  const [district, setDistrict] = useState(initial?.districtId ? String(initial.districtId) : "");
   const districts = provinces.find((p) => String(p.id) === province)?.districts ?? [];
   return (
     <fieldset className="grid gap-3 sm:grid-cols-2">
@@ -82,9 +82,10 @@ function PlacePicker({
   );
 }
 
-type Spot = { provinceId: number; districtId: number };
+/** İlçesiz Spot: tanıtımdaki rota formundan yalnız il gelir */
+type Spot = { provinceId: number; districtId?: number };
 type Values = { loadFrom: string; loadTo: string; cargoType: string; weightTon: string; vehicleType: string; bodyType: string; priceType: string; price: string; note: string };
-/** "Benzerini yayınla": eski ilandan doldurulan başlangıç değerleri */
+/** "Benzerini yayınla" (eski ilandan) ya da tanıtımdaki rota formu (yalnız iller): başlangıç değerleri */
 export type LoadDraft = Partial<Values> & { origin?: Spot; dest?: Spot };
 
 /** P3 ilan oluştur. Alanlar kontrollü ve form sıfırlanmadan gönderilir: hata dönünce girilenler kaybolmaz. */
@@ -95,7 +96,7 @@ export function NewLoadForm({ provinces, today, maxDay, draft }: { provinces: Pr
   const set = (k: keyof typeof v) => (e: { target: { value: string } }) => setV((s) => ({ ...s, [k]: e.target.value }));
   const f = state.fields ?? {};
   // F7: kalkış, varış ve araç seçilince tahmini fiyat aralığı
-  const [route, setRoute] = useState({ from: origin ? String(origin.districtId) : "", to: dest ? String(dest.districtId) : "" });
+  const [route, setRoute] = useState({ from: origin?.districtId ? String(origin.districtId) : "", to: dest?.districtId ? String(dest.districtId) : "" });
   const [estimate, setEstimate] = useState<PriceEstimate | null>(null);
   useEffect(() => {
     let live = true;

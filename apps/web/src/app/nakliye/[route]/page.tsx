@@ -65,7 +65,7 @@ export default async function RouteLandingPage({ params }: PageProps<"/nakliye/[
             İlanınızı verin; nakliyeciler sizi arasın ya da teklif versin. İlanlar düzenli olarak sahibine teyit ettirilir, bayat ilan listede kalmaz.
           </p>
           <div className="flex flex-wrap items-center gap-3">
-            <Link href="/panel/ilanlar/yeni" className={buttonVariants({ className: "h-11 px-5" })}>
+            <Link href={`/panel/ilanlar/yeni?nereden=${r.from.id}&nereye=${r.to.id}`} className={buttonVariants({ className: "h-11 px-5" })}>
               Yük ilanı ver <ArrowRight aria-hidden />
             </Link>
             <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">

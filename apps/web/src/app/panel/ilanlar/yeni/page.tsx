@@ -3,13 +3,17 @@ import { Suspense } from "react";
 import { LOAD_DATE_LIMITS, trDay } from "@nakliye/shared";
 import { api, ApiError } from "@/lib/api";
 import { getLocations } from "@/lib/locations";
+import { TR_PROVINCES } from "@/lib/provinces";
 import type { LoadDetail, Me } from "@/lib/types";
 import { BecomeShipper } from "../../become-shipper";
 import { NewLoadForm, type LoadDraft } from "./new-load-form";
 
 export const metadata: Metadata = { title: "Yeni ilan" };
 
-/** P3 ilan oluştur (tek ekran, docs/02 ilke 4). `?kopya=<ilan>`: eski ilanın bilgileriyle dolu gelir ("Benzerini yayınla"). */
+/**
+ * P3 ilan oluştur (tek ekran, docs/02 ilke 4). `?kopya=<ilan>`: eski ilanın bilgileriyle dolu gelir ("Benzerini yayınla").
+ * `?nereden=<il>&nereye=<il>` (plaka kodu; tanıtımdaki rota formu ve güzergâh sayfaları): iller seçili gelir.
+ */
 export default function NewLoadPage({ searchParams }: PageProps<"/panel/ilanlar/yeni">) {
   return (
     <div className="max-w-3xl space-y-6">
@@ -31,11 +35,12 @@ async function Form({ searchParams }: Pick<PageProps<"/panel/ilanlar/yeni">, "se
   const now = new Date();
   const today = trDay(now);
   const maxDay = trDay(new Date(now.getTime() + LOAD_DATE_LIMITS.maxDaysAhead * 86_400_000));
-  const { kopya } = await searchParams;
-  const draft = typeof kopya === "string" ? await copyOf(kopya, today) : undefined;
+  const { kopya, nereden, nereye } = await searchParams;
+  const copied = typeof kopya === "string" ? await copyOf(kopya, today) : undefined;
+  const draft = copied ?? routeDraft(nereden, nereye);
   return (
     <>
-      {draft && (
+      {copied && (
         <p role="status" className="rounded-lg border bg-muted/40 p-4 text-sm">
           Bilgiler eski ilanınızdan dolduruldu. Yükleme tarihlerini kontrol edip yayınlayın.
         </p>
@@ -43,6 +48,13 @@ async function Form({ searchParams }: Pick<PageProps<"/panel/ilanlar/yeni">, "se
       <NewLoadForm provinces={await getLocations()} today={today} maxDay={maxDay} draft={draft} />
     </>
   );
+}
+
+/** Rota formundan gelen iller; listede olmayan değer yok sayılır (ilçe kullanıcı seçer). */
+function routeDraft(from: unknown, to: unknown): LoadDraft | undefined {
+  const province = (v: unknown) => (typeof v === "string" && TR_PROVINCES.some(([id]) => String(id) === v) ? { provinceId: Number(v) } : undefined);
+  const origin = province(from), dest = province(to);
+  return origin || dest ? { origin, dest } : undefined;
 }
 
 /**
