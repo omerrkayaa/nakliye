@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, BellRing, FileSpreadsheet, KeyRound, RefreshCcw, Share2, Smartphone, Star } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { HeroMap } from "@/components/hero-map/hero-map";
 import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { buttonVariants } from "@/components/ui/button";
 import { PROVINCES, ROUTE_PAGES } from "@/lib/route-pages";
@@ -31,21 +32,24 @@ export default function Home() {
     <>
       <SiteHeader />
       <main className="flex-1">
-        <section className="mx-auto max-w-5xl space-y-8 px-4 py-16 sm:py-24">
-          <div className="max-w-3xl space-y-5">
-            <h1 className="text-4xl font-bold tracking-tight text-balance sm:text-5xl">Gördüğün her yük gerçek ve şu an geçerli.</h1>
-            <p className="text-lg text-muted-foreground">
-              Yük sahibiyle nakliyeciyi buluşturan, bayat ilanı listeden düşüren platform. Aydın – İzmir – Manisa – İstanbul hattında başlıyoruz.
-            </p>
+        <section className="mx-auto max-w-5xl space-y-10 px-4 py-14 sm:py-20">
+          <div className="space-y-8">
+            <div className="max-w-3xl space-y-5">
+              <h1 className="text-4xl font-bold tracking-tight text-balance sm:text-5xl">Gördüğün her yük gerçek ve şu an geçerli.</h1>
+              <p className="text-lg text-muted-foreground">
+                Yük sahibiyle nakliyeciyi buluşturan, bayat ilanı listeden düşüren platform. Aydın – İzmir – Manisa – İstanbul hattında başlıyoruz.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link href="/panel" className={buttonVariants({ size: "lg", className: "h-12 px-6 text-base" })}>
+                Yük sahibiyim, panele gir <ArrowRight aria-hidden />
+              </Link>
+              <span className="inline-flex h-12 items-center gap-2 rounded-lg border px-4 text-sm text-muted-foreground">
+                <Smartphone className="size-5" aria-hidden /> Nakliyeci uygulaması (Android) yakında
+              </span>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <Link href="/panel" className={buttonVariants({ size: "lg", className: "h-12 px-6 text-base" })}>
-              Yük sahibiyim, panele gir <ArrowRight aria-hidden />
-            </Link>
-            <span className="inline-flex h-12 items-center gap-2 rounded-lg border px-4 text-sm text-muted-foreground">
-              <Smartphone className="size-5" aria-hidden /> Nakliyeci uygulaması (Android) yakında
-            </span>
-          </div>
+          <HeroMap />
         </section>
 
         <section aria-labelledby="farklar" className="border-y bg-muted/30">
