@@ -1,4 +1,5 @@
 // Herkese açık site: W1 tanıtım ve W4 yasal sayfalar (girişsiz).
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { adminToken, API, api, apiUser, createLoad, localPhone, otpFor, phone, psql } from "./helpers";
 
@@ -27,6 +28,49 @@ test("tanıtım sayfası: değer önerisi, panele giriş, nasıl çalışır ve 
   await expect(page).toHaveURL(/\/giris\?sonra=%2Fpanel$/);
   await expect(page.getByRole("link", { name: "kullanım şartlarını" })).toHaveAttribute("href", "/kullanim-sartlari");
   await expect(page.getByRole("link", { name: "KVKK aydınlatma metnini" })).toHaveAttribute("href", "/kvkk");
+});
+
+test("nasıl çalışır: yük sahibi / nakliyeci sekmeleri klavyeyle; #nakliyeci bağlantısı nakliyeci sekmesini açar", async ({ page }) => {
+  await page.goto("/");
+  const shipper = page.getByRole("tab", { name: "Yük sahibiyim" });
+  const carrier = page.getByRole("tab", { name: "Nakliyeciyim" });
+  await expect(shipper).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tabpanel")).toContainText("Nakliyecilerim");
+  await expect(page.getByRole("tabpanel").getByRole("link", { name: "İlan ver" })).toHaveAttribute("href", "/panel/ilanlar/yeni");
+  await shipper.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(carrier).toBeFocused();
+  await expect(carrier).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tabpanel")).toContainText("Rota alarmı");
+  await page.keyboard.press("ArrowRight"); // başa döner
+  await expect(shipper).toHaveAttribute("aria-selected", "true");
+  await page.goto("/#nakliyeci");
+  await expect(carrier).toHaveAttribute("aria-selected", "true");
+});
+
+test("Dönüş Planı canlandırması: rota üstü kuralıyla uyan ve elenen örnekler; hareketi azaltınca durur; iki temada WCAG AA", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  for (const scheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.goto("/");
+    const section = page.getByRole("region", { name: "Gidiş dolu, dönüş de dolu" });
+    await section.scrollIntoViewIfNeeded();
+    // Hareketi azaltılmış: oynat düğmesi yok, 2. adımın son hâli (koridor ve ilanlar görünür)
+    await expect(section.getByRole("button", { name: /Canlandırmayı/ })).toHaveCount(0);
+    await expect(section.getByRole("button", { name: /Yoldayken Dönüş Planı/ })).toHaveAttribute("aria-current", "step");
+    const items = section.getByRole("listitem").filter({ hasText: "→" });
+    await expect(items).toHaveCount(3);
+    await expect(items.nth(0)).toContainText(/Gebze → Manisa.*Kalkış rotadan \d+ km, varış \d+ km sapıyor/);
+    await expect(items.nth(1)).toContainText("Bursa → Ankara");
+    await expect(items.nth(1)).toContainText("Elendi: varışı rotadan uzak");
+    await expect(items.nth(2)).toContainText("İzmir → İstanbul");
+    await expect(items.nth(2)).toContainText("Elendi: ters yönde");
+    // Adıma tıklayınca o adımın son hâli
+    await section.getByRole("button", { name: /dolu döndü/ }).click();
+    await expect(section.getByRole("button", { name: /dolu döndü/ })).toHaveAttribute("aria-current", "step");
+    const r = await new AxeBuilder({ page }).include("#donus-plani").include("#nasil-calisir").withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
+    expect(r.violations.map((v) => `${scheme}: ${v.id} ${v.nodes.map((n) => n.target.join(" ")).join(" | ")}`)).toEqual([]);
+  }
 });
 
 test("rota formu: 81 il API ile aynı ve alfabetik; girişsiz gönderim girişten sonra ilan formunu illerle açar", async ({ page }) => {

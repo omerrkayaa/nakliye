@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, BellRing, FileSpreadsheet, KeyRound, RefreshCcw, Share2, Smartphone, Star } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { AudienceTabs } from "@/components/audience-tabs";
 import { Faq } from "@/components/faq";
 import { HeroMap } from "@/components/hero-map/hero-map";
 import { LiveFeed } from "@/components/live-feed";
 import { ProductShots } from "@/components/product-shots";
+import { ReturnPlanSection } from "@/components/return-plan/return-plan-section";
 import { RouteForm } from "@/components/route-form";
 import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { buttonVariants } from "@/components/ui/button";
@@ -19,18 +21,7 @@ const FEATURES: [LucideIcon, string, string][] = [
   [Share2, "WhatsApp'ta paylaş", "İlanı tek dokunuşla gruplara gönderin; bağlantı ilanın güncel durumunu gösterir."],
 ];
 
-const SHIPPER_STEPS = [
-  ["İlan verin", "Nereden, nereye, ne zaman ve hangi araç: tek ekran."],
-  ["Teklifleri karşılaştırın", "Fiyat, puan, tamamlanan iş ve araç yan yana; birini kabul edin."],
-  ["Teslimi kodla onaylayın", "Kod alıcıda; nakliyeci kodu girince taşıma tamamlanır."],
-];
-const CARRIER_STEPS = [
-  ["Yükleri görün", "Yalnız teyitli ilanlar; yakınınızdaki ve rotanızdaki yükler önde."],
-  ["Arayın ya da teklif verin", "Numara tek dokunuşla açılır; teklifiniz yük sahibine anında gider."],
-  ["Boş dönüşü bildirin", "Aracınız nerede boşalıyor? Uyan yük çıkınca bildirim gelir."],
-];
-
-/** W1 tanıtım sayfası (docs/02 §5a): değer önerisi, farklar, nasıl çalışır, rozetlerin anlamı (W3 özeti), canlı yük akışı, panel ve uygulama ekranları, SSS. */
+/** W1 tanıtım sayfası (docs/02 §5a): değer önerisi, farklar, nasıl çalışır (yük sahibi / nakliyeci sekmeleri), Dönüş Planı canlandırması, rozetlerin anlamı (W3 özeti), canlı yük akışı, panel ve uygulama ekranları, SSS. */
 export default function Home() {
   return (
     <>
@@ -78,15 +69,14 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="nasil-calisir" aria-labelledby="nasil" className="mx-auto max-w-5xl space-y-8 px-4 py-14">
+        <section id="nasil-calisir" aria-labelledby="nasil" className="mx-auto max-w-5xl space-y-6 px-4 py-14">
           <h2 id="nasil" className="text-2xl font-bold">
             Nasıl çalışır
           </h2>
-          <div className="grid gap-8 md:grid-cols-2">
-            <Steps title="Yük sahibi (web paneli)" steps={SHIPPER_STEPS} />
-            <Steps title="Nakliyeci (Android uygulaması)" steps={CARRIER_STEPS} />
-          </div>
+          <AudienceTabs />
         </section>
+
+        <ReturnPlanSection />
 
         <ProductShots />
 
@@ -145,27 +135,6 @@ export default function Home() {
       </main>
       <SiteFooter />
     </>
-  );
-}
-
-function Steps({ title, steps }: { title: string; steps: string[][] }) {
-  return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold">{title}</h3>
-      <ol className="space-y-4">
-        {steps.map(([head, text], i) => (
-          <li key={head} className="flex gap-4">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground" aria-hidden>
-              {i + 1}
-            </span>
-            <div>
-              <p className="font-medium">{head}</p>
-              <p className="text-sm text-muted-foreground">{text}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
-    </div>
   );
 }
 
