@@ -127,3 +127,32 @@ test("silinmiş yük sahibiyle iş: iş detayında 'Silinmiş kullanıcı', aram
   await expect(vis(page, "Silinmiş kullanıcı")).toBeVisible();
   await expect(btn(page, /^Ara · /)).toHaveCount(0);
 });
+
+test("herkese açık profil: firma yokken anahtar yok; firma kaydedilince aç → API'de açık, paylaş düğmesi; kapat", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = collectErrors(page);
+  const me = phone(56);
+  await uiLogin(page, me, true);
+  await page.getByRole("tab", { name: /Profil/ }).click();
+  await expect(vis(page, "Herkese açık profil")).toBeVisible();
+  await expect(vis(page, "Profil açmak için yukarıda firma unvanınızı kaydedin.")).toBeVisible();
+  await expect(page.getByRole("switch", { name: /Herkese açık profil/ })).toHaveCount(0);
+
+  await page.getByLabel("Firma unvanı (isteğe bağlı)").locator("visible=true").fill("Mobil Profil Nakliyat");
+  await vis(page, "Kaydet").click();
+  await expect(vis(page, "✓ Kaydedildi")).toBeVisible();
+  const toggle = page.getByRole("switch", { name: "Herkese açık profil kapalı" }).locator("visible=true");
+  await toggle.click();
+  await expect(page.getByRole("switch", { name: "Herkese açık profil açık" }).locator("visible=true")).toBeVisible();
+  await expect(btn(page, "Profil bağlantısını paylaş")).toBeVisible();
+  const t = await apiUser(me);
+  const company = (await api<{ company: { id: string; publicProfile: boolean } }>("GET", "/me", t)).body.company;
+  expect(company.publicProfile).toBe(true);
+  expect((await api("GET", `/public/carriers/${company.id}`)).status).toBe(200);
+
+  await page.getByRole("switch", { name: "Herkese açık profil açık" }).locator("visible=true").click();
+  await expect(page.getByRole("switch", { name: "Herkese açık profil kapalı" }).locator("visible=true")).toBeVisible();
+  await expect(btn(page, "Profil bağlantısını paylaş")).toHaveCount(0);
+  expect((await api("GET", `/public/carriers/${company.id}`)).status).toBe(404);
+  expect(errors).toEqual([]);
+});

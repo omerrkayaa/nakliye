@@ -98,6 +98,8 @@ export const updateCompanySchema = z
     taxNo: taxNoSchema.nullable().optional(),
     taxOffice: createCompanySchema.shape.taxOffice.nullable(),
     address: createCompanySchema.shape.address.nullable(),
+    /** Herkese açık nakliyeci profili (yalnız nakliyeci açabilir; telefon ve kişi adı gösterilmez) */
+    publicProfile: z.boolean().optional(),
   })
   .refine((v) => Object.values(v).some((x) => x !== undefined), "Değiştirilecek en az bir alan gönderin");
 

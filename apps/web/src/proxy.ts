@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { isGuideSlug } from "@/lib/guide-slugs";
 import { routePage } from "@/lib/route-pages";
 import { ACCESS_COOKIE, REFRESH_COOKIE, accessCookie, refreshCookie, refreshTokens } from "@/lib/session";
 
@@ -20,6 +21,11 @@ export async function proxy(req: NextRequest) {
     const [slug, ...sub] = req.nextUrl.pathname.slice("/nakliye/".length).split("/");
     const known = routePage(slug!) && (sub.length === 0 || (sub.length === 1 && sub[0] === "opengraph-image"));
     return known ? NextResponse.next() : NextResponse.rewrite(new URL("/404", req.url));
+  }
+  // Rehber yazıları: aynı sebeple bilinmeyen yazı render edilmeden 404
+  if (req.nextUrl.pathname.startsWith("/rehber/")) {
+    const [slug, ...sub] = req.nextUrl.pathname.slice("/rehber/".length).split("/");
+    return isGuideSlug(slug!) && sub.length === 0 ? NextResponse.next() : NextResponse.rewrite(new URL("/404", req.url));
   }
   const access = req.cookies.get(ACCESS_COOKIE)?.value;
   const refresh = req.cookies.get(REFRESH_COOKIE)?.value;
@@ -48,4 +54,4 @@ function toLogin(req: NextRequest) {
   return NextResponse.redirect(url, 303);
 }
 
-export const config = { matcher: ["/panel/:path*", "/giris", "/nakliye/:path*"] };
+export const config = { matcher: ["/panel/:path*", "/giris", "/nakliye/:path*", "/rehber/:path+"] };

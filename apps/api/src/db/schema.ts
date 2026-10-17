@@ -128,6 +128,8 @@ export const companies = pgTable("companies", {
   taxOffice: varchar("tax_office", { length: 80 }),
   address: text("address"),
   verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  // Herkese açık nakliyeci profili (/nakliyeci/<id>): nakliyeci kendisi açar (karar 2026-10-17, KVKK açık rıza)
+  publicProfile: boolean("public_profile").notNull().default(false),
   createdAt: createdAt(),
 });
 

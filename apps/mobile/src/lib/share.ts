@@ -18,3 +18,16 @@ export async function shareLoad(l: ShareableLoad & { shareId: string }) {
     } else Alert.alert("Paylaşılamadı", "Tekrar deneyin.");
   }
 }
+
+/** Herkese açık nakliyeci profilinin bağlantısını sistemin paylaşım menüsüyle gönder */
+export async function shareProfile(companyId: string, title: string) {
+  const message = `${title} · nakliyeci profili: ${WEB_URL}/nakliyeci/${companyId}`;
+  try {
+    await Share.share({ message });
+  } catch {
+    if (Platform.OS === "web") {
+      await navigator.clipboard?.writeText(message).catch(() => undefined);
+      window.alert("Profil bağlantısı panoya kopyalandı");
+    } else Alert.alert("Paylaşılamadı", "Tekrar deneyin.");
+  }
+}

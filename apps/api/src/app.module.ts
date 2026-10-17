@@ -12,6 +12,8 @@ import { JobsModule } from "./jobs/jobs.module.js";
 import { LoadsModule } from "./loads/loads.module.js";
 import { LocationsController } from "./locations.controller.js";
 import { PriceController } from "./price.controller.js";
+import { RatingsModule } from "./ratings/ratings.module.js";
+import { PublicCarriersController } from "./public-carriers.controller.js";
 import { PublicFeedController } from "./public-feed.controller.js";
 import { PublicRoutesController } from "./public-routes.controller.js";
 import { ReturnPlanModule } from "./return-plan/return-plan.module.js";
@@ -46,7 +48,8 @@ import { VehiclesModule } from "./vehicles/vehicles.module.js";
     ReturnPlanModule,
     SchedulerModule,
     AdminModule,
+    RatingsModule, // PublicCarriersController: TrustService
   ],
-  controllers: [HealthController, LocationsController, PriceController, PublicRoutesController, PublicFeedController, AdminSettingsController],
+  controllers: [HealthController, LocationsController, PriceController, PublicRoutesController, PublicFeedController, PublicCarriersController, AdminSettingsController],
 })
 export class AppModule {}

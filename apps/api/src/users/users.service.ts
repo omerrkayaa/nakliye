@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import {
   isVerifiedBadge,
   type AddRolesInput,
@@ -95,6 +95,11 @@ export class UsersService {
   }
 
   async updateCompany(userId: string, input: UpdateCompanyInput) {
+    // Herkese açık profil yalnız nakliyeci içindir (rol veritabanından: belirteçteki roller bayat olabilir)
+    if (input.publicProfile) {
+      const [carrier] = await this.db.select().from(userRoles).where(and(eq(userRoles.userId, userId), eq(userRoles.role, "carrier")));
+      if (!carrier) throw new ForbiddenException("Herkese açık profil yalnız nakliyeciler içindir");
+    }
     // Satır kilitli: vergi levhası onayıyla yarışta okunan "onaylı mı" bilgisi bayat kalmasın
     const { company, identityChanged } = await this.db.transaction(async (tx) => {
       const [current] = await tx.select().from(companies).where(eq(companies.ownerUserId, userId)).for("update");
@@ -123,6 +128,7 @@ export class UsersService {
       address: c.address,
       verified: c.verifiedAt !== null,
       verifiedAt: c.verifiedAt,
+      publicProfile: c.publicProfile,
       createdAt: c.createdAt,
     };
   }

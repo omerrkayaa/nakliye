@@ -2,11 +2,12 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { BODY_TYPES, VEHICLE_TYPES } from "@nakliye/shared";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Switch, Text, View } from "react-native";
 import { Badge, Button, Card, ErrorText, Field, Muted, Status, s } from "@/components/ui";
 import { api, API_URL, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { confirm } from "@/lib/confirm";
+import { shareProfile } from "@/lib/share";
 import { C, TOUCH } from "@/lib/theme";
 import type { Vehicle } from "@/lib/types";
 import { useApi } from "@/lib/use-api";
@@ -34,6 +35,8 @@ export default function Profil() {
       <Account />
 
       {isCarrier && <Vehicles />}
+
+      {isCarrier && <PublicProfile />}
 
       <Button title="Belgelerim" variant="outline" icon="document-text-outline" onPress={() => router.push("/belgeler")} />
       <Button title="Hesap ve veriler" variant="outline" icon="person-circle-outline" onPress={() => router.push("/hesap")} />
@@ -99,6 +102,55 @@ function Vehicles() {
       )}
       {actionError && <ErrorText>{actionError}</ErrorText>}
       <Button title="Araç ekle" icon="add" variant="outline" onPress={() => router.push("/arac/yeni")} />
+    </Card>
+  );
+}
+
+/**
+ * Herkese açık nakliyeci profili (karar 2026-10-17): nakliyeci kendisi açar. Profilde firma unvanı, doğrulama,
+ * puan, tamamlanan iş ve araç tipleri görünür; telefon, ad soyad ve plaka görünmez. Firma unvanı gerekir.
+ */
+function PublicProfile() {
+  const { me, refreshMe } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const company = me?.company;
+
+  async function toggle(next: boolean) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api("/companies", { method: "PATCH", body: { publicProfile: next } });
+      await refreshMe();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Kaydedilemedi");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card style={{ gap: 8 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <Text style={[s.label, { flex: 1 }]}>Herkese açık profil</Text>
+        {company && (
+          <Switch
+            accessibilityLabel={`Herkese açık profil ${company.publicProfile ? "açık" : "kapalı"}`}
+            value={company.publicProfile}
+            disabled={busy}
+            onValueChange={toggle}
+            trackColor={{ true: C.primary }}
+            thumbColor={C.card}
+          />
+        )}
+      </View>
+      {company ? (
+        <Muted>Açarsanız yük sahipleri bağlantıyla firma unvanınızı, doğrulama durumunuzu, puanınızı, tamamlanan iş sayınızı ve araç tiplerinizi görür. Telefonunuz, adınız ve plakalarınız görünmez.</Muted>
+      ) : (
+        <Muted>Profil açmak için yukarıda firma unvanınızı kaydedin.</Muted>
+      )}
+      {error && <ErrorText>{error}</ErrorText>}
+      {company?.publicProfile && <Button title="Profil bağlantısını paylaş" variant="outline" icon="share-social-outline" onPress={() => shareProfile(company.id, company.title)} />}
     </Card>
   );
 }

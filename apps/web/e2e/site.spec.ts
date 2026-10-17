@@ -129,6 +129,39 @@ test("rehber: alt bilgiden dizine, dizinden yazıya; son kontrol tarihi, kaynakl
   expect(r?.status()).toBe(404);
 });
 
+test("nakliyeci profili: kapalıyken bulunamadı; açınca firma, seviye, iş, puan ve araçlar; telefon, ad ve plaka yok; iki temada WCAG AA", async ({ page }) => {
+  const p = phone(985);
+  const C = await apiUser(p, "carrier", "Profil Gizli Ad");
+  const company = (await api("POST", "/companies", C.accessToken, { title: "Ege Profil Nakliyat" })).body;
+  // Plaka etkin araçlar arasında tekil: önceki koşuların araçlarıyla çakışmasın diye rastgele, sonda silinir
+  const plate = `35EP${String(Math.floor(Math.random() * 100000)).padStart(5, "0")}`;
+  const vehicle = await api("POST", "/vehicles", C.accessToken, { plate, vehicleType: "tir", bodyType: "tenteli", capacityTon: 25 });
+  expect(vehicle.status, JSON.stringify(vehicle.body)).toBe(201);
+  await page.goto(`/nakliyeci/${company.id}`);
+  await expect(page.getByRole("main").getByRole("alert")).toContainText("Profil bulunamadı");
+
+  await api("PATCH", "/companies", C.accessToken, { publicProfile: true });
+  for (const scheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.goto(`/nakliyeci/${company.id}`);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Ege Profil Nakliyat");
+    await expect(page.getByText("Belgeleri henüz onaylanmadı")).toBeVisible();
+    await expect(page.getByText("Henüz yok")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Araçlar" })).toContainText("1 Tır");
+    await expect(page.getByRole("region", { name: "Araçlar" })).toContainText("Tenteli");
+    const text = await page.locator("body").innerText();
+    for (const secret of ["Profil Gizli Ad", plate, localPhone(p), p]) expect(text, secret).not.toContain(secret);
+    const r = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
+    expect(r.violations.map((v) => `${scheme}: ${v.id} ${v.nodes.map((n) => n.target.join(" ")).join(" | ")}`)).toEqual([]);
+  }
+  // Arama motoruna kapalı
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+  await api("PATCH", "/companies", C.accessToken, { publicProfile: false });
+  await page.goto(`/nakliyeci/${company.id}`);
+  await expect(page.getByRole("main").getByRole("alert")).toContainText("Profil bulunamadı");
+  await api("DELETE", `/vehicles/${vehicle.body.id}`, C.accessToken);
+});
+
 test("rota formu: 81 il API ile aynı ve alfabetik; girişsiz gönderim girişten sonra ilan formunu illerle açar", async ({ page }) => {
   const provinces = (await (await fetch(`${API}/locations`)).json()) as { id: number; name: string }[];
   await page.goto("/");

@@ -340,3 +340,17 @@ export interface PublicFeed {
   activeLoads: number;
   loads: { origin: Place; dest: Place; loadFrom: string; loadTo: string; cargoType: CargoType; weightTon: number; vehicleType: VehicleType; status: LoadStatus; lastConfirmedAt: string }[];
 }
+
+/** Herkese açık nakliyeci profili (GET /public/carriers/:id): telefon, kişi adı, plaka, vergi no yok */
+export interface PublicCarrier {
+  id: string;
+  title: string;
+  verificationLevel: 0 | 1 | 2;
+  companyVerified: boolean;
+  memberSince: string;
+  rating: number | null;
+  ratingCount: number;
+  completedJobs: number;
+  /** Büyükten küçüğe araç tipi */
+  vehicles: { vehicleType: VehicleType; count: number; bodyTypes: BodyType[] }[];
+}

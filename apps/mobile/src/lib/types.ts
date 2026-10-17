@@ -13,7 +13,8 @@ export interface Me {
   roles: Role[];
   verified: boolean;
   trustScore: number;
-  company: { title: string } | null;
+  /** publicProfile: herkese açık nakliyeci profili (web /nakliyeci/<id>) */
+  company: { id: string; title: string; publicProfile: boolean } | null;
 }
 
 export interface Tokens {

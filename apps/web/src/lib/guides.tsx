@@ -1,13 +1,14 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { RETURN_PLAN_PARAMS } from "@nakliye/shared";
+import type { GuideSlug } from "./guide-slugs";
 
 // Rehber yazıları (SEO). Yasal bilgiler resmî metinlerden doğrulandı (2026-10-17): Karayolu Taşıma Yönetmeliği (KTY,
 // UHDGM metni + 15.05.2025 ve 16.05.2026 değişiklikleri) ve Karayolu Taşımacılık Faaliyetleri Mesleki Yeterlilik Eğitimi
 // Yönetmeliği (29.01.2026'ya kadar işlenmiş). Kaynakta doğrulanamayan bilgi yazılmadı ya da "yaklaşık" diye işaretlendi.
 
 export interface Guide {
-  slug: string;
+  slug: GuideSlug;
   title: string;
   description: string;
   /** Bilgilerin en son resmî kaynakla karşılaştırıldığı gün */

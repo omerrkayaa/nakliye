@@ -1,0 +1,1 @@
+ALTER TABLE "companies" ADD COLUMN "public_profile" boolean DEFAULT false NOT NULL;
