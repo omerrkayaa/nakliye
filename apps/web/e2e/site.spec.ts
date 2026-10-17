@@ -12,6 +12,16 @@ test("tanıtım sayfası: değer önerisi, panele giriş, nasıl çalışır ve 
   await expect(page.getByText("Nakliyeci uygulaması (Android) yakında")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Nasıl çalışır" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Kartlardaki işaretler ne anlama geliyor?" })).toBeVisible();
+  // Panel ve uygulama ekranları: üç görüntü yükleniyor ve açıklamalı
+  const shots = page.getByRole("region", { name: "Panel ve uygulama" }).getByRole("img");
+  await expect(shots).toHaveCount(3);
+  for (const img of await shots.all()) {
+    await img.scrollIntoViewIfNeeded();
+    await expect(img).toHaveAttribute("alt", /.{40,}/);
+    await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true);
+  }
+  // Sayfa sonundaki çağrı ilan formuna gider
+  await expect(page.getByRole("region", { name: "Yükünüzü bugün ilan edin" }).getByRole("link", { name: "İlan ver" })).toHaveAttribute("href", "/panel/ilanlar/yeni");
   // Girişsiz panel → giriş sayfası
   await page.getByRole("link", { name: "Yük sahibiyim, panele gir" }).click();
   await expect(page).toHaveURL(/\/giris\?sonra=%2Fpanel$/);

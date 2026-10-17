@@ -4,8 +4,10 @@ import type { LucideIcon } from "lucide-react";
 import { Faq } from "@/components/faq";
 import { HeroMap } from "@/components/hero-map/hero-map";
 import { LiveFeed } from "@/components/live-feed";
+import { ProductShots } from "@/components/product-shots";
 import { RouteForm } from "@/components/route-form";
 import { SiteFooter, SiteHeader } from "@/components/site-chrome";
+import { buttonVariants } from "@/components/ui/button";
 import { PROVINCES, ROUTE_PAGES } from "@/lib/route-pages";
 
 const FEATURES: [LucideIcon, string, string][] = [
@@ -28,7 +30,7 @@ const CARRIER_STEPS = [
   ["Boş dönüşü bildirin", "Aracınız nerede boşalıyor? Uyan yük çıkınca bildirim gelir."],
 ];
 
-/** W1 tanıtım sayfası (docs/02 §5a): değer önerisi, farklar, nasıl çalışır, rozetlerin anlamı (W3 özeti), canlı yük akışı, SSS. */
+/** W1 tanıtım sayfası (docs/02 §5a): değer önerisi, farklar, nasıl çalışır, rozetlerin anlamı (W3 özeti), canlı yük akışı, panel ve uygulama ekranları, SSS. */
 export default function Home() {
   return (
     <>
@@ -86,6 +88,8 @@ export default function Home() {
           </div>
         </section>
 
+        <ProductShots />
+
         <section id="guven" aria-labelledby="guven-baslik" className="border-t bg-muted/30">
           <div className="mx-auto max-w-5xl space-y-6 px-4 py-14">
             <h2 id="guven-baslik" className="text-2xl font-bold">
@@ -101,7 +105,21 @@ export default function Home() {
 
         <Faq />
 
-        <div className="border-t bg-muted/30">
+        <section aria-labelledby="basla" className="bg-primary text-primary-foreground">
+          <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-14 sm:flex-row sm:items-center sm:justify-between">
+            <div className="max-w-xl space-y-2">
+              <h2 id="basla" className="text-2xl font-bold">
+                Yükünüzü bugün ilan edin
+              </h2>
+              <p className="text-primary-foreground/80">Teyitli ilanlar, kodla teslim ve yalnız tamamlanan işten puan. Deneme aşamasında kullanmak ücretsiz.</p>
+            </div>
+            <Link href="/panel/ilanlar/yeni" className={buttonVariants({ variant: "secondary", size: "lg", className: "h-12 shrink-0 px-6" })}>
+              İlan ver <ArrowRight aria-hidden />
+            </Link>
+          </div>
+        </section>
+
+        <div className="bg-muted/30">
           <nav aria-labelledby="guzergahlar" className="mx-auto max-w-5xl space-y-4 px-4 py-14">
             <h2 id="guzergahlar" className="text-2xl font-bold">
               Güzergâhlar

@@ -77,7 +77,7 @@ async function Load({ params, searchParams }: Pick<PageProps<"/panel/ilanlar/[id
             {l.note && <Item term="Not">{l.note}</Item>}
           </dl>
           {(visible || l.status === "moderasyonda") && (
-            <div className="flex flex-wrap items-start gap-3 border-t pt-4">
+            <div className="flex flex-wrap items-center gap-3 border-t pt-4">
               {visible && <ConfirmButton id={l.id} />}
               {visible && <ShareButtons url={SITE_URL + sharePath(l.shareId)} text={loadShareText(l, SITE_URL + sharePath(l.shareId))} />}
               <CloseButtons id={l.id} canFind={visible} />

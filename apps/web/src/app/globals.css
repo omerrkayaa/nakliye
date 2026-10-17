@@ -134,5 +134,7 @@
   }
   html {
     @apply font-sans;
+    /* Tanıtım sayfasının yapışkan üst bilgisi bağlantıyla gidilen başlığı örtmesin */
+    scroll-padding-top: 4.5rem;
   }
 }

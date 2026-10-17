@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { Truck } from "lucide-react";
 import type { ReactNode } from "react";
+import { buttonVariants } from "@/components/ui/button";
 
 /** Herkese açık sayfaların (W1–W4) üst ve alt bilgisi. */
 export function SiteHeader() {
   return (
-    <header className="border-b">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4">
+    <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75">
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
         <Link href="/" className="flex items-center gap-2 font-bold text-primary">
           <Truck className="size-6" aria-hidden /> Nakliye
         </Link>
@@ -20,7 +21,7 @@ export function SiteHeader() {
           <Link href="/#sss" className="hidden underline-offset-4 hover:underline sm:inline">
             SSS
           </Link>
-          <Link href="/panel" className="font-medium text-primary underline-offset-4 hover:underline">
+          <Link href="/panel" className={buttonVariants({ size: "sm" })}>
             Giriş
           </Link>
         </nav>
