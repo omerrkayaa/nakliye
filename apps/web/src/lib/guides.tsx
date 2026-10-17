@@ -210,9 +210,9 @@ export const GUIDES: Guide[] = [
         <section>
           <h2>Platformda</h2>
           <p>
-            Ayrı bir &quot;parsiyel&quot; seçeneği yok: ilanda yükünüzün tonajını doğru yazmanız yeterli. Nakliyeciler aracının taşıyabileceğinden ağır
-            yükleri görmez; hafif yükünüz uygun araçtaki nakliyecilerin hepsine görünür. Nakliyecinin dönüş yolunun üstündeki yükler{" "}
-            <A href="/#donus-plani">Dönüş Planı</A>&apos;nda öne çıkar.
+            Ayrı bir &quot;parsiyel&quot; seçeneği yok: ilanda yükünüzün tonajını doğru yazmanız yeterli. Yük aramada ilanların hepsi görünür; nakliyeciye
+            önerilen eşleşmelerde ise aracının kapasitesini aşan yükler çıkmaz, yani hafif yükünüz onu alabilecek araçların karşısına çıkar. Nakliyecinin
+            dönüş yolunun üstündeki yükler <A href="/#donus-plani">Dönüş Planı</A>&apos;nda öne çıkar.
           </p>
         </section>
       </>
