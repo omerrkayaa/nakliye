@@ -3,12 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ArrowRight, Smartphone } from "lucide-react";
-import { VEHICLE_TYPES } from "@nakliye/shared";
+import { PriceTable } from "@/components/price-table";
 import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { buttonVariants } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api } from "@/lib/api";
-import { tl } from "@/lib/format";
 import { ROUTE_PAGES, routePage, type RoutePage } from "@/lib/route-pages";
 import type { RouteSummary } from "@/lib/types";
 
@@ -126,28 +124,7 @@ async function Live({ route }: { route: RoutePage }) {
         <h2 id="fiyat" className="text-xl font-semibold">
           Tahmini taşıma ücreti
         </h2>
-        <Table data-testid="price-table">
-          <TableHeader>
-            <TableRow>
-              <TableHead>Araç</TableHead>
-              <TableHead className="text-right">Tahmini aralık</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {s.estimates.map((e) => (
-              <TableRow key={e.vehicleType}>
-                <TableCell>{VEHICLE_TYPES[e.vehicleType]}</TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {tl(e.min)} – {tl(e.max)}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        <p className="text-sm text-muted-foreground">
-          {s.source === "karayolu" ? "Karayolu" : "Yaklaşık"} {s.distanceKm} km (il merkezleri arası). Yakıt, şoför ve araç gideri üzerinden hesaplanır; otoyol/köprü
-          ücreti dahil değildir. Gerçek fiyat yüke, tarihe ve yükleme yerine göre değişir.
-        </p>
+        <PriceTable summary={s} />
       </section>
     </>
   );

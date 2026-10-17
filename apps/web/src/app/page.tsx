@@ -5,6 +5,7 @@ import { AudienceTabs } from "@/components/audience-tabs";
 import { Faq } from "@/components/faq";
 import { HeroMap } from "@/components/hero-map/hero-map";
 import { LiveFeed } from "@/components/live-feed";
+import { PriceForm } from "@/components/price-form";
 import { ProductShots } from "@/components/product-shots";
 import { ReturnPlanSection } from "@/components/return-plan/return-plan-section";
 import { RouteForm } from "@/components/route-form";
@@ -77,6 +78,18 @@ export default function Home() {
         </section>
 
         <ReturnPlanSection />
+
+        <section aria-labelledby="fiyat-baslik" className="mx-auto max-w-5xl space-y-5 px-4 py-14">
+          <div className="max-w-2xl space-y-2">
+            <h2 id="fiyat-baslik" className="text-2xl font-bold">
+              Bu yol ne tutar?
+            </h2>
+            <p className="text-muted-foreground">İki il seçin; karayolu mesafesini ve araç tipine göre tahmini taşıma ücretini görün.</p>
+          </div>
+          <div className="max-w-3xl">
+            <PriceForm id="ana-fiyat" />
+          </div>
+        </section>
 
         <ProductShots />
 

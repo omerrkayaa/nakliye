@@ -73,6 +73,35 @@ test("Dönüş Planı canlandırması: rota üstü kuralıyla uyan ve elenen ör
   }
 });
 
+test("fiyat hesaplayıcı: tanıtımdan il → il, araç tiplerine göre aralık; aynı il ve geçersiz il uyarısı; varsayım açıklaması", async ({ page }) => {
+  await page.goto("/");
+  const form = page.getByRole("form", { name: "Taşıma ücreti hesapla" });
+  await form.getByLabel("Nereden").selectOption({ label: "İzmir" });
+  await form.getByLabel("Nereye").selectOption({ label: "Ankara" });
+  await form.getByRole("button", { name: "Hesapla" }).click();
+  await expect(page).toHaveURL(/\/fiyat\?nereden=35&nereye=6$/);
+  await expect(page.getByRole("heading", { name: /^İzmir → Ankara: (yaklaşık )?\d+ km$/ })).toBeVisible();
+  const rows = page.getByTestId("price-table").getByRole("row");
+  await expect(rows).toHaveCount(6); // başlık + 5 araç tipi
+  await expect(rows.nth(1)).toContainText(/Tır.*₺ – .*₺/);
+  // Seçim formda korunur; ilan formuna ve güzergâh sayfasına bağlantı
+  await expect(page.getByLabel("Nereden")).toHaveValue("35");
+  await expect(page.getByRole("link", { name: "Bu güzergâhta ilan ver" })).toHaveAttribute("href", "/panel/ilanlar/yeni?nereden=35&nereye=6");
+  await expect(page.getByRole("link", { name: "İzmir – Ankara nakliye sayfası" })).toHaveAttribute("href", "/nakliye/izmir-ankara");
+  await expect(page.getByRole("region", { name: "Bu aralık nasıl hesaplanıyor?" })).toContainText("başlangıç varsayımıdır");
+  // Koridor dışı güzergâh da hesaplanır (güzergâh sayfası yok)
+  await page.goto("/fiyat?nereden=1&nereye=25");
+  await expect(page.getByRole("heading", { name: /^Adana → Erzurum: / })).toBeVisible();
+  await expect(page.getByRole("link", { name: /nakliye sayfası/ })).toHaveCount(0);
+  await page.goto("/fiyat?nereden=35&nereye=35");
+  await expect(page.getByRole("main").getByRole("alert")).toHaveText("Kalkış ve varış ili farklı olmalı.");
+  await page.goto("/fiyat?nereden=99&nereye=6");
+  await expect(page.getByRole("main").getByRole("alert")).toHaveText("İl bulunamadı. Listeden iki il seçin.");
+  await page.goto("/fiyat");
+  await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
+  await expect(page.getByTestId("price-table")).toHaveCount(0);
+});
+
 test("rota formu: 81 il API ile aynı ve alfabetik; girişsiz gönderim girişten sonra ilan formunu illerle açar", async ({ page }) => {
   const provinces = (await (await fetch(`${API}/locations`)).json()) as { id: number; name: string }[];
   await page.goto("/");

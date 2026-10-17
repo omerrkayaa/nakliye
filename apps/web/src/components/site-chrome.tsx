@@ -16,6 +16,9 @@ export function SiteHeader() {
           <Link href="/#nasil-calisir" className="hidden underline-offset-4 hover:underline sm:inline">
             Nasıl çalışır
           </Link>
+          <Link href="/fiyat" className="hidden underline-offset-4 hover:underline sm:inline">
+            Fiyat hesapla
+          </Link>
           <Link href="/#guven" className="hidden underline-offset-4 hover:underline sm:inline">
             Güven
           </Link>
