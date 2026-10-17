@@ -41,6 +41,9 @@ export function SiteFooter() {
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-4 py-6 text-sm text-muted-foreground">
         <p>© 2026 Nakliye · Bilgisayar Mühendisliği tez projesi</p>
         <nav aria-label="Kurumsal" className="flex flex-wrap gap-4">
+          <Link href="/rehber" className="underline-offset-4 hover:underline">
+            Rehber
+          </Link>
           <Link href="/hakkimizda" className="underline-offset-4 hover:underline">
             Hakkımızda
           </Link>

@@ -112,6 +112,23 @@ test("hakkımızda: alt bilgiden açılır; neden, farklar, bilerek yapmadıklar
   await expect(page.getByRole("link", { name: "Bize ulaşın" })).toHaveAttribute("href", "/iletisim");
 });
 
+test("rehber: alt bilgiden dizine, dizinden yazıya; son kontrol tarihi, kaynaklar ve danışmanlık uyarısı; bilinmeyen yazı 404", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("contentinfo").getByRole("link", { name: "Rehber" }).click();
+  await expect(page).toHaveURL(/rehber$/);
+  const items = page.getByRole("main").getByRole("listitem");
+  await expect(items).toHaveCount(4);
+  await page.getByRole("link", { name: /Nakliyede gerekli belgeler/ }).click();
+  await expect(page).toHaveURL(/rehber\/nakliye-belgeleri$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Nakliyede gerekli belgeler: K belgesi, SRC ve irsaliye");
+  await expect(page.getByText(/^Son kontrol: /)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Kaynaklar" })).toBeVisible();
+  await expect(page.getByText("hukuki ya da mali danışmanlık değildir")).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Diğer rehberler" }).getByRole("link")).toHaveCount(3);
+  const r = await page.goto("/rehber/olmayan-yazi");
+  expect(r?.status()).toBe(404);
+});
+
 test("rota formu: 81 il API ile aynı ve alfabetik; girişsiz gönderim girişten sonra ilan formunu illerle açar", async ({ page }) => {
   const provinces = (await (await fetch(`${API}/locations`)).json()) as { id: number; name: string }[];
   await page.goto("/");
@@ -210,7 +227,7 @@ test("yasal sayfalar: alt bilgiden açılır, taslak uyarısı var", async ({ pa
 
 test("telefon genişliğinde (390 px) herkese açık sayfalar yatay taşmaz", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const path of ["/", "/fiyat?nereden=35&nereye=6", "/hakkimizda", "/kvkk", "/kullanim-sartlari", "/iletisim", "/giris"]) {
+  for (const path of ["/", "/fiyat?nereden=35&nereye=6", "/hakkimizda", "/rehber", "/rehber/nakliye-belgeleri", "/kvkk", "/kullanim-sartlari", "/iletisim", "/giris"]) {
     await page.goto(path);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), path).toBe(true);
     if (process.env.SHOTS && path === "/") await page.screenshot({ path: `${process.env.SHOTS}/tanitim-390.png`, fullPage: true });
