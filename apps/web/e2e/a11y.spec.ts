@@ -70,7 +70,7 @@ test.beforeAll(async () => {
 });
 
 test("herkese açık sayfalar ve giriş adımları WCAG AA ihlali içermez", async ({ page }) => {
-  const found = await scanPaths(page, ["/", "/giris", "/kvkk", "/kullanim-sartlari", "/iletisim", "/nakliye/izmir-ankara", `/ilan/${shareId}`]);
+  const found = await scanPaths(page, ["/", "/fiyat?nereden=35&nereye=6", "/hakkimizda", "/giris", "/kvkk", "/kullanim-sartlari", "/iletisim", "/nakliye/izmir-ankara", `/ilan/${shareId}`]);
   // Giriş: kod adımı (hata mesajı görünürken)
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/giris");

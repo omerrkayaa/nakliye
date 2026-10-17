@@ -102,6 +102,16 @@ test("fiyat hesaplayıcı: tanıtımdan il → il, araç tiplerine göre aralık
   await expect(page.getByTestId("price-table")).toHaveCount(0);
 });
 
+test("hakkımızda: alt bilgiden açılır; neden, farklar, bilerek yapmadıklarımız, kim geliştiriyor; iletişime bağlantı", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("contentinfo").getByRole("link", { name: "Hakkımızda" }).click();
+  await expect(page).toHaveURL(/hakkimizda$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Hakkımızda");
+  for (const h of ["Neden?", "Neyi farklı yapıyoruz?", "Bilerek yapmadıklarımız", "Kim geliştiriyor?"]) await expect(page.getByRole("heading", { name: h })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Bilerek yapmadıklarımız" }).getByRole("listitem")).toHaveCount(3);
+  await expect(page.getByRole("link", { name: "Bize ulaşın" })).toHaveAttribute("href", "/iletisim");
+});
+
 test("rota formu: 81 il API ile aynı ve alfabetik; girişsiz gönderim girişten sonra ilan formunu illerle açar", async ({ page }) => {
   const provinces = (await (await fetch(`${API}/locations`)).json()) as { id: number; name: string }[];
   await page.goto("/");
@@ -200,7 +210,7 @@ test("yasal sayfalar: alt bilgiden açılır, taslak uyarısı var", async ({ pa
 
 test("telefon genişliğinde (390 px) herkese açık sayfalar yatay taşmaz", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const path of ["/", "/kvkk", "/kullanim-sartlari", "/iletisim", "/giris"]) {
+  for (const path of ["/", "/fiyat?nereden=35&nereye=6", "/hakkimizda", "/kvkk", "/kullanim-sartlari", "/iletisim", "/giris"]) {
     await page.goto(path);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), path).toBe(true);
     if (process.env.SHOTS && path === "/") await page.screenshot({ path: `${process.env.SHOTS}/tanitim-390.png`, fullPage: true });

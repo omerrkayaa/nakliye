@@ -40,7 +40,10 @@ export function SiteFooter() {
     <footer className="mt-auto border-t bg-muted/30">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-4 py-6 text-sm text-muted-foreground">
         <p>© 2026 Nakliye · Bilgisayar Mühendisliği tez projesi</p>
-        <nav aria-label="Yasal" className="flex flex-wrap gap-4">
+        <nav aria-label="Kurumsal" className="flex flex-wrap gap-4">
+          <Link href="/hakkimizda" className="underline-offset-4 hover:underline">
+            Hakkımızda
+          </Link>
           <Link href="/kvkk" className="underline-offset-4 hover:underline">
             KVKK aydınlatma metni
           </Link>
