@@ -35,7 +35,7 @@ async function Profile() {
         </p>
         {c &&
           (c.verified ? (
-            <p className="flex items-center gap-1 font-medium text-emerald-700">
+            <p className="flex items-center gap-1 font-medium text-emerald-700 dark:text-emerald-400">
               <BadgeCheck className="size-4" aria-hidden /> Firma doğrulandı
             </p>
           ) : (

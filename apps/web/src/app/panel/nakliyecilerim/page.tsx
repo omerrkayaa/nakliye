@@ -48,7 +48,7 @@ async function Carriers() {
             <p className="flex items-center gap-2 font-semibold">
               {c.displayName ?? "Adsız nakliyeci"}
               {c.verified && (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                   <BadgeCheck className="size-4" aria-hidden /> Doğrulanmış
                 </span>
               )}

@@ -4,9 +4,9 @@ import { cn } from "cn";
 
 // Durum yalnız renkle değil ikon ve metinle de belirtilir (docs/02 §7, renk körlüğü)
 const STYLE: Record<LoadStatus, { icon: LucideIcon; className: string }> = {
-  teyitli: { icon: CircleCheck, className: "bg-emerald-50 text-emerald-800 border-emerald-200" },
-  teyit_bekliyor: { icon: Clock, className: "bg-amber-50 text-amber-900 border-amber-300" },
-  moderasyonda: { icon: Hourglass, className: "bg-sky-50 text-sky-900 border-sky-200" },
+  teyitli: { icon: CircleCheck, className: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-100 border-emerald-200 dark:border-emerald-800" },
+  teyit_bekliyor: { icon: Clock, className: "bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-100 border-amber-300 dark:border-amber-800" },
+  moderasyonda: { icon: Hourglass, className: "bg-sky-50 dark:bg-sky-950/40 text-sky-900 dark:text-sky-100 border-sky-200 dark:border-sky-800" },
   suresi_doldu: { icon: TimerOff, className: "bg-muted text-muted-foreground border-border" },
   kapandi: { icon: Lock, className: "bg-muted text-muted-foreground border-border" },
   iptal: { icon: CircleX, className: "bg-muted text-muted-foreground border-border" },

@@ -75,7 +75,7 @@ async function JobView({ params }: Pick<PageProps<"/panel/tasimalar/[id]">, "par
             <Item term={shipper ? "Nakliyeci" : "Yük sahibi"}>
               <span className="inline-flex items-center gap-2">
                 {j.counterpart.displayName ?? "—"}
-                {j.counterpart.verified && <BadgeCheck className="size-4 text-emerald-700" aria-label="Doğrulanmış" />}
+                {j.counterpart.verified && <BadgeCheck className="size-4 text-emerald-700 dark:text-emerald-400" aria-label="Doğrulanmış" />}
               </span>
             </Item>
             <Item term="Telefon">
@@ -165,7 +165,7 @@ function StatusNote({ j }: { j: JobDetail }) {
       );
     case "teslim_edildi":
       return (
-        <p className={`${box} border-amber-300 bg-amber-50 text-amber-950`}>
+        <p className={`${box} border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-950 dark:text-amber-100`}>
           Yük teslim edildi. Sorun varsa {j.autoCompleteAt ? `${at(j.autoCompleteAt)} tarihine kadar` : "48 saat içinde"} itiraz edin; itiraz
           edilmezse taşıma otomatik tamamlanır.
         </p>

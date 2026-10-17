@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Truck } from "lucide-react";
 import type { ReactNode } from "react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { buttonVariants } from "@/components/ui/button";
 
 /** Herkese açık sayfaların (W1–W4) üst ve alt bilgisi. */
@@ -21,6 +22,7 @@ export function SiteHeader() {
           <Link href="/#sss" className="hidden underline-offset-4 hover:underline sm:inline">
             SSS
           </Link>
+          <ThemeToggle />
           <Link href="/panel" className={buttonVariants({ size: "sm" })}>
             Giriş
           </Link>

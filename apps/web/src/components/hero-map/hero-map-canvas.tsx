@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { onThemeChange } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import type { HeroMapData } from "./projection";
 import type { HeroScene } from "./scene";
@@ -34,6 +35,7 @@ export function HeroMapCanvas({ fallback }: { fallback: ReactNode }) {
     });
     io.observe(el);
     document.addEventListener("visibilitychange", sync);
+    const stopTheme = onThemeChange(() => scene?.applyTheme());
 
     const fail = () => {
       scene?.dispose();
@@ -73,6 +75,7 @@ export function HeroMapCanvas({ fallback }: { fallback: ReactNode }) {
       else window.clearTimeout(idle);
       io.disconnect();
       document.removeEventListener("visibilitychange", sync);
+      stopTheme();
       scene?.dispose();
     };
   }, [router]);

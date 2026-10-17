@@ -75,7 +75,7 @@ function NewCode({ id }: { id: string }) {
     <form action={dispatch} className="space-y-2">
       <input type="hidden" name="id" value={id} />
       {state.deliveryCode ? (
-        <p role="status" className="rounded-lg bg-emerald-50 p-3 text-emerald-950">
+        <p role="status" className="rounded-lg bg-emerald-50 dark:bg-emerald-950/40 p-3 text-emerald-950 dark:text-emerald-100">
           Yeni teslim kodunuz: <span className="font-mono text-xl font-bold tracking-[0.3em]">{state.deliveryCode}</span>
           <span className="block text-sm">Eski kod artık geçersiz. Kod SMS ile de gönderildi.</span>
         </p>

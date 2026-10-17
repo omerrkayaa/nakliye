@@ -105,15 +105,15 @@ export default function Home() {
 
         <Faq />
 
-        <section aria-labelledby="basla" className="bg-primary text-primary-foreground">
+        <section aria-labelledby="basla" className="bg-primary text-primary-foreground dark:border-y dark:bg-card dark:text-card-foreground">
           <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-14 sm:flex-row sm:items-center sm:justify-between">
             <div className="max-w-xl space-y-2">
               <h2 id="basla" className="text-2xl font-bold">
                 Yükünüzü bugün ilan edin
               </h2>
-              <p className="text-primary-foreground/80">Teyitli ilanlar, kodla teslim ve yalnız tamamlanan işten puan. Deneme aşamasında kullanmak ücretsiz.</p>
+              <p className="text-primary-foreground/80 dark:text-muted-foreground">Teyitli ilanlar, kodla teslim ve yalnız tamamlanan işten puan. Deneme aşamasında kullanmak ücretsiz.</p>
             </div>
-            <Link href="/panel/ilanlar/yeni" className={buttonVariants({ variant: "secondary", size: "lg", className: "h-12 shrink-0 px-6" })}>
+            <Link href="/panel/ilanlar/yeni" className={buttonVariants({ variant: "secondary", size: "lg", className: "h-12 shrink-0 px-6 dark:bg-primary dark:text-primary-foreground" })}>
               İlan ver <ArrowRight aria-hidden />
             </Link>
           </div>

@@ -55,7 +55,7 @@ export function ProductShots() {
 function Phone({ src, alt, caption }: { src: StaticImageData; alt: string; caption: string }) {
   return (
     <figure className="space-y-3">
-      <div className="overflow-hidden rounded-[1.75rem] border-[5px] border-primary bg-primary shadow-lg shadow-primary/10">
+      <div className="overflow-hidden rounded-[1.75rem] border-[5px] border-primary bg-primary shadow-lg shadow-primary/10 dark:border-slate-700 dark:bg-slate-700">
         <Image src={src} alt={alt} sizes="(min-width: 1024px) 180px, 45vw" placeholder="blur" className="rounded-[1.4rem]" />
       </div>
       <figcaption className="text-sm text-muted-foreground">{caption}</figcaption>

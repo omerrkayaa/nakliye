@@ -47,7 +47,7 @@ async function Load({ params, searchParams }: Pick<PageProps<"/panel/ilanlar/[id
   return (
     <>
       {yeni && (
-        <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+        <p role="status" className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-4 text-emerald-900 dark:text-emerald-100">
           {l.status === "moderasyonda"
             ? "İlanınız alındı. Yeni hesapların ilk ilanları kısa bir kontrolden sonra yayına çıkar."
             : "İlanınız yayında. Uygun boş aracı olan ve bu güzergâha alarm kuran nakliyeciler bilgilendirilir."}

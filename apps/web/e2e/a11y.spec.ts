@@ -1,10 +1,14 @@
 // NFR-06 erişilebilirlik: WCAG 2.0/2.1/2.2 A ve AA kurallarıyla otomatik tarama (axe-core). Herkese açık sayfalar,
-// giriş adımları, yük sahibi paneli ve yönetim bölümü; masaüstü ve telefon genişliği (telefonda yatay taşma da, NFR-03).
+// giriş adımları, yük sahibi paneli ve yönetim bölümü; masaüstü ve telefon genişliği (telefonda yatay taşma da, NFR-03),
+// açık ve koyu tema (koyu: sistem tercihi taklit edilir; kayıtlı seçim yokken sayfa onu izler).
 // Otomatik tarama WCAG'in yalnız bir kısmını yakalar (renk kontrastı, etiket, ad, rol, hedef boyutu…); klavye ve ekran
 // okuyucu denemesi ayrıca gerekir.
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { adminToken, api, apiLogin, apiUser, createLoad, localPhone, phone, psql, adminSession } from "./helpers";
+
+// İki tema × iki genişlik: sayfa grubu başına tarama sayısı dört katı
+test.describe.configure({ timeout: 240_000 });
 
 // Seri değil: bir sayfa grubunda ihlal çıksa da diğerleri taransın (dosya içindeki testler yine sırayla çalışır)
 
@@ -27,16 +31,21 @@ async function scan(page: Page, label: string): Promise<Finding[]> {
 }
 async function scanPaths(page: Page, paths: string[]) {
   const all: Finding[] = [];
-  for (const width of [1280, 390]) {
-    await page.setViewportSize({ width, height: 900 });
-    for (const p of paths) {
-      await page.goto(p);
-      all.push(...(await scan(page, `${p} @${width}`)));
-      // NFR-03 "mobilde de çalışır" (WCAG 1.4.10 yeniden akış): telefon genişliğinde yatay kaydırma olmamalı
-      const sw = await page.evaluate(() => document.documentElement.scrollWidth);
-      if (width < 1000 && sw > width) all.push({ path: `${p} @${width}`, id: "yatay-tasma", impact: "serious", help: `Sayfa ${sw} px genişliğinde, yatay kayıyor`, count: 1, targets: [] });
+  for (const scheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const p of paths) {
+        await page.goto(p);
+        await expect(page.locator("html")).toHaveAttribute("data-theme", scheme);
+        all.push(...(await scan(page, `${p} @${width} ${scheme}`)));
+        // NFR-03 "mobilde de çalışır" (WCAG 1.4.10 yeniden akış): telefon genişliğinde yatay kaydırma olmamalı
+        const sw = await page.evaluate(() => document.documentElement.scrollWidth);
+        if (width < 1000 && sw > width) all.push({ path: `${p} @${width}`, id: "yatay-tasma", impact: "serious", help: `Sayfa ${sw} px genişliğinde, yatay kayıyor`, count: 1, targets: [] });
+      }
     }
   }
+  await page.emulateMedia({ colorScheme: "light" });
   return all;
 }
 const report = (f: Finding[]) => f.map((x) => `${x.path}: [${x.impact}] ${x.id} (${x.count}) ${x.help} → ${x.targets.join(" | ")}`).join("\n");

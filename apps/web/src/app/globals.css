@@ -2,7 +2,8 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/* Tema <html data-theme="dark|light">: açılıştaki satır içi betik (layout.tsx) kayıtlı seçimi ya da sistem tercihini yazar */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 @theme inline {
   --color-background: var(--background);
@@ -86,27 +87,38 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  /* Tanıtım haritası (SVG yedeği + three.js sahnesi okur; three.js oklch okuyamadığı için onaltılık) */
+  --map-sky: #e9eff8;
+  --map-land: #f5f7fb;
+  --map-side: #17325b;
+  --map-dot: #b4c1d4;
+  --map-line: #17325b;
+  --map-fill-light: #b9c6da;
+  --map-shadow: 0.14;
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+[data-theme="dark"] {
+  color-scheme: dark;
+  --background: oklch(0.17 0.02 258);
+  --foreground: oklch(0.96 0.005 258);
+  --card: oklch(0.21 0.025 258);
+  --card-foreground: oklch(0.96 0.005 258);
+  --popover: oklch(0.21 0.025 258);
+  --popover-foreground: oklch(0.96 0.005 258);
+  --primary: oklch(0.78 0.1 255);
+  --primary-foreground: oklch(0.18 0.03 258);
+  --brand-accent: oklch(0.74 0.17 50);
+  --brand-accent-foreground: oklch(0.2 0.03 45);
+  --secondary: oklch(0.27 0.025 258);
+  --secondary-foreground: oklch(0.96 0.005 258);
+  --muted: oklch(0.25 0.025 258);
+  --muted-foreground: oklch(0.74 0.02 258);
+  --accent: oklch(0.27 0.025 258);
+  --accent-foreground: oklch(0.96 0.005 258);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.7 0.1 255);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -120,6 +132,13 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --map-sky: #18243a;
+  --map-land: #24334d;
+  --map-side: #0e1a2e;
+  --map-dot: #44587a;
+  --map-line: #9dbdf0;
+  --map-fill-light: #1a2438;
+  --map-shadow: 0.4;
 }
 
 @layer base {

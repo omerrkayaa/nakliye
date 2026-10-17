@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { Bell, LogOut, Truck } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import type { Me } from "@/lib/types";
@@ -9,7 +10,8 @@ import { logoutAction } from "./actions";
 export default function PanelLayout({ children }: LayoutProps<"/panel">) {
   return (
     <div className="flex flex-1 flex-col">
-      <header className="border-b bg-primary text-primary-foreground">
+      {/* Koyu temada birincil renk açık mavi; üst bilgi koyu zeminde kalsın */}
+      <header className="border-b bg-primary text-primary-foreground dark:bg-card dark:text-card-foreground">
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4 sm:gap-6">
           <Link href="/panel" aria-label="Nakliye" className="flex shrink-0 items-center gap-2 font-bold">
             <Truck className="size-5 text-brand-accent" aria-hidden />
@@ -44,12 +46,13 @@ export default function PanelLayout({ children }: LayoutProps<"/panel">) {
             <Suspense>
               <UserName />
             </Suspense>
+            <ThemeToggle className="hover:bg-white/10" />
             <Suspense>
               <NotificationBell />
             </Suspense>
             <form action={logoutAction}>
               {/* Dar ekranda yalnız simge (yönetici menüsüyle başlık 390 px'e sığsın); ad ekran okuyucuda kalır */}
-              <Button type="submit" variant="ghost" size="sm" aria-label="Çıkış" className="text-primary-foreground hover:bg-white/10 hover:text-primary-foreground">
+              <Button type="submit" variant="ghost" size="sm" aria-label="Çıkış" className="text-primary-foreground hover:bg-white/10 hover:text-primary-foreground dark:text-card-foreground dark:hover:text-card-foreground">
                 <LogOut aria-hidden /> <span className="hidden sm:inline">Çıkış</span>
               </Button>
             </form>

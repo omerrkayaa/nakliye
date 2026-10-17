@@ -9,7 +9,7 @@ export function ConfirmAnswer({ id, loadId }: { id: string; loadId: string }) {
   const [state, dispatch, pending] = useActionState<NotifyState, FormData>(answerConfirmAction, {});
   if (state.done) {
     return (
-      <p role="status" className="text-sm font-medium text-emerald-700">
+      <p role="status" className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
         ✓ {state.done}
       </p>
     );

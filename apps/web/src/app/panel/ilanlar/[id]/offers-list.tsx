@@ -21,7 +21,7 @@ export function OffersList({ offers, canAccept }: { offers: Offer[]; canAccept: 
   return (
     <div className="space-y-4">
       {state.deliveryCode && (
-        <div role="status" className="space-y-3 rounded-lg border-2 border-emerald-300 bg-emerald-50 p-5 text-emerald-950">
+        <div role="status" className="space-y-3 rounded-lg border-2 border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-5 text-emerald-950 dark:text-emerald-100">
           <p className="font-semibold">Teklif kabul edildi, taşıma oluştu. Nakliyecinin numarası taşıma sayfasında.</p>
           <p>
             Teslim kodunuz:{" "}
@@ -54,7 +54,7 @@ export function OffersList({ offers, canAccept }: { offers: Offer[]; canAccept: 
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span className="font-medium">{o.carrier.displayName ?? "Nakliyeci"}</span>
                   {o.carrier.verified && (
-                    <span className="inline-flex items-center gap-1 text-sm text-emerald-700">
+                    <span className="inline-flex items-center gap-1 text-sm text-emerald-700 dark:text-emerald-400">
                       <BadgeCheck className="size-4" aria-hidden /> Doğrulanmış
                     </span>
                   )}

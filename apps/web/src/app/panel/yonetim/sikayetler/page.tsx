@@ -93,7 +93,7 @@ function Target({ r }: { r: AdminReport }) {
           {o.status === "askida" && <span className="font-semibold text-destructive"> · Askıda</span>}
         </p>
       )}
-      {r.openOnTarget > 1 && <p className="font-medium text-amber-700">Bu hedefe {r.openOnTarget} açık şikayet var</p>}
+      {r.openOnTarget > 1 && <p className="font-medium text-amber-700 dark:text-amber-400">Bu hedefe {r.openOnTarget} açık şikayet var</p>}
     </div>
   );
 }

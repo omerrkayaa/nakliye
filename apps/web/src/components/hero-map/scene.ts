@@ -50,6 +50,8 @@ export interface SceneOptions {
 
 export interface HeroScene {
   setActive(active: boolean): void;
+  /** Tema değişti: zemin, yol ve ışık renkleri globals.css'teki --map-* değişkenlerinden yeniden okunur */
+  applyTheme(): void;
   dispose(): void;
 }
 
@@ -78,7 +80,8 @@ export function createScene(o: SceneOptions): HeroScene {
   };
 
   // Işık: gökyüzü/zemin dolgu + gölge veren güneş
-  scene.add(new HemisphereLight("#ffffff", "#b9c6da", 2.2));
+  const fill = new HemisphereLight("#ffffff", "#b9c6da", 2.2);
+  scene.add(fill);
   const sun = new DirectionalLight("#ffffff", 1.6);
   sun.position.set(-3, 9, 5);
   sun.castShadow = true;
@@ -93,17 +96,17 @@ export function createScene(o: SceneOptions): HeroScene {
   const shapes = data.outline.map((ring) => new Shape(ring.map(([lon, lat]) => new Vector2(...project(lon, lat)))));
   const landGeo = new ExtrudeGeometry(shapes, { depth: DEPTH, bevelEnabled: true, bevelThickness: BEVEL, bevelSize: BEVEL, bevelSegments: 2, curveSegments: 1 });
   landGeo.rotateX(-Math.PI / 2);
-  const land = new Mesh(landGeo, [
-    new MeshStandardMaterial({ color: "#f5f7fb", roughness: 0.95 }),
-    new MeshStandardMaterial({ color: COLORS.primary, roughness: 0.6 }),
-  ]);
+  const landTop = new MeshStandardMaterial({ color: "#f5f7fb", roughness: 0.95 });
+  const landSide = new MeshStandardMaterial({ color: COLORS.primary, roughness: 0.6 });
+  const land = new Mesh(landGeo, [landTop, landSide]);
   land.castShadow = true;
   land.receiveShadow = true;
   scene.add(land);
   const bounds = new Box3().setFromObject(land);
   const center = bounds.getCenter(new Vector3());
 
-  const ground = new Mesh(new PlaneGeometry(60, 60), new ShadowMaterial({ opacity: 0.14 }));
+  const groundMat = new ShadowMaterial({ opacity: 0.14 });
+  const ground = new Mesh(new PlaneGeometry(60, 60), groundMat);
   ground.rotateX(-Math.PI / 2);
   ground.position.y = -BEVEL - 0.35;
   ground.receiveShadow = true;
@@ -111,7 +114,8 @@ export function createScene(o: SceneOptions): HeroScene {
 
   // 973 ilçe noktası (tek çizim çağrısı)
   const dotGeo = new CircleGeometry(0.02, 10).rotateX(-Math.PI / 2);
-  const dots = new InstancedMesh(dotGeo, new MeshBasicMaterial({ color: "#b4c1d4" }), data.districts.length);
+  const dotMat = new MeshBasicMaterial({ color: "#b4c1d4" });
+  const dots = new InstancedMesh(dotGeo, dotMat, data.districts.length);
   const m = new Matrix4();
   data.districts.forEach(([lon, lat], i) => dots.setMatrixAt(i, m.makeTranslation(at(lon, lat, 0.002))));
   dots.instanceMatrix.needsUpdate = true;
@@ -315,12 +319,13 @@ export function createScene(o: SceneOptions): HeroScene {
     if (!h) return [];
     const el = document.createElement("span");
     el.textContent = h.name;
-    el.className = "pointer-events-none absolute top-0 left-0 hidden rounded-md bg-white/85 px-1.5 py-0.5 text-[11px] font-semibold text-[#17325b] shadow-sm sm:block";
+    el.className =
+      "pointer-events-none absolute top-0 left-0 hidden rounded-md bg-white/85 px-1.5 py-0.5 text-[11px] font-semibold text-[#17325b] shadow-sm sm:block dark:bg-slate-900/85 dark:text-slate-100";
     host.appendChild(el);
     return [{ el, pos: h.pos }];
   });
   const tip = document.createElement("div");
-  tip.className = "pointer-events-none absolute top-0 left-0 hidden max-w-56 rounded-lg bg-[#17325b] px-2.5 py-1.5 text-xs font-medium text-white shadow-lg";
+  tip.className = "pointer-events-none absolute top-0 left-0 hidden max-w-56 rounded-lg bg-[#17325b] px-2.5 py-1.5 text-xs font-medium text-white shadow-lg dark:bg-slate-700";
   host.appendChild(tip);
 
   const v = new Vector3();
@@ -406,6 +411,20 @@ export function createScene(o: SceneOptions): HeroScene {
     placeLabels();
   };
 
+  const applyTheme = () => {
+    const cs = getComputedStyle(document.documentElement);
+    const get = (name: string, fallback: string) => cs.getPropertyValue(name).trim() || fallback;
+    landTop.color.set(get("--map-land", "#f5f7fb"));
+    landSide.color.set(get("--map-side", COLORS.primary));
+    dotMat.color.set(get("--map-dot", "#b4c1d4"));
+    fill.groundColor.set(get("--map-fill-light", "#b9c6da"));
+    groundMat.opacity = Number(get("--map-shadow", "0.14"));
+    const line = get("--map-line", COLORS.primary);
+    for (const mat of [hubMat, haloMat, roadMat, truckMats.trailer]) mat.color.set(line);
+    if (o.reducedMotion) render();
+  };
+  applyTheme();
+
   // Hareket
   const tmp = new Vector3();
   const tan = new Vector3();
@@ -476,6 +495,7 @@ export function createScene(o: SceneOptions): HeroScene {
 
   let active = false;
   return {
+    applyTheme,
     setActive(next) {
       if (o.reducedMotion || next === active) return;
       active = next;

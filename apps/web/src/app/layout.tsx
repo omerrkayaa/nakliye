@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { SITE_URL } from "@/lib/site";
+import { ThemeScript } from "@/components/theme-script";
 import "./globals.css";
 
 // Türkçe karakterler (ı, ş, ğ, İ) latin-ext alt kümesinde
@@ -14,7 +15,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="tr" className={`${inter.variable} h-full antialiased`}>
+    // data-theme'i satır içi betik yazar (sunucu kullanıcının temasını bilmez); suppressHydrationWarning bu farkı kabul ettirir
+    <html lang="tr" className={`${inter.variable} h-full antialiased`} suppressHydrationWarning>
+      <head>
+        <ThemeScript />
+      </head>
       <body className="flex min-h-full flex-col">{children}</body>
     </html>
   );

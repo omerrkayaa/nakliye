@@ -75,7 +75,7 @@ export function BulkUpload() {
                       <TableCell>{r.summary.price}</TableCell>
                       <TableCell className="whitespace-normal">
                         {res?.id ? (
-                          <Link href={`/panel/ilanlar/${res.id}`} className="inline-flex items-center gap-1 text-emerald-700 underline-offset-4 hover:underline">
+                          <Link href={`/panel/ilanlar/${res.id}`} className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 underline-offset-4 hover:underline">
                             <CircleCheck className="size-4" aria-hidden /> {res.status === "moderasyonda" ? "Onay bekliyor" : "Yayında"}
                           </Link>
                         ) : res?.error ? (
@@ -91,7 +91,7 @@ export function BulkUpload() {
                             ))}
                           </ul>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-emerald-700">
+                          <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400">
                             <CircleCheck className="size-4" aria-hidden /> Hazır
                           </span>
                         )}
@@ -104,7 +104,7 @@ export function BulkUpload() {
           </div>
 
           {published ? (
-            <div role="status" className="space-y-3 rounded-lg border-2 border-emerald-300 bg-emerald-50 p-4 text-emerald-950">
+            <div role="status" className="space-y-3 rounded-lg border-2 border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-4 text-emerald-950 dark:text-emerald-100">
               <p className="font-semibold">
                 {publish.created} ilan açıldı{(publish.results?.length ?? 0) > (publish.created ?? 0) ? `, ${(publish.results?.length ?? 0) - (publish.created ?? 0)} satır açılamadı` : ""}.
               </p>

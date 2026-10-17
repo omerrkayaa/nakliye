@@ -49,7 +49,7 @@ export function ProfileForm({ hasCompany, initial }: { hasCompany: boolean; init
         </p>
       )}
       {state.done && !pending && (
-        <p role="status" className="text-sm font-medium text-emerald-700">
+        <p role="status" className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
           Kaydedildi.
         </p>
       )}

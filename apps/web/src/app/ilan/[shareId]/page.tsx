@@ -115,7 +115,7 @@ async function Shared({ params }: Pick<PageProps<"/ilan/[shareId]">, "params">) 
           <p className="flex flex-wrap items-center gap-2 border-t pt-4">
             <span>{l.shipper.displayName ?? "Yük sahibi"}</span>
             {l.shipper.verified && (
-              <span className="inline-flex items-center gap-1 text-sm text-emerald-700">
+              <span className="inline-flex items-center gap-1 text-sm text-emerald-700 dark:text-emerald-400">
                 <BadgeCheck className="size-4" aria-hidden /> Doğrulanmış
               </span>
             )}

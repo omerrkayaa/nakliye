@@ -27,17 +27,17 @@ const LEGEND = [
 export function HeroMap() {
   return (
     <figure className="space-y-3">
-      <div className="relative aspect-[2/1] overflow-hidden lg:aspect-[5/2] rounded-2xl border bg-gradient-to-b from-[#e9eff8] to-white">
+      <div className="relative aspect-[2/1] overflow-hidden lg:aspect-[5/2] rounded-2xl border bg-gradient-to-b from-(--map-sky) to-background">
         <HeroMapCanvas
           fallback={
             <svg viewBox={`${f(minX)} ${f(minY)} ${f(maxX - minX)} ${f(maxY - minY)}`} className="size-full">
-              <path d={data.outline.map((r) => `${line(r)}Z`).join("")} fill="#f5f7fb" stroke={COLORS.primary} strokeWidth={0.06} strokeLinejoin="round" />
+              <path d={data.outline.map((r) => `${line(r)}Z`).join("")} fill="var(--map-land)" stroke="var(--map-line)" strokeWidth={0.06} strokeLinejoin="round" />
               {data.routes.map((r) => (
-                <path key={`${r.from}-${r.to}`} d={line(r.points)} fill="none" stroke={COLORS.primary} strokeOpacity={0.5} strokeWidth={0.035} strokeLinecap="round" />
+                <path key={`${r.from}-${r.to}`} d={line(r.points)} fill="none" stroke="var(--map-line)" strokeOpacity={0.5} strokeWidth={0.035} strokeLinecap="round" />
               ))}
               {data.hubs.map((h) => {
                 const [x, y] = xy(h.lon, h.lat);
-                return <circle key={h.slug} cx={f(x)} cy={f(y)} r={0.07} fill={COLORS.primary} />;
+                return <circle key={h.slug} cx={f(x)} cy={f(y)} r={0.07} fill="var(--map-line)" />;
               })}
             </svg>
           }
@@ -52,7 +52,7 @@ export function HeroMap() {
             </li>
           ))}
           <li className="inline-flex items-center gap-1.5">
-            <span aria-hidden className="h-2 w-4 rounded-sm" style={{ background: `linear-gradient(90deg, ${COLORS.primary} 62%, ${COLORS.accent} 62%)` }} />
+            <span aria-hidden className="h-2 w-4 rounded-sm" style={{ background: `linear-gradient(90deg, var(--map-line) 62%, ${COLORS.accent} 62%)` }} />
             Tır, gerçek karayolu güzergâhında
           </li>
         </ul>

@@ -17,7 +17,7 @@ export function AnswerButtons({ token }: { token: string }) {
 
   if (state.answered) {
     return (
-      <p role="status" className="rounded-lg bg-emerald-50 p-4 font-medium text-emerald-900">
+      <p role="status" className="rounded-lg bg-emerald-50 dark:bg-emerald-950/40 p-4 font-medium text-emerald-900 dark:text-emerald-100">
         {DONE[state.answered]}
       </p>
     );
