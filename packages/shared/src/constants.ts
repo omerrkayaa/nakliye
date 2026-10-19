@@ -36,6 +36,27 @@ export const BODY_TYPES = {
 } as const;
 export type BodyType = keyof typeof BODY_TYPES;
 
+/** Araç tanıma görsellerinde kasa seçilmemişse gösterilen, o araçta en sık görülen kasa */
+export const TYPICAL_BODY: Record<VehicleType, BodyType> = { tir: "tenteli", kirkayak: "damper", kamyon: "acik", kamyonet: "acik", panelvan: "kapali" };
+
+/** Araç tanıma (web 3B görüntüleyici, rehber, mobil seçim): tek cümlelik açıklama. Kapasiteler yaklaşık; kesin değer ruhsatta. */
+export const VEHICLE_TYPE_INFO: Record<VehicleType, string> = {
+  tir: "Çekici ve yarı römorktan oluşur; şehirlerarası komple yüklerin aracı, yaklaşık 25 ton yük alır.",
+  kirkayak: "Dört dingilli büyük kamyon; tırdan kısa olduğu için şehir içine ve dar yükleme alanlarına daha kolay girer.",
+  kamyon: "Orta tonajlı yükler için; bölgesel dağıtımda ve kısa-orta mesafede yaygın.",
+  kamyonet: "Azami yüklü ağırlığı 3,5 tonu geçmeyen hafif yük taşıtı; birkaç paletlik ya da parça yükler için.",
+  panelvan: "Kapalı kasalı hafif ticari araç; koli, küçük eşya ve şehir içi dağıtım için.",
+};
+export const BODY_TYPE_INFO: Record<BodyType, string> = {
+  tenteli: "Brandayla örtülü; yandan ve üstten yükleme yapılabilir, en yaygın kasa.",
+  acik: "Uzun ya da hacimli yükler için; yük bağlanarak taşınır.",
+  kapali: "Yağmur ve hırsızlığa karşı korumalı; arkadan yüklenir.",
+  frigo: "Soğutmalı; gıda ve ilaç gibi sıcaklık hassas yükler için.",
+  damper: "Kasası devrilerek boşaltılır; kum, çakıl, hafriyat gibi dökme yükler için.",
+  kayar_perde: "Yan perdeleri kayarak açılır; yandan forkliftle hızlı yükleme için.",
+  lowbed: "Alçak platformlu; iş makinesi gibi yüksek ve ağır yükler için.",
+};
+
 export const CARGO_TYPES = {
   genel: "Genel kargo",
   palet: "Palet",

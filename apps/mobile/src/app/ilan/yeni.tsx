@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
 import { Choice } from "@/components/choice";
 import { PriceHint } from "@/components/price-hint";
+import { VehiclePreview } from "@/components/vehicle-preview";
 import { DayChips, dayFromToday, DistrictField } from "@/components/place-fields";
 import { Button, Card, Chip, ErrorText, Field, Muted, s } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
@@ -138,6 +139,7 @@ export default function IlanYeni() {
           <Choice label="Araç tipi" options={VEHICLE_TYPES} value={vehicleType} onChange={setVehicleType} error={errors.vehicleType} />
           <Muted>Yeten en küçük aracı seçin; bu tip ya da daha büyük araçlar teklif verebilir.</Muted>
           <Choice label="Kasa tipi" options={BODY_TYPES} value={bodyType} onChange={setBodyType} allLabel="Fark etmez" />
+          <VehiclePreview vehicle={vehicleType} body={bodyType} />
         </Card>
 
         <Card style={{ gap: 16 }}>

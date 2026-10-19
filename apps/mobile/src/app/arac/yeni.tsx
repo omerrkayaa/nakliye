@@ -4,6 +4,7 @@ import { useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView } from "react-native";
 import { Choice } from "@/components/choice";
 import { Button, Card, ErrorText, Field, Muted } from "@/components/ui";
+import { VehiclePreview } from "@/components/vehicle-preview";
 import { api, ApiError } from "@/lib/api";
 
 /** A5 — Araç ekle: plaka, araç tipi, kasa tipi, tonaj. Belge fotoğrafları dosya deposu kararıyla (rehber §4). */
@@ -45,6 +46,7 @@ export default function AracYeni() {
           <Field label="Plaka" placeholder="ör. 09 ABC 123" autoCapitalize="characters" autoCorrect={false} value={plate} onChangeText={setPlate} error={errors.plate} />
           <Choice label="Araç tipi" options={VEHICLE_TYPES} value={vehicleType} onChange={setVehicleType} error={errors.vehicleType} />
           <Choice label="Kasa tipi" options={BODY_TYPES} value={bodyType} onChange={setBodyType} error={errors.bodyType} />
+          <VehiclePreview vehicle={vehicleType} body={bodyType} />
           <Field label="Taşıma kapasitesi (ton)" keyboardType="decimal-pad" placeholder="ör. 25" value={ton} onChangeText={setTon} error={errors.ton} />
           <Muted>Ruhsat, K belgesi ve SRC fotoğrafları sonraki sürümde eklenecek.</Muted>
         </Card>

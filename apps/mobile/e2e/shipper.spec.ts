@@ -59,6 +59,9 @@ test("yük sahibi: giriş → ilan → teyit → teklif kabul → teslim → pua
     await page.getByLabel("Ağırlık (ton)").locator("visible=true").fill("18");
     await vis(page, "Tır", true).click();
     await vis(page, "Tenteli", true).click();
+    // Araç tanıma: seçilen tipin resmi ve açıklaması
+    await expect(page.getByTestId("vehicle-preview").locator("visible=true")).toContainText("Çekici ve yarı römorktan oluşur");
+    await expect(page.getByTestId("vehicle-preview").locator("visible=true")).toContainText("Brandayla örtülü");
     // F7: güzergâh + araç seçilince tahmini aralık (Nazilli → Esenyurt ~ 600 km)
     await expect(vis(page, /^Tahmini piyasa aralığı: [\d.]+ ₺ – [\d.]+ ₺ \((karayolu|yaklaşık) \d+ km/)).toBeVisible();
     await vis(page, "Sabit fiyat", true).click();

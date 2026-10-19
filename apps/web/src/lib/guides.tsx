@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { RETURN_PLAN_PARAMS } from "@nakliye/shared";
+import { VehicleExplorer } from "@/components/vehicle-3d/vehicle-explorer";
 import type { GuideSlug } from "./guide-slugs";
 
 // Rehber yazıları (SEO). Yasal bilgiler resmî metinlerden doğrulandı (2026-10-17): Karayolu Taşıma Yönetmeliği (KTY,
@@ -115,6 +116,11 @@ export const GUIDES: Guide[] = [
     sources: [KTY],
     body: (
       <>
+        <section>
+          <h2>Araçları tanıyın</h2>
+          <p>Araç ve kasa tipine dokunun; görseli sürükleyerek çevirebilirsiniz.</p>
+          <VehicleExplorer />
+        </section>
         <section>
           <h2>Yönetmelikte kamyon ve kamyonet</h2>
           <p>

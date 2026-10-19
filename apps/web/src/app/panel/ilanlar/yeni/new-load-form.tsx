@@ -1,10 +1,11 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { BODY_TYPES, CARGO_TYPES, VEHICLE_TYPES } from "@nakliye/shared";
+import { BODY_TYPES, CARGO_TYPES, VEHICLE_TYPES, type BodyType, type VehicleType } from "@nakliye/shared";
 import { Field, invalid, selectClass, submitWithoutReset } from "@/components/field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { VehicleHelpDialog } from "@/components/vehicle-3d/vehicle-help-dialog";
 import type { Province } from "@/lib/types";
 import { tl } from "@/lib/format";
 import { createLoadAction, estimatePriceAction, type FormState, type PriceEstimate } from "../actions";
@@ -154,6 +155,11 @@ export function NewLoadForm({ provinces, today, maxDay, draft }: { provinces: Pr
             </select>
           </Field>
         </div>
+        <VehicleHelpDialog
+          vehicle={(v.vehicleType || null) as VehicleType | null}
+          body={(v.bodyType || null) as BodyType | null}
+          onPick={(vehicleType, bodyType) => setV((s) => ({ ...s, vehicleType, bodyType: bodyType ?? "" }))}
+        />
       </section>
 
       <section className="space-y-4">
