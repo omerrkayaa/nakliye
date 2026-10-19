@@ -51,7 +51,9 @@ export default async function RouteLandingPage({ params }: PageProps<"/nakliye/[
           </p>
         </div>
 
-        <Suspense fallback={<p className="text-muted-foreground">Güncel bilgiler yükleniyor…</p>}>
+        {/* İlan sayısı + fiyat tablosu için yer ayrılır (ölçülen: 390 px'te 539, sm ve üstünde 479 px): yoksa sonradan
+            gelince altındaki "İlan ver" kutusu ve güzergâh listesi aşağı kayıyordu (CLS, telefonda 0,31) */}
+        <Suspense fallback={<p className="min-h-[539px] text-muted-foreground sm:min-h-[479px]">Güncel bilgiler yükleniyor…</p>}>
           <Live route={r} />
         </Suspense>
 

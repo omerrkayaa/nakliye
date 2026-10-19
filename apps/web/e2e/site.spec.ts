@@ -118,15 +118,21 @@ test("rehber: alt bilgiden dizine, dizinden yazıya; son kontrol tarihi, kaynakl
   await expect(page).toHaveURL(/rehber$/);
   const items = page.getByRole("main").getByRole("listitem");
   await expect(items).toHaveCount(4);
-  await page.getByRole("link", { name: /Nakliyede gerekli belgeler/ }).click();
+  await page.getByRole("link", { name: /Nakliye belgeleri/ }).click();
   await expect(page).toHaveURL(/rehber\/nakliye-belgeleri$/);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Nakliyede gerekli belgeler: K belgesi, SRC ve irsaliye");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Nakliye belgeleri: K belgesi, SRC ve irsaliye");
   await expect(page.getByText(/^Son kontrol: /)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Kaynaklar" })).toBeVisible();
   await expect(page.getByText("hukuki ya da mali danışmanlık değildir")).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Diğer rehberler" }).getByRole("link")).toHaveCount(3);
+  // Paylaşım önizlemesi: yazının kendi görseli (proxy'nin 404 kuralı görseli de kesiyordu)
+  const og = await page.locator('meta[property="og:image"]').getAttribute("content");
+  const img = await page.request.get(og!);
+  expect(img.status()).toBe(200);
+  expect(img.headers()["content-type"]).toBe("image/png");
   const r = await page.goto("/rehber/olmayan-yazi");
   expect(r?.status()).toBe(404);
+  expect((await page.request.get("/rehber/olmayan-yazi/opengraph-image")).status()).toBe(404);
 });
 
 test("nakliyeci profili: kapalıyken bulunamadı; açınca firma, seviye, iş, puan ve araçlar; telefon, ad ve plaka yok; iki temada WCAG AA", async ({ page }) => {

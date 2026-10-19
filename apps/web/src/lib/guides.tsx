@@ -34,7 +34,7 @@ const A = ({ href, children }: { href: string; children: ReactNode }) => (
 export const GUIDES: Guide[] = [
   {
     slug: "nakliye-belgeleri",
-    title: "Nakliyede gerekli belgeler: K belgesi, SRC ve irsaliye",
+    title: "Nakliye belgeleri: K belgesi, SRC ve irsaliye",
     description: "K1, K2, K3 yetki belgeleri, SRC3 ve SRC4, taşıma senedi, taşıma ve sevk irsaliyesi, U-ETDS bildirimi: yurt içi yük taşımada hangi belge ne işe yarar?",
     checked: "17 Ekim 2026",
     sources: [KTY, KTY_2025, MYB],
@@ -109,7 +109,7 @@ export const GUIDES: Guide[] = [
   },
   {
     slug: "arac-tipleri",
-    title: "Nakliye araç tipleri: tır, kırkayak, kamyon, kamyonet, panelvan",
+    title: "Nakliye araç tipleri: tırdan panelvana",
     description: "Hangi yük için hangi araç? Tır, kırkayak, kamyon, kamyonet ve panelvan arasındaki fark, kasa tipleri ve yaklaşık taşıma kapasiteleri.",
     checked: "17 Ekim 2026",
     sources: [KTY],

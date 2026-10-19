@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, BellRing, FileSpreadsheet, KeyRound, RefreshCcw, Share2, Smartphone, Star } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -12,6 +13,14 @@ import { RouteForm } from "@/components/route-form";
 import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { buttonVariants } from "@/components/ui/button";
 import { PROVINCES, ROUTE_PAGES } from "@/lib/route-pages";
+
+// Arama sonucunda yalnız "Nakliye" görünüyordu (düzenin varsayılan başlığı); başlık ≤ 60, açıklama ≤ 160 karakter
+export const metadata: Metadata = {
+  title: { absolute: "Teyitli yük ilanları, nakliyeci ve dönüş yükü · Nakliye" },
+  description:
+    "Yük sahibiyle nakliyeciyi buluşturan platform: sahibine düzenli teyit ettirilen ilanlar, teklif karşılaştırma, kodla teslim ve dönüş yükü önerisi.",
+  alternates: { canonical: "/" },
+};
 
 const FEATURES: [LucideIcon, string, string][] = [
   [RefreshCcw, "Canlı ilan teyidi", "İlan sahibine düzenli olarak “hâlâ geçerli mi?” diye sorulur. Cevapsız ilan listeden düşer; bayat ilanla vakit kaybetmezsiniz."],
@@ -127,7 +136,8 @@ export default function Home() {
             <h2 id="guzergahlar" className="text-2xl font-bold">
               Güzergâhlar
             </h2>
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {/* Telefonda iki sütun ve görünen metinde "nakliye" yok (bağlantı adında var): tek sütunda 72 bağlantı ~2.400 px'ti */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:gap-6 lg:grid-cols-3">
               {PROVINCES.map((p) => (
                 <div key={p.slug} className="space-y-2">
                   <h3 className="font-semibold">{p.name} çıkışlı</h3>
@@ -135,7 +145,8 @@ export default function Home() {
                     {ROUTE_PAGES.filter((r) => r.from === p).map((r) => (
                       <li key={r.slug}>
                         <Link href={r.path} className="text-primary underline-offset-4 hover:underline">
-                          {r.from.name} – {r.to.name} nakliye
+                          {r.from.name} – {r.to.name}
+                          <span className="max-sm:sr-only"> nakliye</span>
                         </Link>
                       </li>
                     ))}

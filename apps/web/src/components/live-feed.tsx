@@ -15,7 +15,16 @@ export function LiveFeed() {
   return (
     <section aria-labelledby="akis-baslik" className="border-t">
       <div className="mx-auto max-w-5xl space-y-6 px-4 py-14">
-        <Suspense fallback={<FeedShell title="Şu an yayındaki ilanlar" />}>
+        {/* Kartlar için yer ayrılır (ölçülen ızgara: telefonda 3 kart 488, sm 512, lg 344 px): 1920×1080'de akış ekranda,
+            kartlar sonradan gelince altındaki bölümler kayardı */}
+        <Suspense
+          fallback={
+            <>
+              <FeedShell title="Şu an yayındaki ilanlar" />
+              <div aria-hidden className="min-h-[488px] sm:min-h-[512px] lg:min-h-[344px]" />
+            </>
+          }
+        >
           <Feed />
         </Suspense>
       </div>

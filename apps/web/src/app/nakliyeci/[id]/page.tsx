@@ -36,7 +36,8 @@ export default function CarrierProfilePage({ params }: PageProps<"/nakliyeci/[id
     <>
       <SiteHeader />
       <main className="mx-auto w-full max-w-3xl flex-1 space-y-8 px-4 py-10">
-        <Suspense fallback={<p className="text-muted-foreground">Yükleniyor…</p>}>
+        {/* Profil için yer ayrılır (ölçülen: 390 px'te ~950, sm ve üstünde 690 px): yoksa profil gelince alt bilgi kayıyordu (CLS) */}
+        <Suspense fallback={<p className="min-h-[760px] text-muted-foreground sm:min-h-[690px]">Yükleniyor…</p>}>
           <Profile params={params} />
         </Suspense>
       </main>

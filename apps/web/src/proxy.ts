@@ -22,10 +22,11 @@ export async function proxy(req: NextRequest) {
     const known = routePage(slug!) && (sub.length === 0 || (sub.length === 1 && sub[0] === "opengraph-image"));
     return known ? NextResponse.next() : NextResponse.rewrite(new URL("/404", req.url));
   }
-  // Rehber yazıları: aynı sebeple bilinmeyen yazı render edilmeden 404
+  // Rehber yazıları: aynı sebeple bilinmeyen yazı render edilmeden 404 (yazı ya da önizleme görseli)
   if (req.nextUrl.pathname.startsWith("/rehber/")) {
     const [slug, ...sub] = req.nextUrl.pathname.slice("/rehber/".length).split("/");
-    return isGuideSlug(slug!) && sub.length === 0 ? NextResponse.next() : NextResponse.rewrite(new URL("/404", req.url));
+    const known = isGuideSlug(slug!) && (sub.length === 0 || (sub.length === 1 && sub[0] === "opengraph-image"));
+    return known ? NextResponse.next() : NextResponse.rewrite(new URL("/404", req.url));
   }
   const access = req.cookies.get(ACCESS_COOKIE)?.value;
   const refresh = req.cookies.get(REFRESH_COOKIE)?.value;

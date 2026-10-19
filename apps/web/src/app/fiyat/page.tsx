@@ -30,7 +30,7 @@ export default function PricePage({ searchParams }: PageProps<"/fiyat">) {
           <p className="text-lg text-muted-foreground">İki il seçin; karayolu mesafesini ve araç tipine göre tahmini taşıma ücretini görün.</p>
         </div>
         <Suspense fallback={<PriceForm />}>
-          <Result searchParams={searchParams} />
+          <Calculator searchParams={searchParams} />
         </Suspense>
         <section aria-labelledby="nasil-hesap" className="space-y-2 rounded-lg border bg-muted/40 p-5 text-sm">
           <h2 id="nasil-hesap" className="flex items-center gap-2 text-base font-semibold">
@@ -51,7 +51,11 @@ export default function PricePage({ searchParams }: PageProps<"/fiyat">) {
   );
 }
 
-async function Result({ searchParams }: { searchParams: PageProps<"/fiyat">["searchParams"] }) {
+/**
+ * İki aşama: adres parametreleri hemen okunur; il çifti geçerliyse sonuç gelene kadar sonuçla aynı yükseklikte yer
+ * ayrılır. Yer ayrılmazsa sonuç sonradan gelince altındaki açıklama kutusu ve alt bilgi aşağı kayıyordu (CLS, telefonda 0,23).
+ */
+async function Calculator({ searchParams }: { searchParams: PageProps<"/fiyat">["searchParams"] }) {
   const q = await searchParams;
   const from = Number(q.nereden), to = Number(q.nereye);
   const picked = PROVINCE_IDS.has(from) && PROVINCE_IDS.has(to);
@@ -59,18 +63,34 @@ async function Result({ searchParams }: { searchParams: PageProps<"/fiyat">["sea
   if (q.nereden === undefined && q.nereye === undefined) return form;
   if (!picked) return <Problem form={form} text="İl bulunamadı. Listeden iki il seçin." />;
   if (from === to) return <Problem form={form} text="Kalkış ve varış ili farklı olmalı." />;
+  return (
+    <>
+      {form}
+      <Suspense fallback={<p className={`${RESULT_HEIGHT} text-muted-foreground`}>Hesaplanıyor…</p>}>
+        <Result from={from} to={to} />
+      </Suspense>
+    </>
+  );
+}
 
+/** Sonuç bölümünün ölçülen yüksekliği: 390 px'te ~460–490, sm ve üstünde 417 px */
+const RESULT_HEIGHT = "min-h-[470px] sm:min-h-[417px]";
+
+async function Result({ from, to }: { from: number; to: number }) {
   let s: RouteSummary;
   try {
     s = await api<RouteSummary>(`/public/routes/${from}/${to}`, { auth: false });
   } catch (e) {
     if (!(e instanceof ApiError)) throw e;
-    return <Problem form={form} text="Şu an hesaplanamadı, biraz sonra yeniden deneyin." />;
+    return (
+      <p role="alert" className="text-sm font-medium text-destructive">
+        Şu an hesaplanamadı, biraz sonra yeniden deneyin.
+      </p>
+    );
   }
   const page = ROUTE_PAGES.find((r) => r.from.id === from && r.to.id === to);
   return (
     <>
-      {form}
       <section aria-labelledby="sonuc" className="space-y-3">
         <h2 id="sonuc" className="text-2xl font-bold">
           {s.from.name} → {s.to.name}: {s.source === "karayolu" ? "" : "yaklaşık "}
