@@ -15,7 +15,8 @@
     "test:e2e": "node test/run-all.mjs api.log",
     "db:seed-demo": "node scripts/seed-demo.mts",
     "db:backup": "node scripts/backup.mjs",
-    "db:backup:check": "node scripts/backup.mjs --check"
+    "db:backup:check": "node scripts/backup.mjs --check",
+    "demo:reset": "node scripts/demo-reset.mjs"
   },
   "dependencies": {
     "@nakliye/shared": "*",
