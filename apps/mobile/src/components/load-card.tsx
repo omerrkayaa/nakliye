@@ -66,6 +66,8 @@ export function LoadCard({ load, onPress, onCall, calling }: { load: Load; onPre
           <Text style={{ fontSize: 15, fontWeight: "600", color: C.text }}>{dayRange(load.loadFrom, load.loadTo)}</Text>
         </View>
         <Muted>{loadSpec(load)}</Muted>
+        {/* Yakınımdakiler: API yalnız konumla arandığında mesafe döner */}
+        {load.distanceKm !== undefined && <Muted>Kalkış {Math.round(load.distanceKm)} km uzakta</Muted>}
         <Text style={{ fontSize: 18, fontWeight: "800", color: C.primary }}>{priceText(load)}</Text>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
           {load.shipper.verified && <Badge tone="ok" icon="shield-checkmark" label="Doğrulanmış" />}

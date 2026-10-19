@@ -23,7 +23,7 @@ const DIFFERENCES: [LucideIcon, string, string][] = [
 const NOT_DOING = [
   "WhatsApp gruplarından ya da başka sitelerden ilan toplamıyoruz.",
   "Ödemeye aracılık etmiyoruz: fiyat, ödeme ve taşıma yük sahibiyle nakliyeci arasındadır.",
-  "Konum takibi yapmıyoruz; uygulama telefonun konumunu istemez.",
+  "Konum takibi yapmıyoruz: konum yalnız \"Yakınımdakiler\"e dokununca bir kez alınır, saklanmaz ve arka planda izlenmez.",
 ];
 
 /** Hakkımızda: neden, nasıl farklı, bilerek yapmadıklarımız, kim geliştiriyor. Köşeli parantezli bilgiler kullanıcı tarafından doldurulacak. */

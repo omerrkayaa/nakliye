@@ -37,6 +37,12 @@
       "expo-secure-store",
       "expo-sharing",
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Yakınınızdaki yükleri göstermek için konumunuz bir kez alınır; saklanmaz ve arka planda izlenmez."
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "cameraPermission": "Araç ruhsatı ve belge fotoğrafı çekmek için kameraya erişim gerekiyor.",
