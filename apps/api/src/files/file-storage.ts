@@ -4,7 +4,7 @@ import { dirname, resolve, sep } from "node:path";
 import { randomUUID } from "node:crypto";
 
 /**
- * Dosya deposu arayüzü (S3 benzeri: anahtarla koy/al/sil). 2026-10-12 karar: şimdilik yerel disk; yayına yakın
+ * Dosya deposu arayüzü (S3 benzeri: anahtarla koy/al/sil). 2026-10-12 kararı: şimdilik yerel disk; yayına yakın
  * gerçek depoya (S3 uyumlu) geçilirken yalnız bu arayüzün başka bir gerçekleştirmesi yazılır.
  */
 export interface FileStorage {

@@ -22,7 +22,7 @@ export const ADMIN_MFA_MS = 12 * HOUR_MS;
 const mfaFresh = (mfaAt: Date | null, now = new Date()) => !!mfaAt && mfaAt <= now && now.getTime() - mfaAt.getTime() < ADMIN_MFA_MS;
 
 /**
- * NFR-04 kod isteği sınırları (2026-10-14 karar: numara başına günde ~5–10, IP başına saatte ~20 farklı
+ * NFR-04 kod isteği sınırları (2026-10-14 kararı: numara başına günde ~5–10, IP başına saatte ~20 farklı
  * numara). Ortam değişkeniyle değişir; 0 = kapalı. Test sunucusunda IP sınırı kapalı çalışır (tüm takımlar tek
  * makineden yüzlerce numarayla girer); güvenlik takımı sınırları açık kendi sunucusunu başlatır.
  */

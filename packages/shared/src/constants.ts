@@ -152,7 +152,7 @@ export type UserStatus = keyof typeof USER_STATUS_LABELS;
 /** Silinen hesabın her yerde görünen adı (FR-07; telefonu ve firması silinir). */
 export const DELETED_USER_NAME = "Silinmiş kullanıcı";
 /**
- * Hesap silme süreleri (FR-07, 2026-10-13 karar). Nitelikli açık şikayet silmeyi en çok
+ * Hesap silme süreleri (FR-07, 2026-10-13 kararı). Nitelikli açık şikayet silmeyi en çok
  * `reportHoldDays` erteler (ilk ertelenen istekten; KVKK başvuruyu en geç 30 günde sonuçlandırmayı ister).
  * `holdRequestValidDays`'ten eski istek yeni başvuru sayılır. Silinen numaranın anahtarlı özeti `restoreDays`
  * saklanır: bu sürede aynı numarayla giriş eski hesabı (puanlar, geçmiş) geri açar; ama silmeden sonraki

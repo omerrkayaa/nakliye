@@ -20,7 +20,7 @@ export function DistrictField({
   onChange: (districtId: number | null) => void;
   allLabel?: string;
 }) {
-  // İlçe kimliği = plaka × 100 + sıra (rehber §3): seçili ilçenin ili kimlikten bulunur
+  // İlçe kimliği = plaka × 100 + sıra: seçili ilçenin ili kimlikten bulunur
   const [provinceId, setProvinceId] = useState<number | null>(value ? Math.floor(value / 100) : null);
   const province = provinces.find((p) => p.id === provinceId);
   return (

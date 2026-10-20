@@ -1,5 +1,5 @@
 /**
- * Görüşme demosu için ek veri (docs/07-demo-senaryosu.md), seed-demo.mts'nin üstüne:
+ * Görüşme demosu için ek veri, seed-demo.mts'nin üstüne:
  * - Üç nakliyeci daha (geçmiş işleri ve puanları farklı) ve Demo Nakliyeci'ye geçmiş: teklif karşılaştırması anlamlı olsun.
  * - Selin Aydın'ın teklif usulü Efeler → Bağcılar ilanına üç bekleyen teklif (+ bildirimleri).
  * - Demo Nakliyeci'nin yolda olan işi (Efeler → Tuzla, dün yüklendi; teslim kodu DELIVERY_CODE) ve dönüş yönünde

@@ -1,7 +1,7 @@
 # 04 — Sistem Tasarımı
 
 > Tarih: 2026-10-06 · Girdi: `03-sistem-analizi.md`
-> ⚠️ Teknoloji yığını **öneridir**. Kodlamaya başlamadan önce kesinleştirilecek (bkz. rehber, "Bekleyen kararlar").
+> ⚠️ Teknoloji yığını **öneridir**. Kodlamaya başlamadan önce kesinleştirilecek.
 
 ---
 

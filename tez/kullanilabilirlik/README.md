@@ -2,7 +2,7 @@
 
 **Gereksinim (docs/03 NFR-07):** ilk ilanı vermek < 90 sn; yük aramaktan aramaya < 3 dokunuş.
 
-Bu bir **analitik ölçüm**dür, gerçek kişiyle yapılan deneme değildir; o deneme rehber §4'te bekliyor.
+Bu bir **analitik ölçüm**dür, gerçek kişiyle yapılan deneme değildir; o deneme henüz yapılmadı.
 
 ## Yöntem
 
@@ -12,7 +12,7 @@ Testler:
 
 Ortak sayaç `e2e/usability.ts`. İki pakette de aynı dosya var.
 
-Çalıştırmak için önce API'yi, web'i ve Expo'yu rehber §5b'deki gibi açın, sonra:
+Çalıştırmak için önce API'yi, web'i ve Expo'yu açın, sonra:
 
 ```
 cd apps/mobile && NFR07_OUT=../../tez/kullanilabilirlik/sonuclar npx playwright test e2e/usability.spec.ts
@@ -91,7 +91,7 @@ Tuşların dağılımı:
 **Sonuç: karşılanıyor.**
 - KLM tipik değerine göre yeni bir hesap ilk ilanını iki platformda da ~52 sn'de veriyor. Yalnız form ~34 sn.
 - Kötü durumda (her tuş 1,2 sn, klavyeye yabancı biri) süre mobilde 81, web'de 86–87 sn. Hedefin altında ama pay az.
-- KLM, ekranı ilk kez gören birinin arayıp okumaya harcadığı zamanı katmaz. Bu yüzden asıl kanıt gerçek kişiyle süre tutulan deneme olacak (rehber §4).
+- KLM, ekranı ilk kez gören birinin arayıp okumaya harcadığı zamanı katmaz. Bu yüzden asıl kanıt gerçek kişiyle süre tutulan deneme olacak.
 
 ### Yük aramaktan aramaya (hedef < 3 dokunuş)
 
@@ -111,7 +111,7 @@ Bu akış mobilde, nakliyecinin yük akışında ölçüldü (demo hesabı).
 
 ## Bulgular ve öneriler
 
-İlk üçü 2026-10-16'da onayımla uygulandı. Yukarıdaki mobil sayılar bu düzeltmelerden sonraki ölçüm.
+İlk üçü 2026-10-16'da uyguladım. Yukarıdaki mobil sayılar bu düzeltmelerden sonraki ölçüm.
 
 1. **Mobil rol ekranında "Nakliyeciyim" önceden seçili geliyor.**
    - Yük sahibi önce o seçimi kaldırmak zorunda; bu fazladan bir dokunuş ve bir karar.

@@ -22,7 +22,7 @@ export interface TrustStats {
 /**
  * Güven skoru (BR-30, FR-42). Girdileri değiştiren olaylarda yeniden hesaplanır: puan görünür oldu, iş oluştu,
  * tamamlandı ya da iptal edildi. Puanlar yalnız görünür olunca sayılır (kör puanlama).
- * BR-06 (teyitsiz düşen ilan) formülde terimi olmadığı için henüz uygulanmadı (rehber §4).
+ * BR-06 (teyitsiz düşen ilan) formülde terimi olmadığı için henüz uygulanmadı (açık karar).
  */
 @Injectable()
 export class TrustService {

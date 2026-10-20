@@ -3,7 +3,7 @@
 //
 //   npm run demo:reset     (apps/api içinden; Docker'da db ve osrm açık olmalı)
 //
-// Sonra API'yi bu veritabanıyla başlatın (docs/07-demo-senaryosu.md):
+// Sonra API'yi bu veritabanıyla başlatın:
 //   DATABASE_URL=postgres://nakliye:nakliye@localhost:5432/nakliye_demo node dist/main.js
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";

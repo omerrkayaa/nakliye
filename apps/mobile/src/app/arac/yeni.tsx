@@ -7,7 +7,7 @@ import { Button, Card, ErrorText, Field, Muted } from "@/components/ui";
 import { VehiclePreview } from "@/components/vehicle-preview";
 import { api, ApiError } from "@/lib/api";
 
-/** A5 — Araç ekle: plaka, araç tipi, kasa tipi, tonaj. Belge fotoğrafları dosya deposu kararıyla (rehber §4). */
+/** A5 — Araç ekle: plaka, araç tipi, kasa tipi, tonaj. Belge fotoğrafları dosya deposu kararıyla. */
 export default function AracYeni() {
   const [plate, setPlate] = useState("");
   const [vehicleType, setVehicleType] = useState<VehicleType | null>(null);
